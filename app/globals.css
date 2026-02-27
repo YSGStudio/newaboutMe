@@ -8,6 +8,7 @@
   --border: #d9e2f0;
   --danger: #c62828;
   --ok: #2e7d32;
+  --info: #0f5cc0;
 }
 
 * {
@@ -32,6 +33,20 @@ main {
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.header-actions {
+  min-width: 200px;
 }
 
 .grid {
@@ -71,6 +86,12 @@ button {
   color: white;
   border: none;
   cursor: pointer;
+  min-height: 44px;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 button.ghost {
@@ -91,14 +112,30 @@ p.hint {
   margin-bottom: 0;
 }
 
-.error {
-  color: var(--danger);
+.notice {
+  margin: 8px 0 0;
   font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }
 
-.success {
+.notice.success {
   color: var(--ok);
-  font-size: 14px;
+  background: #e9f7ed;
+  border-color: #c6e8ce;
+}
+
+.notice.error {
+  color: var(--danger);
+  background: #fdeceb;
+  border-color: #f5c8c5;
+}
+
+.notice.info {
+  color: var(--info);
+  background: #eaf3ff;
+  border-color: #c8dcff;
 }
 
 .row {
@@ -118,4 +155,70 @@ p.hint {
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.tab {
+  width: auto;
+  padding: 10px 14px;
+  background: #edf3ff;
+  color: #365a91;
+  border-radius: 10px;
+  border: 1px solid #d5e2fb;
+  font-weight: 600;
+}
+
+.tab.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e8edf6;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #edf2fb;
+}
+
+.table th {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .sticky-header {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
