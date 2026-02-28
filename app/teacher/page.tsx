@@ -6,6 +6,7 @@ import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
+import StatsDashboard from '@/components/teacher/StatsDashboard';
 
 type ClassItem = {
   id: string;
@@ -35,7 +36,7 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'stats'>('class');
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -304,10 +305,11 @@ export default function TeacherPage() {
             <Tabs
               items={[
                 { key: 'class', label: '학급 관리' },
-                { key: 'student', label: '학생 관리' }
+                { key: 'student', label: '학생 관리' },
+                { key: 'stats', label: '통계 대시보드' }
               ]}
               value={activeTab}
-              onChange={(key) => setActiveTab(key as 'class' | 'student')}
+              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'stats')}
             />
           </section>
 
@@ -401,6 +403,8 @@ export default function TeacherPage() {
               </div>
             </section>
           )}
+
+          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
         </>
       )}
     </main>
