@@ -19,7 +19,7 @@ export default function HomePage() {
 
         <article className="card">
           <h2>학생 화면</h2>
-          <p>학급코드+번호+PIN 로그인, 피드 작성/반응, 계획 체크</p>
+          <p>학급코드+이름 로그인, 피드 작성/반응, 계획 체크</p>
           <Link href="/student">
             <button className="ghost">학생 페이지 열기</button>
           </Link>

@@ -19,7 +19,6 @@ type StudentItem = {
   id: string;
   name: string;
   student_number: number;
-  pin_code: string;
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -41,11 +40,12 @@ export default function TeacherPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState<StudentItem[]>([]);
-  const [showPin, setShowPin] = useState(false);
+  const [hasTeacherSession, setHasTeacherSession] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
+  const [deletingClassId, setDeletingClassId] = useState('');
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -63,11 +63,16 @@ export default function TeacherPage() {
     try {
       const data = await api<{ classes: ClassItem[] }>('/api/classes');
       setClasses(data.classes);
+      setHasTeacherSession(true);
       if (data.classes.length > 0 && !selectedClassId) {
         setSelectedClassId(data.classes[0].id);
+      } else if (data.classes.length === 0) {
+        setSelectedClassId('');
+        setStudents([]);
       }
     } catch {
       setClasses([]);
+      setHasTeacherSession(false);
     }
   }, [selectedClassId]);
 
@@ -110,6 +115,7 @@ export default function TeacherPage() {
         });
       }
       setAuthMessage('인증 성공. 학급 데이터를 불러옵니다.');
+      setHasTeacherSession(true);
       await loadClasses();
       clearNoticeLater();
     } catch (error) {
@@ -182,11 +188,36 @@ export default function TeacherPage() {
     setClasses([]);
     setStudents([]);
     setSelectedClassId('');
+    setHasTeacherSession(false);
     setAuthMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
 
-  const isAuthed = classes.length > 0 || Boolean(selectedClassId);
+  const onDeleteClass = async (classId: string) => {
+    const confirmed = window.confirm('학급을 즉시 삭제할까요? 학생/피드/계획 데이터도 함께 삭제됩니다.');
+    if (!confirmed) return;
+
+    setDeletingClassId(classId);
+    setAuthError('');
+
+    try {
+      await api(`/api/classes/${classId}`, { method: 'DELETE' });
+      if (selectedClassId === classId) {
+        setSelectedClassId('');
+        setStudents([]);
+      }
+      await loadClasses();
+      setAuthMessage('학급이 삭제되었습니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setAuthError((error as Error).message);
+      clearNoticeLater();
+    } finally {
+      setDeletingClassId('');
+    }
+  };
+
+  const isAuthed = hasTeacherSession;
 
   return (
     <main className="grid" style={{ gap: 16 }}>
@@ -313,6 +344,14 @@ export default function TeacherPage() {
                         <p className="hint" style={{ marginTop: 4 }}>
                           {c.grade}학년 {c.section}반 / 코드 {c.class_code}
                         </p>
+                        <button
+                          type="button"
+                          className="outline"
+                          onClick={() => onDeleteClass(c.id)}
+                          disabled={deletingClassId === c.id}
+                        >
+                          {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -337,12 +376,7 @@ export default function TeacherPage() {
               </form>
 
               <div style={{ marginTop: 16 }}>
-                <div className="row space-between">
-                  <h3 style={{ margin: 0 }}>학생 목록</h3>
-                  <button className="outline" type="button" style={{ width: 120 }} onClick={() => setShowPin((v) => !v)}>
-                    PIN {showPin ? '숨기기' : '보기'}
-                  </button>
-                </div>
+                <h3 style={{ margin: 0 }}>학생 목록</h3>
 
                 {students.length === 0 ? (
                   <EmptyState title="등록된 학생이 없습니다" description="학생을 추가하면 이곳에 표시됩니다." />
@@ -352,7 +386,6 @@ export default function TeacherPage() {
                       <tr>
                         <th>번호</th>
                         <th>이름</th>
-                        <th>PIN</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -360,7 +393,6 @@ export default function TeacherPage() {
                         <tr key={student.id}>
                           <td>{student.student_number}</td>
                           <td>{student.name}</td>
-                          <td>{showPin ? student.pin_code : '••••'}</td>
                         </tr>
                       ))}
                     </tbody>

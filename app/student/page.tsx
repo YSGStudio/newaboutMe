@@ -33,6 +33,7 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 export default function StudentPage() {
   const [classId, setClassId] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [timelineDate, setTimelineDate] = useState(new Date().toISOString().slice(0, 10));
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [feeds, setFeeds] = useState<FeedRow[]>([]);
   const [message, setMessage] = useState('');
@@ -62,8 +63,8 @@ export default function StudentPage() {
     setPlans(data.plans);
   };
 
-  const loadFeeds = async (targetClassId: string) => {
-    const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}`);
+  const loadFeeds = async (targetClassId: string, date: string = timelineDate) => {
+    const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}?date=${date}`);
     setFeeds(data.feeds);
   };
 
@@ -82,14 +83,13 @@ export default function StudentPage() {
         method: 'POST',
         body: JSON.stringify({
           classCode: String(form.get('classCode')).toUpperCase(),
-          studentNumber: Number(form.get('studentNumber')),
-          pinCode: String(form.get('pinCode'))
+          name: String(form.get('name'))
         })
       });
 
       setClassId(data.class.id);
       setStudentName(data.student.name);
-      await Promise.all([loadPlans(), loadFeeds(data.class.id)]);
+      await Promise.all([loadPlans(), loadFeeds(data.class.id, timelineDate)]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -146,7 +146,7 @@ export default function StudentPage() {
         })
       });
       formEl.reset();
-      if (classId) await loadFeeds(classId);
+      if (classId) await loadFeeds(classId, timelineDate);
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -163,7 +163,7 @@ export default function StudentPage() {
         method: 'POST',
         body: JSON.stringify({ reactionType })
       });
-      if (classId) await loadFeeds(classId);
+      if (classId) await loadFeeds(classId, timelineDate);
     } catch (err) {
       setError((err as Error).message);
       clearNoticeLater();
@@ -176,8 +176,21 @@ export default function StudentPage() {
     setStudentName('');
     setPlans([]);
     setFeeds([]);
+    setTimelineDate(new Date().toISOString().slice(0, 10));
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
+  };
+
+  const onChangeTimelineDate = async (nextDate: string) => {
+    setTimelineDate(nextDate);
+    if (classId) {
+      try {
+        await loadFeeds(classId, nextDate);
+      } catch (err) {
+        setError((err as Error).message);
+        clearNoticeLater();
+      }
+    }
   };
 
   const isLoggedIn = Boolean(studentName);
@@ -186,7 +199,7 @@ export default function StudentPage() {
     <main className="grid" style={{ gap: 16 }}>
       <PageHeader
         title="학생 홈"
-        subtitle={isLoggedIn ? `${studentName} 학생, 오늘도 화이팅!` : '학급코드, 출석번호, PIN으로 로그인하세요'}
+        subtitle={isLoggedIn ? `${studentName} 학생, 오늘도 화이팅!` : '학급코드와 이름으로 로그인하세요'}
         right={
           isLoggedIn ? (
             <button className="outline" type="button" onClick={onLogout}>
@@ -208,12 +221,8 @@ export default function StudentPage() {
               <input name="classCode" placeholder="ABC123" required maxLength={6} />
             </div>
             <div>
-              <label>출석번호</label>
-              <input name="studentNumber" type="number" min={1} max={99} required />
-            </div>
-            <div>
-              <label>PIN (4자리)</label>
-              <input name="pinCode" pattern="\d{4}" required />
+              <label>이름</label>
+              <input name="name" placeholder="김마음" required />
             </div>
             <SubmitButton loading={loginLoading} idleText="로그인" />
           </form>
@@ -227,7 +236,7 @@ export default function StudentPage() {
             <div className="grid two">
               <div className="card" style={{ padding: 12 }}>
                 <strong>감정 작성</strong>
-                <p className="hint">오늘 작성 가능한 최대 3회</p>
+                <p className="hint">오늘 작성 가능한 최대 1회</p>
               </div>
               <div className="card" style={{ padding: 12 }}>
                 <strong>계획 달성률</strong>
@@ -303,10 +312,20 @@ export default function StudentPage() {
 
           {activeTab === 'timeline' && (
             <section className="card">
-              <h2>감정 타임라인</h2>
+              <div className="row space-between" style={{ marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>감정 타임라인</h2>
+                <div style={{ width: 180 }}>
+                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
+                  <input
+                    type="date"
+                    value={timelineDate}
+                    onChange={(event) => onChangeTimelineDate(event.target.value)}
+                  />
+                </div>
+              </div>
               <div className="grid">
                 {feeds.length === 0 ? (
-                  <EmptyState title="아직 피드가 없습니다" description="첫 감정 피드를 작성해보세요." />
+                  <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택하거나 새 피드를 작성해보세요." />
                 ) : (
                   feeds.map((feed) => (
                     <div key={feed.id} className="card" style={{ padding: 12 }}>

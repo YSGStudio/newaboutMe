@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
-import { randomPin } from '@/lib/utils';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentCreateSchema } from '@/lib/validators';
 
@@ -26,7 +25,7 @@ export async function GET(_: Request, { params }: Params) {
 
   const { data, error } = await supabaseAdmin
     .from('students')
-    .select('id,name,student_number,pin_code,created_at')
+    .select('id,name,student_number,created_at')
     .eq('class_id', params.id)
     .order('student_number', { ascending: true });
 
@@ -47,17 +46,14 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const pinCode = parsed.data.pinCode ?? randomPin();
-
   const { data, error } = await supabaseAdmin
     .from('students')
     .insert({
       class_id: params.id,
       name: parsed.data.name,
-      student_number: parsed.data.studentNumber,
-      pin_code: pinCode
+      student_number: parsed.data.studentNumber
     })
-    .select('id,name,student_number,pin_code,created_at')
+    .select('id,name,student_number,created_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

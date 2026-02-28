@@ -5,8 +5,6 @@ export const randomCode = (len = 6) => {
   return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
-export const randomPin = () => Math.floor(1000 + Math.random() * 9000).toString();
-
 export const randomToken = () => randomBytes(32).toString('hex');
 
 export const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');

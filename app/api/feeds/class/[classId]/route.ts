@@ -5,7 +5,14 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 
 type Params = { params: { classId: string } };
 
-export async function GET(_: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
+  const url = new URL(req.url);
+  const queryDate = url.searchParams.get('date');
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const targetDate = queryDate && datePattern.test(queryDate) ? queryDate : new Date().toISOString().slice(0, 10);
+  const dayStart = `${targetDate}T00:00:00.000Z`;
+  const dayEnd = `${targetDate}T23:59:59.999Z`;
+
   const teacherAuth = await requireTeacher();
   let allowedClassId: string | null = null;
 
@@ -35,9 +42,11 @@ export async function GET(_: Request, { params }: Params) {
     )
     .eq('students.class_id', allowedClassId)
     .eq('is_visible', true)
+    .gte('created_at', dayStart)
+    .lte('created_at', dayEnd)
     .order('created_at', { ascending: false })
     .limit(100);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ feeds: data });
+  return NextResponse.json({ feeds: data, date: targetDate });
 }

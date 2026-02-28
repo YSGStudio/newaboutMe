@@ -19,14 +19,12 @@ export const classCreateSchema = z.object({
 
 export const studentCreateSchema = z.object({
   name: z.string().min(1).max(30),
-  studentNumber: z.number().int().min(1).max(99),
-  pinCode: z.string().regex(/^\d{4}$/).optional()
+  studentNumber: z.number().int().min(1).max(99)
 });
 
 export const studentLoginSchema = z.object({
   classCode: z.string().min(6).max(6),
-  studentNumber: z.number().int().min(1).max(99),
-  pinCode: z.string().regex(/^\d{4}$/)
+  name: z.string().min(1).max(30)
 });
 
 export const feedCreateSchema = z.object({

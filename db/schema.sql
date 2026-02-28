@@ -35,9 +35,9 @@ create table if not exists students (
   class_id uuid not null references classes (id) on delete cascade,
   name text not null,
   student_number int not null,
-  pin_code text not null,
   created_at timestamptz not null default now(),
-  unique (class_id, student_number)
+  unique (class_id, student_number),
+  unique (class_id, name)
 );
 
 create table if not exists student_sessions (

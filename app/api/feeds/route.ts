@@ -23,8 +23,8 @@ export async function POST(req: Request) {
     .eq('student_id', auth.student.id)
     .gte('created_at', todayStart.toISOString());
 
-  if ((count ?? 0) >= 3) {
-    return NextResponse.json({ error: '하루 최대 3개의 피드만 작성할 수 있습니다.' }, { status: 400 });
+  if ((count ?? 0) >= 1) {
+    return NextResponse.json({ error: '하루 최대 1개의 피드만 작성할 수 있습니다.' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin

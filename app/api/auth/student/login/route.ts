@@ -25,20 +25,25 @@ export async function POST(req: Request) {
 
   const { data: student } = await supabaseAdmin
     .from('students')
-    .select('id,name,student_number,pin_code')
+    .select('id,name,student_number')
     .eq('class_id', classRow.id)
-    .eq('student_number', parsed.data.studentNumber)
-    .maybeSingle();
+    .eq('name', parsed.data.name);
 
-  if (!student || student.pin_code !== parsed.data.pinCode) {
-    return NextResponse.json({ error: '학생 번호 또는 PIN이 올바르지 않습니다.' }, { status: 401 });
+  if (!student || student.length === 0) {
+    return NextResponse.json({ error: '이름을 확인해주세요.' }, { status: 401 });
   }
 
-  await createStudentSession(student.id);
+  if (student.length > 1) {
+    return NextResponse.json({ error: '동명이인이 있어 로그인할 수 없습니다. 교사에게 문의하세요.' }, { status: 409 });
+  }
+
+  const matchedStudent = student[0];
+
+  await createStudentSession(matchedStudent.id);
 
   return NextResponse.json({
     ok: true,
-    student: { id: student.id, name: student.name, studentNumber: student.student_number },
+    student: { id: matchedStudent.id, name: matchedStudent.name, studentNumber: matchedStudent.student_number },
     class: { id: classRow.id, className: classRow.class_name, classCode: classRow.class_code }
   });
 }
