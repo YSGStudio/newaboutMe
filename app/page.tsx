@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <main className="grid" style={{ gap: 24 }}>
       <section className="card">
-        <h1>마음일기 (MaumDiary)</h1>
+        <h1>AboutMe</h1>
         <p>기획서 기반 MVP: 교사/학생 인증, 감정 피드, 일일 계획 체크를 구현했습니다.</p>
       </section>
 

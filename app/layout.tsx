@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '마음일기 (MaumDiary)',
+  title: 'AboutMe',
   description: '초등학생 감정 피드 & 일일 계획 관리 SaaS'
 };
 
