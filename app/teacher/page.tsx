@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
+import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
 type ClassItem = {
   id: string;
@@ -20,6 +21,16 @@ type StudentItem = {
   id: string;
   name: string;
   student_number: number;
+};
+
+type FeedItem = {
+  id: string;
+  emotion_type: EmotionType;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  students: { id: string; name: string; student_number: number };
+  feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -36,16 +47,19 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'stats'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'stats'>('class');
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState<StudentItem[]>([]);
+  const [feeds, setFeeds] = useState<FeedItem[]>([]);
+  const [feedDate, setFeedDate] = useState(new Date().toISOString().slice(0, 10));
   const [hasTeacherSession, setHasTeacherSession] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
 
@@ -84,6 +98,17 @@ export default function TeacherPage() {
     setStudents(data.students);
   }, []);
 
+  const loadFeeds = useCallback(async (classId: string, date: string) => {
+    if (!classId) return;
+    setFeedLoading(true);
+    try {
+      const data = await api<{ feeds: FeedItem[] }>(`/api/feeds/class/${classId}?date=${date}`);
+      setFeeds(data.feeds);
+    } finally {
+      setFeedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadClasses();
   }, [loadClasses]);
@@ -91,8 +116,16 @@ export default function TeacherPage() {
   useEffect(() => {
     if (selectedClassId) {
       loadStudents(selectedClassId).catch((err: Error) => setAuthError(err.message));
+    } else {
+      setFeeds([]);
     }
   }, [selectedClassId, loadStudents]);
+
+  useEffect(() => {
+    if (activeTab === 'feed' && selectedClassId) {
+      loadFeeds(selectedClassId, feedDate).catch((err: Error) => setAuthError(err.message));
+    }
+  }, [activeTab, selectedClassId, feedDate, loadFeeds]);
 
   const onTeacherAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -189,6 +222,7 @@ export default function TeacherPage() {
     await api('/api/auth/teacher/logout', { method: 'POST' });
     setClasses([]);
     setStudents([]);
+    setFeeds([]);
     setSelectedClassId('');
     setHasTeacherSession(false);
     setAuthMessage('로그아웃 되었습니다.');
@@ -242,6 +276,10 @@ export default function TeacherPage() {
   };
 
   const isAuthed = hasTeacherSession;
+
+  const onChangeFeedDate = (nextDate: string) => {
+    setFeedDate(nextDate);
+  };
 
   return (
     <main className="grid" style={{ gap: 16 }}>
@@ -329,10 +367,11 @@ export default function TeacherPage() {
               items={[
                 { key: 'class', label: '학급 관리' },
                 { key: 'student', label: '학생 관리' },
+                { key: 'feed', label: '마음피드' },
                 { key: 'stats', label: '통계 대시보드' }
               ]}
               value={activeTab}
-              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'stats')}
+              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'feed' | 'stats')}
             />
           </section>
 
@@ -435,6 +474,57 @@ export default function TeacherPage() {
                   </table>
                 )}
               </div>
+            </section>
+          )}
+
+          {activeTab === 'feed' && (
+            <section className="card">
+              <div className="row space-between" style={{ marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>마음피드</h2>
+                <div style={{ width: 180 }}>
+                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
+                  <input
+                    type="date"
+                    value={feedDate}
+                    onChange={(event) => onChangeFeedDate(event.target.value)}
+                    disabled={!selectedClassId}
+                  />
+                </div>
+              </div>
+
+              {!selectedClassId ? (
+                <EmptyState title="학급을 먼저 선택하세요" description="상단에서 학급을 선택하면 날짜별 피드를 볼 수 있습니다." />
+              ) : feedLoading ? (
+                <p className="hint">피드를 불러오는 중입니다...</p>
+              ) : feeds.length === 0 ? (
+                <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택해보세요." />
+              ) : (
+                <div className="grid">
+                  {feeds.map((feed) => (
+                    <article key={feed.id} className="card" style={{ padding: 12 }}>
+                      <div className="row space-between">
+                        <strong>
+                          {EMOTION_META[feed.emotion_type].emoji} {feed.students.student_number}번 {feed.students.name}
+                        </strong>
+                        <span className="hint" style={{ margin: 0 }}>
+                          {new Date(feed.created_at).toLocaleString('ko-KR')}
+                        </span>
+                      </div>
+                      <p>{feed.content}</p>
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
+                          const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
+                          return (
+                            <span key={reactionKey} className="badge">
+                              {REACTION_META[reactionKey].emoji} {count}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
