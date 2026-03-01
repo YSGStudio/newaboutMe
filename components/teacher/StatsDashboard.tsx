@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import Tabs from '@/components/ui/Tabs';
 import { EMOTION_META } from '@/types/domain';
 
 type StudentItem = {
@@ -53,6 +54,12 @@ type StudentMonthly = {
     total: number;
     achievementRate: number;
   }>;
+};
+
+const periodMeta: Record<Period, { label: string; hint: string }> = {
+  week: { label: '주간', hint: '최근 7일' },
+  month: { label: '월간', hint: '최근 30일' },
+  semester: { label: '학기', hint: '최근 120일' }
 };
 
 const api = async <T,>(url: string): Promise<T> => {
@@ -186,6 +193,18 @@ function DonutChart({ distribution }: { distribution: ClassEmotions['distributio
   );
 }
 
+function MetricCard({ title, value, description }: { title: string; value: string; description: string }) {
+  return (
+    <article className="card" style={{ padding: 12 }}>
+      <p className="hint" style={{ marginTop: 0 }}>
+        {title}
+      </p>
+      <strong style={{ fontSize: 28, lineHeight: 1.2 }}>{value}</strong>
+      <p className="hint">{description}</p>
+    </article>
+  );
+}
+
 export default function StatsDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [period, setPeriod] = useState<Period>('month');
   const [graphType, setGraphType] = useState<GraphType>('bar');
@@ -266,43 +285,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
   );
 
   const onExportPdf = () => window.print();
-
-  const onExportImage = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 700;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = '#111827';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText('마음일기 통계 대시보드', 40, 60);
-    ctx.font = '20px sans-serif';
-    ctx.fillText(`기간: ${period}`, 40, 100);
-
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(`전체 평균 달성률: ${overview?.averageAchievementRate ?? 0}%`, 40, 160);
-    ctx.fillText(`학생 수: ${overview?.totalStudents ?? 0}`, 40, 200);
-    ctx.fillText(`피드 수: ${emotions?.totalFeeds ?? 0}`, 40, 240);
-
-    ctx.font = '18px sans-serif';
-    ctx.fillText('계획별 달성 순위', 40, 300);
-    (overview?.planRanking ?? []).slice(0, 8).forEach((item, idx) => {
-      const y = 340 + idx * 36;
-      ctx.fillStyle = '#334155';
-      ctx.fillText(`${idx + 1}. ${item.title} (${item.achievementRate}%)`, 40, y);
-      ctx.fillStyle = '#93c5fd';
-      ctx.fillRect(420, y - 16, item.achievementRate * 6, 18);
-    });
-
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `maumdiary-stats-${classId}-${period}.png`;
-    link.click();
-  };
+  const selectedStudent = students.find((student) => student.id === studentId) ?? null;
 
   if (!classId) {
     return <EmptyState title="학급을 선택하세요" description="통계는 학급 선택 후 확인할 수 있습니다." />;
@@ -310,17 +293,23 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 
   return (
     <section className="card">
+      <h2 style={{ marginTop: 0, marginBottom: 6 }}>통계 대시보드</h2>
+      <p className="hint" style={{ marginTop: 0 }}>
+        기간과 학생을 먼저 선택한 뒤, 보고 싶은 그래프를 고르세요.
+      </p>
+
       <div className="grid two">
         <div>
-          <label>기간 필터</label>
+          <label>1. 기간 선택</label>
           <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
           </select>
+          <p className="hint">{periodMeta[period].hint} 기준으로 계산됩니다.</p>
         </div>
         <div>
-          <label>개별 학생</label>
+          <label>2. 학생 선택</label>
           <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
             <option value="">학생 선택</option>
             {students.map((student) => (
@@ -329,50 +318,82 @@ export default function StatsDashboard({ classId, students }: { classId: string;
               </option>
             ))}
           </select>
+          <p className="hint">
+            {selectedStudent
+              ? `${selectedStudent.student_number}번 ${selectedStudent.name} 학생 데이터가 반영됩니다.`
+              : '학생을 선택하면 개별 통계가 함께 표시됩니다.'}
+          </p>
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-        <button className={graphType === 'bar' ? 'ghost' : 'outline'} type="button" onClick={() => setGraphType('bar')}>
-          막대 그래프
-        </button>
-        <button className={graphType === 'line' ? 'ghost' : 'outline'} type="button" onClick={() => setGraphType('line')}>
-          라인 차트
-        </button>
-        <button className={graphType === 'donut' ? 'ghost' : 'outline'} type="button" onClick={() => setGraphType('donut')}>
-          도넛 차트
-        </button>
-        <button className="outline" type="button" onClick={onExportPdf}>
-          PDF 내보내기
-        </button>
-        <button className="outline" type="button" onClick={onExportImage}>
-          이미지 내보내기
-        </button>
+      <div className="grid" style={{ marginTop: 12, gap: 8 }}>
+        <label style={{ marginBottom: 0 }}>3. 그래프 선택</label>
+        <Tabs
+          items={[
+            { key: 'bar', label: '계획 달성률 비교' },
+            { key: 'line', label: '학생 달성률 추이' },
+            { key: 'donut', label: '학급 감정 분포' }
+          ]}
+          value={graphType}
+          onChange={(key) => setGraphType(key as GraphType)}
+        />
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="outline" type="button" onClick={onExportPdf} style={{ width: 'auto' }}>
+            PDF 내보내기
+          </button>
+        </div>
       </div>
 
       <Notice type="error" message={error} />
       {loading && <Notice type="info" message="통계 데이터를 불러오는 중입니다..." />}
 
       <div className="grid two" style={{ marginTop: 14 }}>
-        <article className="card" style={{ padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>학급 전체 뷰</h3>
-          <p className="hint">전체 평균 달성률</p>
-          <strong style={{ fontSize: 32 }}>{overview?.averageAchievementRate ?? 0}%</strong>
-          <p className="hint">학생 {overview?.totalStudents ?? 0}명 · 활성 계획 {overview?.totalPlans ?? 0}개</p>
-        </article>
+        <MetricCard
+          title="학급 전체 평균 달성률"
+          value={`${overview?.averageAchievementRate ?? 0}%`}
+          description={`학생 ${overview?.totalStudents ?? 0}명 · 활성 계획 ${overview?.totalPlans ?? 0}개`}
+        />
+        <MetricCard
+          title="현재 선택 학생"
+          value={studentPlans?.student.name ?? '학생 선택 필요'}
+          description={`${periodMeta[period].label} 기준 계획별 달성률을 보여줍니다.`}
+        />
+        <MetricCard
+          title="학급 감정 피드 수"
+          value={`${emotions?.totalFeeds ?? 0}건`}
+          description="선택한 기간의 전체 감정 피드"
+        />
+        <MetricCard
+          title="표시 기간"
+          value={periodMeta[period].label}
+          description={periodMeta[period].hint}
+        />
+      </div>
 
-        <article className="card" style={{ padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>개별 학생 뷰</h3>
-          <p className="hint">선택한 학생의 계획별 달성률</p>
-          <strong style={{ fontSize: 18 }}>{studentPlans?.student.name ?? '학생 선택 필요'}</strong>
-        </article>
+      <div className="card" style={{ marginTop: 14, padding: 12 }}>
+        <strong style={{ fontSize: 14 }}>
+          {graphType === 'bar' && '계획 달성률 비교: 학급 상위 계획과 선택 학생의 계획 달성률을 함께 확인합니다.'}
+          {graphType === 'line' && '학생 달성률 추이: 선택 학생의 날짜별 달성률 변화를 확인합니다.'}
+          {graphType === 'donut' && '학급 감정 분포: 학급 전체 감정 표현 비율을 확인합니다.'}
+        </strong>
       </div>
 
       <div className="grid" style={{ marginTop: 14 }}>
         {graphType === 'bar' && (
           <>
-            <BarChart title="계획별 달성 순위 (학급)" rows={planBarRows} />
-            <BarChart title="선택 학생 계획 달성률" rows={studentPlanRows} />
+            {planBarRows.length > 0 ? (
+              <BarChart title="계획별 달성 순위 (학급)" rows={planBarRows} />
+            ) : (
+              <EmptyState title="학급 계획 데이터가 없습니다" description="학생 계획이 등록되면 그래프가 표시됩니다." />
+            )}
+            {studentPlanRows.length > 0 ? (
+              <BarChart title="선택 학생 계획 달성률" rows={studentPlanRows} />
+            ) : (
+              <EmptyState
+                title="학생 계획 데이터가 없습니다"
+                description="학생을 선택하고 계획을 등록하면 그래프가 표시됩니다."
+              />
+            )}
           </>
         )}
 

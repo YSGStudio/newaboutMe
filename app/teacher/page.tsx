@@ -47,6 +47,7 @@ export default function TeacherPage() {
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
+  const [deletingStudentId, setDeletingStudentId] = useState('');
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -215,6 +216,28 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setDeletingClassId('');
+    }
+  };
+
+  const onDeleteStudent = async (student: StudentItem) => {
+    const confirmed = window.confirm(
+      `${student.student_number}번 ${student.name} 학생을 삭제할까요?\n감정 피드, 반응, 계획, 체크 기록, 학생 세션도 함께 삭제됩니다.`
+    );
+    if (!confirmed) return;
+
+    setDeletingStudentId(student.id);
+    setAuthError('');
+
+    try {
+      await api(`/api/students/${student.id}`, { method: 'DELETE' });
+      await loadStudents(selectedClassId);
+      setAuthMessage('학생이 삭제되었습니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setAuthError((error as Error).message);
+      clearNoticeLater();
+    } finally {
+      setDeletingStudentId('');
     }
   };
 
@@ -388,6 +411,7 @@ export default function TeacherPage() {
                       <tr>
                         <th>번호</th>
                         <th>이름</th>
+                        <th>관리</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -395,6 +419,16 @@ export default function TeacherPage() {
                         <tr key={student.id}>
                           <td>{student.student_number}</td>
                           <td>{student.name}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="outline"
+                              onClick={() => onDeleteStudent(student)}
+                              disabled={deletingStudentId === student.id}
+                            >
+                              {deletingStudentId === student.id ? '삭제 중...' : '삭제'}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
