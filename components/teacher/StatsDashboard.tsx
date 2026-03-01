@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
-import Tabs from '@/components/ui/Tabs';
 import { EMOTION_META } from '@/types/domain';
 
 type StudentItem = {
@@ -13,31 +12,30 @@ type StudentItem = {
 };
 
 type Period = 'week' | 'month' | 'semester';
-type GraphType = 'bar' | 'line' | 'donut';
 
-type ClassOverview = {
-  averageAchievementRate: number;
-  totalStudents: number;
-  totalPlans: number;
-  planRanking: Array<{
-    title: string;
+type EmotionDistributionItem = {
+  emotionType: keyof typeof EMOTION_META;
+  count: number;
+  ratio: number;
+};
+
+type StudentSnapshot = {
+  range: {
+    period: Period;
+    startDate: string;
+    endDate: string;
+    days: number;
+  };
+  student: {
+    id: string;
+    name: string;
+    studentNumber: number;
+  };
+  today: {
     completed: number;
-    totalPossible: number;
+    total: number;
     achievementRate: number;
-  }>;
-};
-
-type ClassEmotions = {
-  totalFeeds: number;
-  distribution: Array<{
-    emotionType: keyof typeof EMOTION_META;
-    count: number;
-    ratio: number;
-  }>;
-};
-
-type StudentPlanStats = {
-  student: { id: string; name: string };
+  };
   plans: Array<{
     planId: string;
     title: string;
@@ -45,15 +43,10 @@ type StudentPlanStats = {
     totalPossible: number;
     achievementRate: number;
   }>;
-};
-
-type StudentMonthly = {
-  points: Array<{
-    date: string;
-    completed: number;
-    total: number;
-    achievementRate: number;
-  }>;
+  emotions: {
+    totalFeeds: number;
+    distribution: EmotionDistributionItem[];
+  };
 };
 
 const periodMeta: Record<Period, { label: string; hint: string }> = {
@@ -62,6 +55,8 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
   semester: { label: '학기', hint: '최근 120일' }
 };
 
+const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
+
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
   const json = await res.json();
@@ -69,71 +64,43 @@ const api = async <T,>(url: string): Promise<T> => {
   return json;
 };
 
-const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 
-function BarChart({
-  title,
-  rows
-}: {
-  title: string;
-  rows: Array<{ key: string; label: string; value: number; description?: string }>;
-}) {
+function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
   return (
     <article className="card" style={{ padding: 12 }}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      <div className="grid" style={{ gap: 10 }}>
-        {rows.map((row) => (
-          <div key={row.key}>
-            <div className="row space-between" style={{ marginBottom: 4 }}>
-              <strong style={{ fontSize: 14 }}>{row.label}</strong>
-              <span className="badge">{row.value}%</span>
+      <h3 style={{ marginTop: 0 }}>계획별 실천률</h3>
+      {rows.length === 0 ? (
+        <EmptyState title="계획 데이터가 없습니다" description="학생 계획이 등록되면 이 영역에 표시됩니다." />
+      ) : (
+        <div className="grid" style={{ gap: 10 }}>
+          {rows.map((row) => (
+            <div key={row.planId}>
+              <div className="row space-between" style={{ marginBottom: 4 }}>
+                <strong style={{ fontSize: 14 }}>{row.title}</strong>
+                <span className="badge">{row.achievementRate}%</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${row.achievementRate}%` }} />
+              </div>
+              <p className="hint">
+                {row.completed}/{row.totalPossible}
+              </p>
             </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${row.value}%` }} />
-            </div>
-            {row.description && <p className="hint">{row.description}</p>}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </article>
   );
 }
 
-function LineChart({ points }: { points: StudentMonthly['points'] }) {
-  if (points.length === 0) return <EmptyState title="추세 데이터가 없습니다" description="기간을 바꿔 확인해보세요." />;
-
-  const width = 760;
-  const height = 220;
-  const padding = 20;
-  const maxX = Math.max(points.length - 1, 1);
-
-  const plot = points
-    .map((point, index) => {
-      const x = padding + ((width - padding * 2) * index) / maxX;
-      const y = height - padding - ((height - padding * 2) * point.achievementRate) / 100;
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  const latest = points[points.length - 1]?.achievementRate ?? 0;
-
-  return (
-    <article className="card" style={{ padding: 12 }}>
-      <div className="row space-between" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>학생 달성률 추이 (라인)</h3>
-        <span className="badge">최근 {latest}%</span>
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="달성률 라인 차트" style={{ width: '100%' }}>
-        <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#c8d4e9" />
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#c8d4e9" />
-        <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={plot} />
-      </svg>
-    </article>
-  );
-}
-
-function DonutChart({ distribution }: { distribution: ClassEmotions['distribution'] }) {
-  const total = distribution.reduce((acc, item) => acc + item.count, 0);
+function EmotionDonutChart({ distribution, totalFeeds }: { distribution: EmotionDistributionItem[]; totalFeeds: number }) {
   const segments = distribution
     .filter((item) => item.count > 0)
     .map((item, index) => `${donutColors[index % donutColors.length]} ${item.ratio}%`)
@@ -141,14 +108,14 @@ function DonutChart({ distribution }: { distribution: ClassEmotions['distributio
 
   return (
     <article className="card" style={{ padding: 12 }}>
-      <h3 style={{ marginTop: 0 }}>감정 분포 (도넛)</h3>
+      <h3 style={{ marginTop: 0 }}>감정 분포도</h3>
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <div
           style={{
             width: 180,
             height: 180,
             borderRadius: '50%',
-            background: total > 0 ? `conic-gradient(${segments})` : '#e5e7eb',
+            background: totalFeeds > 0 ? `conic-gradient(${segments})` : '#e5e7eb',
             position: 'relative'
           }}
         >
@@ -165,9 +132,10 @@ function DonutChart({ distribution }: { distribution: ClassEmotions['distributio
               color: '#64748b'
             }}
           >
-            총 {total}건
+            총 {totalFeeds}건
           </div>
         </div>
+
         <div className="grid" style={{ gap: 6, flex: 1 }}>
           {distribution.map((item, index) => (
             <div key={item.emotionType} className="row space-between">
@@ -193,99 +161,131 @@ function DonutChart({ distribution }: { distribution: ClassEmotions['distributio
   );
 }
 
-function MetricCard({ title, value, description }: { title: string; value: string; description: string }) {
-  return (
-    <article className="card" style={{ padding: 12 }}>
-      <p className="hint" style={{ marginTop: 0 }}>
-        {title}
-      </p>
-      <strong style={{ fontSize: 28, lineHeight: 1.2 }}>{value}</strong>
-      <p className="hint">{description}</p>
-    </article>
-  );
-}
-
 export default function StatsDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [period, setPeriod] = useState<Period>('month');
-  const [graphType, setGraphType] = useState<GraphType>('bar');
-  const [studentId, setStudentId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const [overview, setOverview] = useState<ClassOverview | null>(null);
-  const [emotions, setEmotions] = useState<ClassEmotions | null>(null);
-  const [studentPlans, setStudentPlans] = useState<StudentPlanStats | null>(null);
-  const [studentMonthly, setStudentMonthly] = useState<StudentMonthly | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [activeStudentId, setActiveStudentId] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [snapshot, setSnapshot] = useState<StudentSnapshot | null>(null);
 
   useEffect(() => {
-    if (students.length > 0 && !studentId) {
-      setStudentId(students[0].id);
-    }
-    if (students.length === 0) {
-      setStudentId('');
-    }
-  }, [students, studentId]);
-
-  useEffect(() => {
-    if (!classId) return;
+    if (!isDetailOpen || !activeStudentId) return;
 
     const load = async () => {
-      setLoading(true);
-      setError('');
+      setDetailLoading(true);
+      setDetailError('');
       try {
-        const [overviewData, emotionData] = await Promise.all([
-          api<ClassOverview>(`/api/stats/class/${classId}/overview?period=${period}`),
-          api<ClassEmotions>(`/api/stats/class/${classId}/emotions?period=${period}`)
-        ]);
-
-        setOverview(overviewData);
-        setEmotions(emotionData);
-
-        if (studentId) {
-          const [plansData, monthlyData] = await Promise.all([
-            api<StudentPlanStats>(`/api/stats/student/${studentId}/plans?period=${period}`),
-            api<StudentMonthly>(`/api/stats/student/${studentId}/monthly?period=${period}`)
-          ]);
-          setStudentPlans(plansData);
-          setStudentMonthly(monthlyData);
-        } else {
-          setStudentPlans(null);
-          setStudentMonthly(null);
-        }
+        const data = await api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`);
+        setSnapshot(data);
       } catch (err) {
-        setError((err as Error).message);
+        setSnapshot(null);
+        setDetailError((err as Error).message);
       } finally {
-        setLoading(false);
+        setDetailLoading(false);
       }
     };
 
     load();
-  }, [classId, period, studentId]);
+  }, [activeStudentId, isDetailOpen, period]);
 
-  const planBarRows = useMemo(
-    () =>
-      (overview?.planRanking ?? []).slice(0, 8).map((plan, index) => ({
-        key: `${plan.title}-${index}`,
-        label: plan.title,
-        value: plan.achievementRate,
-        description: `${plan.completed}/${plan.totalPossible}`
-      })),
-    [overview]
-  );
+  const openDetail = (studentId: string) => {
+    setActiveStudentId(studentId);
+    setIsDetailOpen(true);
+  };
 
-  const studentPlanRows = useMemo(
-    () =>
-      (studentPlans?.plans ?? []).map((plan) => ({
-        key: plan.planId,
-        label: plan.title,
-        value: plan.achievementRate,
-        description: `${plan.completed}/${plan.totalPossible}`
-      })),
-    [studentPlans]
-  );
+  const closeDetail = () => {
+    setIsDetailOpen(false);
+    setDetailError('');
+  };
 
-  const onExportPdf = () => window.print();
-  const selectedStudent = students.find((student) => student.id === studentId) ?? null;
+  const exportSnapshotPdf = () => {
+    if (!snapshot) return;
+
+    const popup = window.open('', '_blank', 'width=960,height=900');
+    if (!popup) {
+      window.alert('팝업이 차단되어 PDF 내보내기를 실행할 수 없습니다. 팝업 차단을 해제해주세요.');
+      return;
+    }
+
+    const planRows =
+      snapshot.plans.length === 0
+        ? '<tr><td colspan="3">계획 데이터가 없습니다.</td></tr>'
+        : snapshot.plans
+            .map(
+              (plan) =>
+                `<tr><td>${escapeHtml(plan.title)}</td><td>${plan.completed}/${plan.totalPossible}</td><td>${plan.achievementRate}%</td></tr>`
+            )
+            .join('');
+
+    const emotionRows = snapshot.emotions.distribution
+      .map(
+        (item) =>
+          `<tr><td>${EMOTION_META[item.emotionType].emoji} ${escapeHtml(EMOTION_META[item.emotionType].label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`
+      )
+      .join('');
+
+    const html = `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>학생 통계 리포트</title>
+    <style>
+      body { font-family: 'Pretendard', 'Noto Sans KR', sans-serif; padding: 24px; color: #1f2937; }
+      h1, h2 { margin: 0 0 8px; }
+      .muted { color: #64748b; margin: 0 0 14px; }
+      .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+      .card { border: 1px solid #dbe5f3; border-radius: 12px; padding: 12px; }
+      .value { font-size: 26px; font-weight: 700; margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { color: #475569; }
+      @media print { body { padding: 0; } }
+    </style>
+  </head>
+  <body>
+    <h1>마음일기 학생 통계 리포트</h1>
+    <p class="muted">${snapshot.student.studentNumber}번 ${escapeHtml(snapshot.student.name)} | ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})</p>
+
+    <div class="cards">
+      <div class="card">
+        <div>오늘 실천률</div>
+        <div class="value">${snapshot.today.achievementRate}%</div>
+        <div class="muted">${snapshot.today.completed}/${snapshot.today.total}</div>
+      </div>
+      <div class="card">
+        <div>감정 피드 수</div>
+        <div class="value">${snapshot.emotions.totalFeeds}건</div>
+        <div class="muted">선택 기간 기준</div>
+      </div>
+    </div>
+
+    <h2>계획별 실천률</h2>
+    <table>
+      <thead>
+        <tr><th>계획</th><th>실천 횟수</th><th>실천률</th></tr>
+      </thead>
+      <tbody>${planRows}</tbody>
+    </table>
+
+    <h2>감정 분포</h2>
+    <table>
+      <thead>
+        <tr><th>감정</th><th>건수</th><th>비율</th></tr>
+      </thead>
+      <tbody>${emotionRows}</tbody>
+    </table>
+  </body>
+</html>`;
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => {
+      popup.print();
+    }, 300);
+  };
 
   if (!classId) {
     return <EmptyState title="학급을 선택하세요" description="통계는 학급 선택 후 확인할 수 있습니다." />;
@@ -293,114 +293,116 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 
   return (
     <section className="card">
-      <h2 style={{ marginTop: 0, marginBottom: 6 }}>통계 대시보드</h2>
+      <h2 style={{ marginTop: 0, marginBottom: 8 }}>통계 대시보드</h2>
       <p className="hint" style={{ marginTop: 0 }}>
-        기간과 학생을 먼저 선택한 뒤, 보고 싶은 그래프를 고르세요.
+        등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
       </p>
 
       <div className="grid two">
         <div>
-          <label>1. 기간 선택</label>
+          <label>조회 기간</label>
           <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
           </select>
-          <p className="hint">{periodMeta[period].hint} 기준으로 계산됩니다.</p>
-        </div>
-        <div>
-          <label>2. 학생 선택</label>
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            <option value="">학생 선택</option>
-            {students.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.student_number}번 {student.name}
-              </option>
-            ))}
-          </select>
-          <p className="hint">
-            {selectedStudent
-              ? `${selectedStudent.student_number}번 ${selectedStudent.name} 학생 데이터가 반영됩니다.`
-              : '학생을 선택하면 개별 통계가 함께 표시됩니다.'}
-          </p>
+          <p className="hint">{periodMeta[period].hint} 기준으로 통계를 계산합니다.</p>
         </div>
       </div>
 
-      <div className="grid" style={{ marginTop: 12, gap: 8 }}>
-        <label style={{ marginBottom: 0 }}>3. 그래프 선택</label>
-        <Tabs
-          items={[
-            { key: 'bar', label: '계획 달성률 비교' },
-            { key: 'line', label: '학생 달성률 추이' },
-            { key: 'donut', label: '학급 감정 분포' }
-          ]}
-          value={graphType}
-          onChange={(key) => setGraphType(key as GraphType)}
-        />
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="outline" type="button" onClick={onExportPdf} style={{ width: 'auto' }}>
-            PDF 내보내기
-          </button>
+      {students.length === 0 ? (
+        <EmptyState title="등록된 학생이 없습니다" description="학생을 먼저 등록하면 카드가 표시됩니다." />
+      ) : (
+        <div className="grid two" style={{ marginTop: 10 }}>
+          {students.map((student) => (
+            <button
+              key={student.id}
+              type="button"
+              className="outline"
+              style={{ textAlign: 'left', padding: 14, background: '#fff' }}
+              onClick={() => openDetail(student.id)}
+            >
+              <div className="row space-between" style={{ marginBottom: 8 }}>
+                <strong style={{ fontSize: 16 }}>{student.name}</strong>
+                <span className="badge">{student.student_number}번</span>
+              </div>
+              <p className="hint" style={{ margin: 0 }}>
+                상세 통계 보기
+              </p>
+            </button>
+          ))}
         </div>
-      </div>
+      )}
 
-      <Notice type="error" message={error} />
-      {loading && <Notice type="info" message="통계 데이터를 불러오는 중입니다..." />}
+      {isDetailOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="학생 상세 통계"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeDetail();
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            zIndex: 1000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16
+          }}
+        >
+          <div className="card" style={{ width: 'min(980px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div className="row space-between" style={{ alignItems: 'flex-start', gap: 12 }}>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 4 }}>학생 상세 통계</h3>
+                <p className="hint" style={{ marginTop: 0 }}>
+                  {snapshot
+                    ? `${snapshot.student.studentNumber}번 ${snapshot.student.name} | ${snapshot.range.startDate} ~ ${snapshot.range.endDate}`
+                    : '데이터를 불러오는 중입니다.'}
+                </p>
+              </div>
+              <div className="row" style={{ width: 'auto' }}>
+                <button type="button" className="outline" style={{ width: 'auto' }} onClick={exportSnapshotPdf} disabled={!snapshot}>
+                  PDF 내보내기
+                </button>
+                <button type="button" className="outline" style={{ width: 'auto' }} onClick={closeDetail}>
+                  닫기
+                </button>
+              </div>
+            </div>
 
-      <div className="grid two" style={{ marginTop: 14 }}>
-        <MetricCard
-          title="학급 전체 평균 달성률"
-          value={`${overview?.averageAchievementRate ?? 0}%`}
-          description={`학생 ${overview?.totalStudents ?? 0}명 · 활성 계획 ${overview?.totalPlans ?? 0}개`}
-        />
-        <MetricCard
-          title="현재 선택 학생"
-          value={studentPlans?.student.name ?? '학생 선택 필요'}
-          description={`${periodMeta[period].label} 기준 계획별 달성률을 보여줍니다.`}
-        />
-        <MetricCard
-          title="학급 감정 피드 수"
-          value={`${emotions?.totalFeeds ?? 0}건`}
-          description="선택한 기간의 전체 감정 피드"
-        />
-        <MetricCard
-          title="표시 기간"
-          value={periodMeta[period].label}
-          description={periodMeta[period].hint}
-        />
-      </div>
+            <Notice type="error" message={detailError} />
+            {detailLoading && <Notice type="info" message="학생 통계 데이터를 불러오는 중입니다..." />}
 
-      <div className="card" style={{ marginTop: 14, padding: 12 }}>
-        <strong style={{ fontSize: 14 }}>
-          {graphType === 'bar' && '계획 달성률 비교: 학급 상위 계획과 선택 학생의 계획 달성률을 함께 확인합니다.'}
-          {graphType === 'line' && '학생 달성률 추이: 선택 학생의 날짜별 달성률 변화를 확인합니다.'}
-          {graphType === 'donut' && '학급 감정 분포: 학급 전체 감정 표현 비율을 확인합니다.'}
-        </strong>
-      </div>
+            {snapshot && (
+              <>
+                <div className="grid two" style={{ marginTop: 12 }}>
+                  <article className="card" style={{ padding: 12 }}>
+                    <p className="hint" style={{ marginTop: 0 }}>
+                      오늘 실천률
+                    </p>
+                    <strong style={{ fontSize: 34, lineHeight: 1.2 }}>{snapshot.today.achievementRate}%</strong>
+                    <p className="hint">실천 {snapshot.today.completed} / 전체 계획 {snapshot.today.total}</p>
+                  </article>
+                  <article className="card" style={{ padding: 12 }}>
+                    <p className="hint" style={{ marginTop: 0 }}>
+                      감정 피드 수
+                    </p>
+                    <strong style={{ fontSize: 34, lineHeight: 1.2 }}>{snapshot.emotions.totalFeeds}건</strong>
+                    <p className="hint">선택 기간 감정 기록</p>
+                  </article>
+                </div>
 
-      <div className="grid" style={{ marginTop: 14 }}>
-        {graphType === 'bar' && (
-          <>
-            {planBarRows.length > 0 ? (
-              <BarChart title="계획별 달성 순위 (학급)" rows={planBarRows} />
-            ) : (
-              <EmptyState title="학급 계획 데이터가 없습니다" description="학생 계획이 등록되면 그래프가 표시됩니다." />
+                <div className="grid" style={{ marginTop: 12 }}>
+                  <PlanBarChart rows={snapshot.plans} />
+                  <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
+                </div>
+              </>
             )}
-            {studentPlanRows.length > 0 ? (
-              <BarChart title="선택 학생 계획 달성률" rows={studentPlanRows} />
-            ) : (
-              <EmptyState
-                title="학생 계획 데이터가 없습니다"
-                description="학생을 선택하고 계획을 등록하면 그래프가 표시됩니다."
-              />
-            )}
-          </>
-        )}
-
-        {graphType === 'line' && <LineChart points={studentMonthly?.points ?? []} />}
-
-        {graphType === 'donut' && <DonutChart distribution={emotions?.distribution ?? []} />}
-      </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
