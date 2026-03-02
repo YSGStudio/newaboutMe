@@ -20,15 +20,16 @@ export async function GET() {
 
   const normalized = (plans ?? []).map((plan) => {
     const todayCheck = (plan.plan_checks ?? []).find((check) => check.check_date === date);
+    const isCompleted = typeof todayCheck?.is_completed === 'boolean' ? todayCheck.is_completed : null;
     return {
       id: plan.id,
       title: plan.title,
-      isCompleted: Boolean(todayCheck?.is_completed),
+      isCompleted,
       checkedAt: todayCheck?.checked_at ?? null
     };
   });
 
-  const completed = normalized.filter((p) => p.isCompleted).length;
+  const completed = normalized.filter((p) => p.isCompleted === true).length;
   const total = normalized.length;
 
   return NextResponse.json({

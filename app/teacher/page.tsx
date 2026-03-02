@@ -21,6 +21,10 @@ type StudentItem = {
   id: string;
   name: string;
   student_number: number;
+  todayCompleted?: number;
+  todayTotal?: number;
+  todayAchievementRate?: number;
+  isTodayAllCompleted?: boolean;
 };
 
 type FeedItem = {
@@ -445,33 +449,45 @@ export default function TeacherPage() {
                 {students.length === 0 ? (
                   <EmptyState title="등록된 학생이 없습니다" description="학생을 추가하면 이곳에 표시됩니다." />
                 ) : (
-                  <table className="table" style={{ marginTop: 8 }}>
-                    <thead>
-                      <tr>
-                        <th>번호</th>
-                        <th>이름</th>
-                        <th>관리</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {students.map((student) => (
-                        <tr key={student.id}>
-                          <td>{student.student_number}</td>
-                          <td>{student.name}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="outline"
-                              onClick={() => onDeleteStudent(student)}
-                              disabled={deletingStudentId === student.id}
-                            >
-                              {deletingStudentId === student.id ? '삭제 중...' : '삭제'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="student-card-grid" style={{ marginTop: 8 }}>
+                    {students.map((student) => {
+                      const todayCompleted = student.todayCompleted ?? 0;
+                      const todayTotal = student.todayTotal ?? 0;
+                      const todayAchievementRate = student.todayAchievementRate ?? 0;
+                      const isTodayAllCompleted = Boolean(student.isTodayAllCompleted);
+                      return (
+                        <article
+                          key={student.id}
+                          className={`card student-card ${isTodayAllCompleted ? 'student-card-complete' : ''}`}
+                          style={{ padding: 12 }}
+                        >
+                          <div className="row space-between">
+                            <strong>
+                              {student.student_number}번 {student.name}
+                            </strong>
+                            <span className="badge">{todayAchievementRate}%</span>
+                          </div>
+                          <p className="hint" style={{ marginTop: 8 }}>
+                            오늘 계획 달성률
+                          </p>
+                          <div className="progress-track" style={{ marginTop: 6 }}>
+                            <div className="progress-fill" style={{ width: `${todayAchievementRate}%` }} />
+                          </div>
+                          <p className="hint" style={{ marginTop: 8 }}>
+                            {todayCompleted}/{todayTotal} 완료
+                          </p>
+                          <button
+                            type="button"
+                            className="outline"
+                            onClick={() => onDeleteStudent(student)}
+                            disabled={deletingStudentId === student.id}
+                          >
+                            {deletingStudentId === student.id ? '삭제 중...' : '삭제'}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </section>

@@ -9,7 +9,7 @@ import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
-type PlanRow = { id: string; title: string; isCompleted: boolean };
+type PlanRow = { id: string; title: string; isCompleted: boolean | null };
 
 type FeedRow = {
   id: string;
@@ -45,7 +45,7 @@ export default function StudentPage() {
   const [feedLoading, setFeedLoading] = useState(false);
 
   const summary = useMemo(() => {
-    const completed = plans.filter((plan) => plan.isCompleted).length;
+    const completed = plans.filter((plan) => plan.isCompleted === true).length;
     const total = plans.length;
     const rate = total ? Math.round((completed / total) * 100) : 0;
     return { completed, total, rate };
@@ -119,7 +119,7 @@ export default function StudentPage() {
     }
   };
 
-  const togglePlan = async (planId: string, nextState: boolean) => {
+  const togglePlan = async (planId: string, nextState: boolean | null) => {
     try {
       await api(`/api/plans/${planId}/check`, {
         method: 'POST',
@@ -295,15 +295,27 @@ export default function StudentPage() {
                   <EmptyState title="등록된 계획이 없습니다" description="오늘 계획을 하나 추가해보세요." />
                 ) : (
                   plans.map((plan) => (
-                    <label key={plan.id} className="card row space-between" style={{ padding: 12 }}>
+                    <div key={plan.id} className="card row space-between" style={{ padding: 12 }}>
                       <span>{plan.title}</span>
-                      <input
-                        style={{ width: 22, height: 22 }}
-                        type="checkbox"
-                        checked={plan.isCompleted}
-                        onChange={(event) => togglePlan(plan.id, event.target.checked)}
-                      />
-                    </label>
+                      <div className="row">
+                        <button
+                          type="button"
+                          className={plan.isCompleted === true ? 'ghost' : 'outline'}
+                          style={{ width: 52, minHeight: 40, padding: '8px 10px' }}
+                          onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
+                        >
+                          O
+                        </button>
+                        <button
+                          type="button"
+                          className={plan.isCompleted === false ? 'ghost' : 'outline'}
+                          style={{ width: 52, minHeight: 40, padding: '8px 10px' }}
+                          onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
+                        >
+                          X
+                        </button>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>

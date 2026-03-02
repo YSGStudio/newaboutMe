@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: Params) {
         plan_id: params.id,
         check_date: date,
         is_completed: parsed.data.isCompleted,
-        checked_at: parsed.data.isCompleted ? new Date().toISOString() : null
+        checked_at: parsed.data.isCompleted === true ? new Date().toISOString() : null
       },
       { onConflict: 'plan_id,check_date' }
     )

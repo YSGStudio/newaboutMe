@@ -42,5 +42,5 @@ export const planCreateSchema = z.object({
 });
 
 export const planCheckSchema = z.object({
-  isCompleted: z.boolean()
+  isCompleted: z.boolean().nullable()
 });

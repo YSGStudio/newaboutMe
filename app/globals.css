@@ -215,10 +215,36 @@ p.hint {
   font-size: 13px;
 }
 
+.student-card-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.student-card {
+  display: grid;
+  gap: 6px;
+}
+
+.student-card-complete {
+  border-color: #84cc9a;
+  background: #e8f8ec;
+}
+
 @media (max-width: 768px) {
   .sticky-header {
     position: static;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .student-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .student-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
