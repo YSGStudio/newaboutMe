@@ -1,13 +1,13 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
 import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
-import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
+import { EMOTION_CATEGORIES, EMOTION_META, EmotionType, REACTION_META, ReactionType } from '@/types/domain';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
 
@@ -39,6 +39,8 @@ export default function StudentPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'timeline'>('emotion');
+  const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
+  const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
 
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
@@ -50,6 +52,17 @@ export default function StudentPage() {
     const rate = total ? Math.round((completed / total) * 100) : 0;
     return { completed, total, rate };
   }, [plans]);
+
+  const emotionOptions = useMemo(
+    () => EMOTION_CATEGORIES.find((category) => category.key === emotionCategory)?.emotions ?? [],
+    [emotionCategory]
+  );
+
+  useEffect(() => {
+    if (!emotionOptions.includes(emotionType)) {
+      setEmotionType(emotionOptions[0] ?? EMOTION_CATEGORIES[0].emotions[0]);
+    }
+  }, [emotionOptions, emotionType]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -141,7 +154,7 @@ export default function StudentPage() {
       await api('/api/feeds', {
         method: 'POST',
         body: JSON.stringify({
-          emotionType: String(form.get('emotionType')),
+          emotionType,
           content: String(form.get('content'))
         })
       });
@@ -262,11 +275,21 @@ export default function StudentPage() {
               <h2>감정 작성</h2>
               <form className="grid" onSubmit={onCreateFeed}>
                 <div>
-                  <label>감정 이모지</label>
-                  <select name="emotionType" defaultValue="joy">
-                    {Object.entries(EMOTION_META).map(([key, meta]) => (
+                  <label>감정 범주</label>
+                  <select value={emotionCategory} onChange={(event) => setEmotionCategory(event.target.value as (typeof EMOTION_CATEGORIES)[number]['key'])}>
+                    {EMOTION_CATEGORIES.map((category) => (
+                      <option key={category.key} value={category.key}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label>세부 감정</label>
+                  <select value={emotionType} onChange={(event) => setEmotionType(event.target.value as EmotionType)}>
+                    {emotionOptions.map((key) => (
                       <option key={key} value={key}>
-                        {meta.emoji} {meta.label}
+                        {EMOTION_META[key].label}
                       </option>
                     ))}
                   </select>
@@ -301,18 +324,18 @@ export default function StudentPage() {
                         <button
                           type="button"
                           className={plan.isCompleted === true ? 'ghost' : 'outline'}
-                          style={{ width: 52, minHeight: 40, padding: '8px 10px' }}
+                          style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
                           onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
                         >
-                          O
+                          완료
                         </button>
                         <button
                           type="button"
                           className={plan.isCompleted === false ? 'ghost' : 'outline'}
-                          style={{ width: 52, minHeight: 40, padding: '8px 10px' }}
+                          style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
                           onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
                         >
-                          X
+                          미완료
                         </button>
                       </div>
                     </div>
@@ -343,12 +366,15 @@ export default function StudentPage() {
                     <div key={feed.id} className="card" style={{ padding: 12 }}>
                       <div className="row space-between">
                         <strong>
-                          {EMOTION_META[feed.emotion_type].emoji} {feed.students.student_number}번 {feed.students.name}
+                          {feed.students.student_number}번 {feed.students.name}
                         </strong>
                         <span className="hint" style={{ margin: 0 }}>
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
+                      <p className="hint" style={{ marginTop: 6, marginBottom: 8 }}>
+                        {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
+                      </p>
                       <p>{feed.content}</p>
                       <div className="row" style={{ flexWrap: 'wrap' }}>
                         {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
@@ -361,7 +387,7 @@ export default function StudentPage() {
                               style={{ width: 'auto', minWidth: 64, minHeight: 44 }}
                               onClick={() => reactFeed(feed.id, reactionKey)}
                             >
-                              {REACTION_META[reactionKey].emoji} {count}
+                              {REACTION_META[reactionKey].label} {count}
                             </button>
                           );
                         })}

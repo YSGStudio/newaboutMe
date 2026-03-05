@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
-import { EMOTION_META } from '@/types/domain';
+import { EMOTION_META, EmotionType } from '@/types/domain';
 
 type StudentItem = {
   id: string;
@@ -14,7 +14,7 @@ type StudentItem = {
 type Period = 'week' | 'month' | 'semester';
 
 type EmotionDistributionItem = {
-  emotionType: keyof typeof EMOTION_META;
+  emotionType: EmotionType;
   count: number;
   ratio: number;
 };
@@ -150,7 +150,7 @@ function EmotionDonutChart({ distribution, totalFeeds }: { distribution: Emotion
                     background: donutColors[index % donutColors.length]
                   }}
                 />
-                {EMOTION_META[item.emotionType].emoji} {EMOTION_META[item.emotionType].label}
+                {EMOTION_META[item.emotionType].categoryLabel} / {EMOTION_META[item.emotionType].label}
               </span>
               <span>{item.ratio}%</span>
             </div>
@@ -221,7 +221,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     const emotionRows = snapshot.emotions.distribution
       .map(
         (item) =>
-          `<tr><td>${EMOTION_META[item.emotionType].emoji} ${escapeHtml(EMOTION_META[item.emotionType].label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`
+          `<tr><td>${escapeHtml(EMOTION_META[item.emotionType].categoryLabel)} / ${escapeHtml(EMOTION_META[item.emotionType].label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`
       )
       .join('');
 

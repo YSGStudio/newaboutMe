@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EMOTION_TYPES } from '@/types/domain';
 
 export const teacherSignupSchema = z.object({
   email: z.string().email(),
@@ -28,7 +29,7 @@ export const studentLoginSchema = z.object({
 });
 
 export const feedCreateSchema = z.object({
-  emotionType: z.enum(['joy', 'sad', 'angry', 'anxious', 'calm', 'thinking', 'excited', 'tired']),
+  emotionType: z.enum(EMOTION_TYPES),
   content: z.string().min(1).max(100),
   imageUrl: z.string().url().optional()
 });

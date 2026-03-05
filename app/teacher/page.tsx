@@ -520,19 +520,22 @@ export default function TeacherPage() {
                     <article key={feed.id} className="card" style={{ padding: 12 }}>
                       <div className="row space-between">
                         <strong>
-                          {EMOTION_META[feed.emotion_type].emoji} {feed.students.student_number}번 {feed.students.name}
+                          {feed.students.student_number}번 {feed.students.name}
                         </strong>
                         <span className="hint" style={{ margin: 0 }}>
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
+                      <p className="hint" style={{ marginTop: 6, marginBottom: 8 }}>
+                        {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
+                      </p>
                       <p>{feed.content}</p>
                       <div className="row" style={{ flexWrap: 'wrap' }}>
                         {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
                           const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
                           return (
                             <span key={reactionKey} className="badge">
-                              {REACTION_META[reactionKey].emoji} {count}
+                              {REACTION_META[reactionKey].label} {count}
                             </span>
                           );
                         })}

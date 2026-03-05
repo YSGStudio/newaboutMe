@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
+import { EMOTION_TYPES } from '@/types/domain';
 
 type Params = { params: { id: string } };
-
-const EMOTIONS = ['joy', 'sad', 'angry', 'anxious', 'calm', 'thinking', 'excited', 'tired'] as const;
 
 export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
@@ -39,7 +38,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const totalFeeds = (data ?? []).length;
   const counts = new Map<string, number>();
-  EMOTIONS.forEach((emotion) => counts.set(emotion, 0));
+  EMOTION_TYPES.forEach((emotion) => counts.set(emotion, 0));
 
   (data ?? []).forEach((item) => {
     counts.set(item.emotion_type, (counts.get(item.emotion_type) ?? 0) + 1);
@@ -48,7 +47,7 @@ export async function GET(req: Request, { params }: Params) {
   return NextResponse.json({
     range,
     totalFeeds,
-    distribution: EMOTIONS.map((emotionType) => ({
+    distribution: EMOTION_TYPES.map((emotionType) => ({
       emotionType,
       count: counts.get(emotionType) ?? 0,
       ratio: safeRate(counts.get(emotionType) ?? 0, totalFeeds)
