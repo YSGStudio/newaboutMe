@@ -286,13 +286,19 @@ export default function StudentPage() {
                 </div>
                 <div>
                   <label>세부 감정</label>
-                  <select value={emotionType} onChange={(event) => setEmotionType(event.target.value as EmotionType)}>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
                     {emotionOptions.map((key) => (
-                      <option key={key} value={key}>
+                      <button
+                        key={key}
+                        type="button"
+                        className={emotionType === key ? 'ghost' : 'outline'}
+                        style={{ width: 'auto', minHeight: 36, padding: '6px 12px' }}
+                        onClick={() => setEmotionType(key as EmotionType)}
+                      >
                         {EMOTION_META[key].label}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div>
                   <label>한 줄 기록 (100자)</label>
