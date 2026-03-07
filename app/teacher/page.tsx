@@ -381,47 +381,102 @@ export default function TeacherPage() {
 
           {activeTab === 'class' && (
             <section className="card">
-              <h2>학급 생성</h2>
-              <form className="grid" onSubmit={onCreateClass}>
+              <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 12 }}>
                 <div>
-                  <label>학급명</label>
-                  <input name="className" placeholder="햇살반" required />
+                  <h2 style={{ margin: 0 }}>학급 관리</h2>
+                  <p className="hint" style={{ marginTop: 6 }}>
+                    학급 생성, 선택, 삭제를 이 화면에서 바로 처리할 수 있습니다.
+                  </p>
                 </div>
-                <div className="row">
-                  <div style={{ flex: 1 }}>
-                    <label>학년</label>
-                    <input name="grade" type="number" min={1} max={6} required />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label>반</label>
-                    <input name="section" type="number" min={1} max={20} required />
-                  </div>
-                </div>
-                <SubmitButton loading={classLoading} idleText="학급 추가" />
-              </form>
+                <span className="badge">총 {classes.length}개 학급</span>
+              </div>
+
+              <div className="grid two" style={{ alignItems: 'start', gap: 14 }}>
+                <article className="card" style={{ padding: 12 }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>새 학급 만들기</h3>
+                  <form className="grid" onSubmit={onCreateClass}>
+                    <div>
+                      <label>학급명</label>
+                      <input name="className" placeholder="햇살반" required />
+                    </div>
+                    <div className="row">
+                      <div style={{ flex: 1 }}>
+                        <label>학년</label>
+                        <input name="grade" type="number" min={1} max={6} required />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label>반</label>
+                        <input name="section" type="number" min={1} max={20} required />
+                      </div>
+                    </div>
+                    <SubmitButton loading={classLoading} idleText="학급 추가" />
+                  </form>
+                </article>
+
+                <article className="card" style={{ padding: 12 }}>
+                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>현재 선택 학급</h3>
+                  {selectedClass ? (
+                    <div className="grid" style={{ gap: 8 }}>
+                      <strong style={{ fontSize: 17 }}>{selectedClass.class_name}</strong>
+                      <p className="hint" style={{ margin: 0 }}>
+                        {selectedClass.grade}학년 {selectedClass.section}반
+                      </p>
+                      <div className="row" style={{ justifyContent: 'flex-start' }}>
+                        <span className="badge">코드 {selectedClass.class_code}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <EmptyState title="선택된 학급이 없습니다" description="아래 목록에서 학급을 선택하세요." />
+                  )}
+                </article>
+              </div>
 
               <div style={{ marginTop: 16 }}>
-                <h3>학급 목록</h3>
+                <h3 style={{ marginBottom: 10 }}>학급 목록</h3>
                 {classes.length === 0 ? (
                   <EmptyState title="학급이 없습니다" description="먼저 학급을 1개 생성하세요." />
                 ) : (
-                  <div className="grid">
-                    {classes.map((c) => (
-                      <div key={c.id} className="card" style={{ padding: 12 }}>
-                        <strong>{c.class_name}</strong>
-                        <p className="hint" style={{ marginTop: 4 }}>
-                          {c.grade}학년 {c.section}반 / 코드 {c.class_code}
-                        </p>
-                        <button
-                          type="button"
-                          className="outline"
-                          onClick={() => onDeleteClass(c.id)}
-                          disabled={deletingClassId === c.id}
+                  <div className="grid two">
+                    {classes.map((c) => {
+                      const isSelected = c.id === selectedClassId;
+                      return (
+                        <article
+                          key={c.id}
+                          className="card"
+                          style={{
+                            padding: 12,
+                            borderColor: isSelected ? '#2563eb' : undefined,
+                            background: isSelected ? '#eff6ff' : undefined
+                          }}
                         >
-                          {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
-                        </button>
-                      </div>
-                    ))}
+                          <div className="row space-between" style={{ alignItems: 'center', marginBottom: 8 }}>
+                            <strong>{c.class_name}</strong>
+                            {isSelected ? <span className="badge">선택됨</span> : null}
+                          </div>
+                          <p className="hint" style={{ marginTop: 0 }}>
+                            {c.grade}학년 {c.section}반
+                          </p>
+                          <p className="hint">학급코드: {c.class_code}</p>
+                          <div className="row" style={{ marginTop: 8 }}>
+                            <button
+                              type="button"
+                              className={isSelected ? 'ghost' : 'outline'}
+                              onClick={() => setSelectedClassId(c.id)}
+                            >
+                              {isSelected ? '현재 선택 중' : '이 학급 선택'}
+                            </button>
+                            <button
+                              type="button"
+                              className="outline"
+                              onClick={() => onDeleteClass(c.id)}
+                              disabled={deletingClassId === c.id}
+                            >
+                              {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
               </div>
