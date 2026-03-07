@@ -71,6 +71,7 @@ export default function TeacherPage() {
     () => classes.find((item) => item.id === selectedClassId) ?? null,
     [classes, selectedClassId]
   );
+  const canCreateClass = classes.length === 0;
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -167,6 +168,11 @@ export default function TeacherPage() {
 
   const onCreateClass = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canCreateClass) {
+      setAuthError('학급은 1개만 생성할 수 있습니다.');
+      clearNoticeLater();
+      return;
+    }
     setClassLoading(true);
     setAuthError('');
     const formEl = event.currentTarget;
@@ -394,22 +400,25 @@ export default function TeacherPage() {
               <div className="grid two" style={{ alignItems: 'start', gap: 14 }}>
                 <article className="card" style={{ padding: 12 }}>
                   <h3 style={{ marginTop: 0, marginBottom: 10 }}>새 학급 만들기</h3>
+                  {!canCreateClass && (
+                    <Notice type="info" message="이미 학급이 생성되어 있어 추가 생성은 비활성화됩니다." />
+                  )}
                   <form className="grid" onSubmit={onCreateClass}>
                     <div>
                       <label>학급명</label>
-                      <input name="className" placeholder="햇살반" required />
+                      <input name="className" placeholder="햇살반" required disabled={!canCreateClass} />
                     </div>
                     <div className="row">
                       <div style={{ flex: 1 }}>
                         <label>학년</label>
-                        <input name="grade" type="number" min={1} max={6} required />
+                        <input name="grade" type="number" min={1} max={6} required disabled={!canCreateClass} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <label>반</label>
-                        <input name="section" type="number" min={1} max={20} required />
+                        <input name="section" type="number" min={1} max={20} required disabled={!canCreateClass} />
                       </div>
                     </div>
-                    <SubmitButton loading={classLoading} idleText="학급 추가" />
+                    <SubmitButton loading={classLoading} idleText={canCreateClass ? '학급 추가' : '학급 생성 비활성화'} disabled={!canCreateClass} />
                   </form>
                 </article>
 

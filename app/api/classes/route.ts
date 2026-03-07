@@ -22,6 +22,16 @@ export async function POST(req: Request) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
+  const { count: classCount, error: countError } = await supabaseAdmin
+    .from('classes')
+    .select('id', { count: 'exact', head: true })
+    .eq('teacher_id', auth.teacher.id);
+
+  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+  if ((classCount ?? 0) >= 1) {
+    return NextResponse.json({ error: '학급은 1개만 생성할 수 있습니다.' }, { status: 400 });
+  }
+
   const body = await req.json();
   const parsed = classCreateSchema.safeParse(body);
   if (!parsed.success) {
