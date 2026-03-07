@@ -163,6 +163,7 @@ export default function StudentPage() {
       });
       formEl.reset();
       if (classId) await loadFeeds(classId, timelineDate);
+      setActiveTab('timeline');
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -367,7 +368,7 @@ export default function StudentPage() {
                   />
                 </div>
               </div>
-              <div className="grid">
+              <div className="feed-card-grid">
                 {feeds.length === 0 ? (
                   <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택하거나 새 피드를 작성해보세요." />
                 ) : (

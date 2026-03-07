@@ -587,7 +587,7 @@ export default function TeacherPage() {
               ) : feeds.length === 0 ? (
                 <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택해보세요." />
               ) : (
-                <div className="grid">
+                <div className="feed-card-grid">
                   {feeds.map((feed) => (
                     <article key={feed.id} className="card feed-post">
                       <div className="row space-between feed-post-header">
