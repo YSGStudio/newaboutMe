@@ -414,71 +414,54 @@ export default function TeacherPage() {
                 </article>
 
                 <article className="card" style={{ padding: 12 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>현재 선택 학급</h3>
-                  {selectedClass ? (
-                    <div className="grid" style={{ gap: 8 }}>
-                      <strong style={{ fontSize: 17 }}>{selectedClass.class_name}</strong>
-                      <p className="hint" style={{ margin: 0 }}>
-                        {selectedClass.grade}학년 {selectedClass.section}반
-                      </p>
-                      <div className="row" style={{ justifyContent: 'flex-start' }}>
-                        <span className="badge">코드 {selectedClass.class_code}</span>
-                      </div>
-                    </div>
+                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>학급 목록</h3>
+                  {classes.length === 0 ? (
+                    <EmptyState title="학급이 없습니다" description="먼저 학급을 1개 생성하세요." />
                   ) : (
-                    <EmptyState title="선택된 학급이 없습니다" description="아래 목록에서 학급을 선택하세요." />
+                    <div className="grid" style={{ gap: 10 }}>
+                      {classes.map((c) => {
+                        const isSelected = c.id === selectedClassId;
+                        return (
+                          <article
+                            key={c.id}
+                            className="card"
+                            style={{
+                              padding: 12,
+                              borderColor: isSelected ? '#e79b9b' : undefined,
+                              background: isSelected ? '#fde7e7' : undefined
+                            }}
+                          >
+                            <div className="row space-between" style={{ alignItems: 'center', marginBottom: 8 }}>
+                              <strong>{c.class_name}</strong>
+                              {isSelected ? <span className="badge">선택됨</span> : null}
+                            </div>
+                            <p className="hint" style={{ marginTop: 0 }}>
+                              {c.grade}학년 {c.section}반
+                            </p>
+                            <p className="hint">학급코드: {c.class_code}</p>
+                            <div className="row" style={{ marginTop: 8 }}>
+                              <button
+                                type="button"
+                                className={isSelected ? 'ghost' : 'outline'}
+                                onClick={() => setSelectedClassId(c.id)}
+                              >
+                                {isSelected ? '현재 선택 중' : '이 학급 선택'}
+                              </button>
+                              <button
+                                type="button"
+                                className="outline"
+                                onClick={() => onDeleteClass(c.id)}
+                                disabled={deletingClassId === c.id}
+                              >
+                                {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
                   )}
                 </article>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <h3 style={{ marginBottom: 10 }}>학급 목록</h3>
-                {classes.length === 0 ? (
-                  <EmptyState title="학급이 없습니다" description="먼저 학급을 1개 생성하세요." />
-                ) : (
-                  <div className="grid two">
-                    {classes.map((c) => {
-                      const isSelected = c.id === selectedClassId;
-                      return (
-                        <article
-                          key={c.id}
-                          className="card"
-                          style={{
-                            padding: 12,
-                            borderColor: isSelected ? '#2563eb' : undefined,
-                            background: isSelected ? '#eff6ff' : undefined
-                          }}
-                        >
-                          <div className="row space-between" style={{ alignItems: 'center', marginBottom: 8 }}>
-                            <strong>{c.class_name}</strong>
-                            {isSelected ? <span className="badge">선택됨</span> : null}
-                          </div>
-                          <p className="hint" style={{ marginTop: 0 }}>
-                            {c.grade}학년 {c.section}반
-                          </p>
-                          <p className="hint">학급코드: {c.class_code}</p>
-                          <div className="row" style={{ marginTop: 8 }}>
-                            <button
-                              type="button"
-                              className={isSelected ? 'ghost' : 'outline'}
-                              onClick={() => setSelectedClassId(c.id)}
-                            >
-                              {isSelected ? '현재 선택 중' : '이 학급 선택'}
-                            </button>
-                            <button
-                              type="button"
-                              className="outline"
-                              onClick={() => onDeleteClass(c.id)}
-                              disabled={deletingClassId === c.id}
-                            >
-                              {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             </section>
           )}
