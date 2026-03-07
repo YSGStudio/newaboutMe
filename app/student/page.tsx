@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -15,9 +16,11 @@ type FeedRow = {
   id: string;
   emotion_type: EmotionType;
   content: string;
+  image_url?: string | null;
   created_at: string;
   students: { id: string; name: string; student_number: number };
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
+  teacher_comments: { id: string; teacher_id: string; content: string; created_at: string; teacher_profiles?: { name?: string | null } | null }[];
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -369,8 +372,8 @@ export default function StudentPage() {
                   <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택하거나 새 피드를 작성해보세요." />
                 ) : (
                   feeds.map((feed) => (
-                    <div key={feed.id} className="card" style={{ padding: 12 }}>
-                      <div className="row space-between">
+                    <article key={feed.id} className="card feed-post">
+                      <div className="row space-between feed-post-header">
                         <strong>
                           {feed.students.student_number}번 {feed.students.name}
                         </strong>
@@ -378,11 +381,20 @@ export default function StudentPage() {
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
-                      <p className="hint" style={{ marginTop: 6, marginBottom: 8 }}>
+
+                      {feed.image_url ? (
+                        <Image src={feed.image_url} alt="피드 이미지" width={1200} height={900} className="feed-post-image" />
+                      ) : (
+                        <div className="feed-post-placeholder" />
+                      )}
+
+                      <div className="feed-post-body">
+                        <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
                         {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
-                      </p>
-                      <p>{feed.content}</p>
-                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        </p>
+                        <p style={{ marginTop: 0 }}>{feed.content}</p>
+
+                        <div className="row" style={{ flexWrap: 'wrap' }}>
                         {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
                           const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
                           return (
@@ -397,8 +409,19 @@ export default function StudentPage() {
                             </button>
                           );
                         })}
+                        </div>
+
+                        {feed.teacher_comments.length > 0 && (
+                          <div className="feed-post-comments">
+                            {feed.teacher_comments.map((comment) => (
+                              <p key={comment.id} className="hint" style={{ marginTop: 0 }}>
+                                <strong>{comment.teacher_profiles?.name ?? '담임교사'}</strong>: {comment.content}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </article>
                   ))
                 )}
               </div>

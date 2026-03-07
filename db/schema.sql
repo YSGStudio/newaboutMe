@@ -219,3 +219,5 @@ create index if not exists idx_students_class_id on students (class_id);
 create index if not exists idx_feeds_student_created on emotion_feeds (student_id, created_at desc);
 create index if not exists idx_plans_student on plans (student_id);
 create index if not exists idx_plan_checks_plan_date on plan_checks (plan_id, check_date);
+create index if not exists idx_teacher_comments_feed_created on teacher_comments (feed_id, created_at desc);
+create index if not exists idx_teacher_comments_teacher_created on teacher_comments (teacher_id, created_at desc);

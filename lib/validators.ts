@@ -38,6 +38,10 @@ export const reactionSchema = z.object({
   reactionType: z.enum(['heart', 'thumbsup', 'hug', 'fighting'])
 });
 
+export const teacherCommentSchema = z.object({
+  content: z.string().min(1).max(200)
+});
+
 export const planCreateSchema = z.object({
   title: z.string().min(1).max(50)
 });

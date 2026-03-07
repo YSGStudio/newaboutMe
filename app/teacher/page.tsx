@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -35,6 +36,7 @@ type FeedItem = {
   created_at: string;
   students: { id: string; name: string; student_number: number };
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
+  teacher_comments: { id: string; teacher_id: string; content: string; created_at: string; teacher_profiles?: { name?: string | null } | null }[];
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -64,8 +66,10 @@ export default function TeacherPage() {
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [savingCommentFeedId, setSavingCommentFeedId] = useState('');
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -289,6 +293,27 @@ export default function TeacherPage() {
 
   const onChangeFeedDate = (nextDate: string) => {
     setFeedDate(nextDate);
+  };
+
+  const onCreateTeacherComment = async (feedId: string) => {
+    const content = (commentDrafts[feedId] ?? '').trim();
+    if (!content) return;
+    try {
+      setSavingCommentFeedId(feedId);
+      await api(`/api/feeds/${feedId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content })
+      });
+      setCommentDrafts((prev) => ({ ...prev, [feedId]: '' }));
+      if (selectedClassId) {
+        await loadFeeds(selectedClassId, feedDate);
+      }
+    } catch (error) {
+      setAuthError((error as Error).message);
+      clearNoticeLater();
+    } finally {
+      setSavingCommentFeedId('');
+    }
   };
 
   return (
@@ -564,8 +589,8 @@ export default function TeacherPage() {
               ) : (
                 <div className="grid">
                   {feeds.map((feed) => (
-                    <article key={feed.id} className="card" style={{ padding: 12 }}>
-                      <div className="row space-between">
+                    <article key={feed.id} className="card feed-post">
+                      <div className="row space-between feed-post-header">
                         <strong>
                           {feed.students.student_number}번 {feed.students.name}
                         </strong>
@@ -573,19 +598,65 @@ export default function TeacherPage() {
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
-                      <p className="hint" style={{ marginTop: 6, marginBottom: 8 }}>
-                        {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
-                      </p>
-                      <p>{feed.content}</p>
-                      <div className="row" style={{ flexWrap: 'wrap' }}>
-                        {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
-                          const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
-                          return (
-                            <span key={reactionKey} className="badge">
-                              {REACTION_META[reactionKey].label} {count}
-                            </span>
-                          );
-                        })}
+
+                      {feed.image_url ? (
+                        <Image src={feed.image_url} alt="피드 이미지" width={1200} height={900} className="feed-post-image" />
+                      ) : (
+                        <div className="feed-post-placeholder" />
+                      )}
+
+                      <div className="feed-post-body">
+                        <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
+                          {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
+                        </p>
+                        <p style={{ marginTop: 0 }}>{feed.content}</p>
+                        <div className="row" style={{ flexWrap: 'wrap' }}>
+                          {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
+                            const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
+                            return (
+                              <span key={reactionKey} className="badge">
+                                {REACTION_META[reactionKey].label} {count}
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        <div className="feed-post-comments">
+                          {feed.teacher_comments.length === 0 ? (
+                            <p className="hint" style={{ marginTop: 0 }}>
+                              아직 교사 댓글이 없습니다.
+                            </p>
+                          ) : (
+                            feed.teacher_comments.map((comment) => (
+                              <p key={comment.id} className="hint" style={{ marginTop: 0 }}>
+                                <strong>{comment.teacher_profiles?.name ?? '담임교사'}</strong>: {comment.content}
+                              </p>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="row" style={{ alignItems: 'stretch' }}>
+                          <input
+                            value={commentDrafts[feed.id] ?? ''}
+                            placeholder="교사 댓글을 입력하세요 (학생 본인에게만 보입니다)"
+                            maxLength={200}
+                            onChange={(event) =>
+                              setCommentDrafts((prev) => ({
+                                ...prev,
+                                [feed.id]: event.target.value
+                              }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="ghost"
+                            style={{ width: 120 }}
+                            onClick={() => onCreateTeacherComment(feed.id)}
+                            disabled={savingCommentFeedId === feed.id || !(commentDrafts[feed.id] ?? '').trim()}
+                          >
+                            {savingCommentFeedId === feed.id ? '등록 중...' : '댓글 등록'}
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))}

@@ -15,6 +15,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const teacherAuth = await requireTeacher();
   let allowedClassId: string | null = null;
+  let studentIdForVisibility: string | null = null;
 
   if (!('error' in teacherAuth)) {
     const { data: classRow } = await supabaseAdmin
@@ -33,12 +34,13 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
     }
     allowedClassId = studentAuth.student.class_id;
+    studentIdForVisibility = studentAuth.student.id;
   }
 
   const { data, error } = await supabaseAdmin
     .from('emotion_feeds')
     .select(
-      'id,emotion_type,content,image_url,is_visible,created_at,students!inner(id,name,student_number),feed_reactions(id,reaction_type,student_id)'
+      'id,emotion_type,content,image_url,is_visible,created_at,student_id,students!inner(id,name,student_number),feed_reactions(id,reaction_type,student_id),teacher_comments(id,teacher_id,content,created_at,teacher_profiles(name))'
     )
     .eq('students.class_id', allowedClassId)
     .eq('is_visible', true)
@@ -48,5 +50,14 @@ export async function GET(req: Request, { params }: Params) {
     .limit(100);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ feeds: data, date: targetDate });
+
+  const feeds = (data ?? []).map((feed) => {
+    if (!studentIdForVisibility) return feed;
+    return {
+      ...feed,
+      teacher_comments: feed.student_id === studentIdForVisibility ? feed.teacher_comments : []
+    };
+  });
+
+  return NextResponse.json({ feeds, date: targetDate });
 }
