@@ -15,7 +15,11 @@ export const teacherLoginSchema = z.object({
 export const classCreateSchema = z.object({
   className: z.string().min(1).max(40),
   grade: z.number().int().min(1).max(6),
-  section: z.number().int().min(1).max(20)
+  section: z.number().int().min(1).max(20),
+  classCode: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,6}$/, '학급코드는 1~6자리 숫자여야 합니다.')
 });
 
 export const studentCreateSchema = z.object({
@@ -24,7 +28,10 @@ export const studentCreateSchema = z.object({
 });
 
 export const studentLoginSchema = z.object({
-  classCode: z.string().min(6).max(6),
+  classCode: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,6}$/, '학급코드는 1~6자리 숫자여야 합니다.'),
   name: z.string().min(1).max(30)
 });
 

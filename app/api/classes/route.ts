@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { classCreateSchema } from '@/lib/validators';
-import { randomCode } from '@/lib/utils';
 
 export async function GET() {
   const auth = await requireTeacher();
@@ -38,15 +37,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  let classCode = randomCode();
-  for (let i = 0; i < 5; i += 1) {
-    const { data: exists } = await supabaseAdmin
-      .from('classes')
-      .select('id')
-      .eq('class_code', classCode)
-      .maybeSingle();
-    if (!exists) break;
-    classCode = randomCode();
+  const classCode = parsed.data.classCode;
+
+  const { data: duplicatedCode, error: duplicateCheckError } = await supabaseAdmin
+    .from('classes')
+    .select('id')
+    .eq('class_code', classCode)
+    .maybeSingle();
+
+  if (duplicateCheckError) return NextResponse.json({ error: duplicateCheckError.message }, { status: 500 });
+  if (duplicatedCode) {
+    return NextResponse.json({ error: '이미 사용 중인 학급코드입니다. 다른 코드를 입력해주세요.' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
     .select('id,class_name,grade,section,class_code,created_at')
     .single();
 
+  if (error?.code === '23505') {
+    return NextResponse.json({ error: '이미 사용 중인 학급코드입니다. 다른 코드를 입력해주세요.' }, { status: 400 });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ class: data }, { status: 201 });
 }

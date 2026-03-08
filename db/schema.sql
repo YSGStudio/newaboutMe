@@ -62,7 +62,7 @@ create table if not exists classes (
   class_name text not null,
   grade int not null check (grade between 1 and 6),
   section int not null check (section between 1 and 20),
-  class_code text not null unique,
+  class_code text not null unique check (class_code ~ '^[0-9]{1,6}$'),
   created_at timestamptz not null default now()
 );
 

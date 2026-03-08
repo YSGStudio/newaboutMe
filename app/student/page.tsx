@@ -98,7 +98,7 @@ export default function StudentPage() {
       }>('/api/auth/student/login', {
         method: 'POST',
         body: JSON.stringify({
-          classCode: String(form.get('classCode')).toUpperCase(),
+          classCode: String(form.get('classCode')).trim(),
           name: String(form.get('name'))
         })
       });
@@ -235,7 +235,7 @@ export default function StudentPage() {
           <form className="grid" onSubmit={onLogin}>
             <div>
               <label>학급코드</label>
-              <input name="classCode" placeholder="ABC123" required maxLength={6} />
+              <input name="classCode" placeholder="예: 1234" required maxLength={6} inputMode="numeric" pattern="[0-9]{1,6}" />
             </div>
             <div>
               <label>이름</label>

@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const classCode = parsed.data.classCode.toUpperCase();
+  const classCode = parsed.data.classCode.trim();
 
   const { data: classRow } = await supabaseAdmin
     .from('classes')

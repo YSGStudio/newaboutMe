@@ -188,7 +188,8 @@ export default function TeacherPage() {
         body: JSON.stringify({
           className: String(form.get('className')),
           grade: Number(form.get('grade')),
-          section: Number(form.get('section'))
+          section: Number(form.get('section')),
+          classCode: String(form.get('classCode')).trim()
         })
       });
       formEl.reset();
@@ -442,6 +443,10 @@ export default function TeacherPage() {
                         <label>반</label>
                         <input name="section" type="number" min={1} max={20} required disabled={!canCreateClass} />
                       </div>
+                    </div>
+                    <div>
+                      <label>학급코드 (숫자 1~6자리)</label>
+                      <input name="classCode" type="text" inputMode="numeric" pattern="[0-9]{1,6}" maxLength={6} placeholder="예: 1234" required disabled={!canCreateClass} />
                     </div>
                     <SubmitButton loading={classLoading} idleText={canCreateClass ? '학급 추가' : '학급 생성 비활성화'} disabled={!canCreateClass} />
                   </form>
