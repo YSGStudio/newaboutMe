@@ -19,7 +19,6 @@ type FeedRow = {
   created_at: string;
   students: { id: string; name: string; student_number: number };
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
-  teacher_comments: { id: string; teacher_id: string; content: string; created_at: string; teacher_profiles?: { name?: string | null } | null }[];
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -197,8 +196,7 @@ export default function StudentPage() {
           {
             ...data.feed,
             students: { id: studentId, name: studentName, student_number: studentNumber },
-            feed_reactions: [],
-            teacher_comments: []
+            feed_reactions: []
           },
           ...prev
         ]);
@@ -464,21 +462,11 @@ export default function StudentPage() {
                               style={{ width: 'auto', minWidth: 64, minHeight: 44 }}
                               onClick={() => reactFeed(feed.id, reactionKey)}
                             >
-                              {REACTION_META[reactionKey].label} {count}
+                              {REACTION_META[reactionKey].emoji} {count}
                             </button>
                           );
                         })}
                         </div>
-
-                        {feed.teacher_comments.length > 0 && (
-                          <div className="feed-post-comments">
-                            {feed.teacher_comments.map((comment) => (
-                              <p key={comment.id} className="hint" style={{ marginTop: 0 }}>
-                                <strong>{comment.teacher_profiles?.name ?? '담임교사'}</strong>: {comment.content}
-                              </p>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </article>
                   ))

@@ -35,7 +35,6 @@ type FeedItem = {
   created_at: string;
   students: { id: string; name: string; student_number: number };
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
-  teacher_comments: { id: string; teacher_id: string; content: string; created_at: string; teacher_profiles?: { name?: string | null } | null }[];
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -66,10 +65,8 @@ export default function TeacherPage() {
   const [studentLoading, setStudentLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
   const [refreshLoading, setRefreshLoading] = useState(false);
-  const [savingCommentFeedId, setSavingCommentFeedId] = useState('');
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -317,58 +314,6 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setRefreshLoading(false);
-    }
-  };
-
-  const onCreateTeacherComment = async (feedId: string) => {
-    const content = (commentDrafts[feedId] ?? '').trim();
-    if (!content) return;
-    const before = feeds;
-    const optimisticComment = {
-      id: `local-${feedId}-${Date.now()}`,
-      teacher_id: 'self',
-      content,
-      created_at: new Date().toISOString(),
-      teacher_profiles: { name: '담임교사' }
-    };
-    setFeeds((prev) =>
-      prev.map((feed) =>
-        feed.id === feedId
-          ? {
-              ...feed,
-              teacher_comments: [optimisticComment, ...feed.teacher_comments]
-            }
-          : feed
-      )
-    );
-    setCommentDrafts((prev) => ({ ...prev, [feedId]: '' }));
-    try {
-      setSavingCommentFeedId(feedId);
-      const data = await api<{
-        comment: { id: string; teacher_id: string; content: string; created_at: string };
-      }>(`/api/feeds/${feedId}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ content })
-      });
-      setFeeds((prev) =>
-        prev.map((feed) =>
-          feed.id === feedId
-            ? {
-                ...feed,
-                teacher_comments: feed.teacher_comments.map((item) =>
-                  item.id === optimisticComment.id ? { ...item, ...data.comment } : item
-                )
-              }
-            : feed
-        )
-      );
-    } catch (error) {
-      setFeeds(before);
-      setCommentDrafts((prev) => ({ ...prev, [feedId]: content }));
-      setAuthError((error as Error).message);
-      clearNoticeLater();
-    } finally {
-      setSavingCommentFeedId('');
     }
   };
 
@@ -674,47 +619,10 @@ export default function TeacherPage() {
                             const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
                             return (
                               <span key={reactionKey} className="badge">
-                                {REACTION_META[reactionKey].label} {count}
+                                {REACTION_META[reactionKey].emoji} {count}
                               </span>
                             );
                           })}
-                        </div>
-
-                        <div className="feed-post-comments">
-                          {feed.teacher_comments.length === 0 ? (
-                            <p className="hint" style={{ marginTop: 0 }}>
-                              아직 교사 댓글이 없습니다.
-                            </p>
-                          ) : (
-                            feed.teacher_comments.map((comment) => (
-                              <p key={comment.id} className="hint" style={{ marginTop: 0 }}>
-                                <strong>{comment.teacher_profiles?.name ?? '담임교사'}</strong>: {comment.content}
-                              </p>
-                            ))
-                          )}
-                        </div>
-
-                        <div className="row" style={{ alignItems: 'stretch' }}>
-                          <input
-                            value={commentDrafts[feed.id] ?? ''}
-                            placeholder="교사 댓글을 입력하세요 (학생 본인에게만 보입니다)"
-                            maxLength={200}
-                            onChange={(event) =>
-                              setCommentDrafts((prev) => ({
-                                ...prev,
-                                [feed.id]: event.target.value
-                              }))
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="ghost"
-                            style={{ width: 120 }}
-                            onClick={() => onCreateTeacherComment(feed.id)}
-                            disabled={savingCommentFeedId === feed.id || !(commentDrafts[feed.id] ?? '').trim()}
-                          >
-                            {savingCommentFeedId === feed.id ? '등록 중...' : '댓글 등록'}
-                          </button>
                         </div>
                       </div>
                     </article>

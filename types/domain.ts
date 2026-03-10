@@ -141,9 +141,9 @@ export const EMOTION_META: Record<EmotionType, { label: string; category: Emotio
   hopeful: { label: '희망', category: 'joy_vitality', categoryLabel: '기쁨/활력' }
 };
 
-export const REACTION_META: Record<ReactionType, { label: string }> = {
-  heart: { label: '하트' },
-  thumbsup: { label: '최고' },
-  hug: { label: '응원' },
-  fighting: { label: '힘내' }
+export const REACTION_META: Record<ReactionType, { label: string; emoji: string }> = {
+  heart: { label: '하트', emoji: '❤️' },
+  thumbsup: { label: '최고', emoji: '👍' },
+  hug: { label: '응원', emoji: '🤗' },
+  fighting: { label: '힘내', emoji: '💪' }
 };
