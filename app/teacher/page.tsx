@@ -66,6 +66,7 @@ export default function TeacherPage() {
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [refreshLoading, setRefreshLoading] = useState(false);
   const [savingCommentFeedId, setSavingCommentFeedId] = useState('');
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
@@ -296,6 +297,30 @@ export default function TeacherPage() {
     setFeedDate(nextDate);
   };
 
+  const onRefreshData = async () => {
+    try {
+      setRefreshLoading(true);
+      setAuthError('');
+      await loadClasses();
+
+      const targetClassId = selectedClassId || classes[0]?.id;
+      if (targetClassId) {
+        await loadStudents(targetClassId);
+        if (activeTab === 'feed') {
+          await loadFeeds(targetClassId, feedDate);
+        }
+      }
+
+      setAuthMessage('최신 데이터로 새로고침했습니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setAuthError((error as Error).message);
+      clearNoticeLater();
+    } finally {
+      setRefreshLoading(false);
+    }
+  };
+
   const onCreateTeacherComment = async (feedId: string) => {
     const content = (commentDrafts[feedId] ?? '').trim();
     if (!content) return;
@@ -324,9 +349,14 @@ export default function TeacherPage() {
         subtitle="학급과 학생을 빠르게 관리하세요"
         right={
           isAuthed ? (
-            <button className="outline" type="button" onClick={onLogout}>
-              로그아웃
-            </button>
+            <div className="row" style={{ width: 'auto' }}>
+              <button className="outline" type="button" onClick={onRefreshData} disabled={refreshLoading}>
+                {refreshLoading ? '새로고침 중...' : '새로고침'}
+              </button>
+              <button className="outline" type="button" onClick={onLogout}>
+                로그아웃
+              </button>
+            </div>
           ) : null
         }
       />
