@@ -55,7 +55,7 @@ export type EmotionCategoryType =
   | 'anger_rejection'
   | 'social_emotions';
 
-export type ReactionType = 'heart' | 'thumbsup' | 'hug' | 'fighting';
+export type ReactionType = 'heart' | 'hug' | 'fighting';
 
 export const EMOTION_CATEGORIES: ReadonlyArray<{
   key: EmotionCategoryType;
@@ -143,7 +143,6 @@ export const EMOTION_META: Record<EmotionType, { label: string; category: Emotio
 
 export const REACTION_META: Record<ReactionType, { label: string; emoji: string }> = {
   heart: { label: '하트', emoji: '❤️' },
-  thumbsup: { label: '최고', emoji: '👍' },
   hug: { label: '응원', emoji: '🤗' },
   fighting: { label: '힘내', emoji: '💪' }
 };

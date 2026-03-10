@@ -42,7 +42,7 @@ export const feedCreateSchema = z.object({
 });
 
 export const reactionSchema = z.object({
-  reactionType: z.enum(['heart', 'thumbsup', 'hug', 'fighting'])
+  reactionType: z.enum(['heart', 'hug', 'fighting'])
 });
 
 export const planCreateSchema = z.object({

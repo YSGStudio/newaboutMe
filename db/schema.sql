@@ -48,7 +48,7 @@ create type emotion_type as enum (
   'hopeful'
 );
 
-create type reaction_type as enum ('heart', 'thumbsup', 'hug', 'fighting');
+create type reaction_type as enum ('heart', 'hug', 'fighting');
 
 create table if not exists teacher_profiles (
   id uuid primary key references auth.users (id) on delete cascade,
