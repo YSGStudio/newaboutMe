@@ -10,6 +10,13 @@ import Tabs from '@/components/ui/Tabs';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionType, REACTION_META, ReactionType } from '@/types/domain';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
+type PlanAchievementRow = {
+  planId: string;
+  title: string;
+  completed: number;
+  totalPossible: number;
+  achievementRate: number;
+};
 
 type FeedRow = {
   id: string;
@@ -38,6 +45,7 @@ export default function StudentPage() {
   const [studentNumber, setStudentNumber] = useState<number | null>(null);
   const [timelineDate, setTimelineDate] = useState(new Date().toISOString().slice(0, 10));
   const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
   const [feeds, setFeeds] = useState<FeedRow[]>([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -79,6 +87,11 @@ export default function StudentPage() {
     setPlans(data.plans);
   };
 
+  const loadPlanAchievements = async () => {
+    const data = await api<{ plans: PlanAchievementRow[] }>('/api/stats/student/me/plans');
+    setPlanAchievements(data.plans);
+  };
+
   const loadFeeds = async (targetClassId: string, date: string = timelineDate) => {
     const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}?date=${date}`);
     setFeeds(data.feeds);
@@ -107,7 +120,7 @@ export default function StudentPage() {
       setStudentId(data.student.id);
       setStudentName(data.student.name);
       setStudentNumber(data.student.studentNumber);
-      await Promise.all([loadPlans(), loadFeeds(data.class.id, timelineDate)]);
+      await Promise.all([loadPlans(), loadPlanAchievements(), loadFeeds(data.class.id, timelineDate)]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -128,6 +141,7 @@ export default function StudentPage() {
       const data = await api<{ plan: { id: string; title: string } }>('/api/plans', { method: 'POST', body: JSON.stringify({ title }) });
       formEl.reset();
       setPlans((prev) => [...prev, { id: data.plan.id, title: data.plan.title, isCompleted: null }]);
+      await loadPlanAchievements();
       setMessage('계획이 추가되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -146,6 +160,7 @@ export default function StudentPage() {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
+      await loadPlanAchievements();
     } catch (err) {
       setPlans(before);
       setError((err as Error).message);
@@ -158,6 +173,7 @@ export default function StudentPage() {
     setPlans((prev) => prev.filter((plan) => plan.id !== planId));
     try {
       await api(`/api/plans/${planId}`, { method: 'DELETE' });
+      await loadPlanAchievements();
       setMessage('계획이 삭제되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -246,6 +262,7 @@ export default function StudentPage() {
     setStudentName('');
     setStudentNumber(null);
     setPlans([]);
+    setPlanAchievements([]);
     setFeeds([]);
     setTimelineDate(new Date().toISOString().slice(0, 10));
     setMessage('로그아웃 되었습니다.');
@@ -370,6 +387,26 @@ export default function StudentPage() {
           {activeTab === 'plan' && (
             <section className="card">
               <h2>오늘의 계획</h2>
+              <div className="grid two" style={{ marginBottom: 12 }}>
+                {planAchievements.length === 0 ? (
+                  <EmptyState title="실천률 데이터가 없습니다" description="계획을 추가하면 누적 실천률이 표시됩니다." />
+                ) : (
+                  planAchievements.map((item) => (
+                    <div key={item.planId} className="card" style={{ padding: 10 }}>
+                      <div className="row space-between" style={{ marginBottom: 4 }}>
+                        <strong style={{ fontSize: 14 }}>{item.title}</strong>
+                        <span className="badge">{item.achievementRate}%</span>
+                      </div>
+                      <div className="progress-track">
+                        <div className="progress-fill" style={{ width: `${item.achievementRate}%` }} />
+                      </div>
+                      <p className="hint">
+                        이번 달 누적 {item.completed}/{item.totalPossible}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
               <form className="row" onSubmit={onCreatePlan}>
                 <input name="title" placeholder="예: 책 30분 읽기" required />
                 <div style={{ width: 140 }}>
