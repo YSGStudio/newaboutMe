@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -324,17 +323,48 @@ export default function TeacherPage() {
   const onCreateTeacherComment = async (feedId: string) => {
     const content = (commentDrafts[feedId] ?? '').trim();
     if (!content) return;
+    const before = feeds;
+    const optimisticComment = {
+      id: `local-${feedId}-${Date.now()}`,
+      teacher_id: 'self',
+      content,
+      created_at: new Date().toISOString(),
+      teacher_profiles: { name: '담임교사' }
+    };
+    setFeeds((prev) =>
+      prev.map((feed) =>
+        feed.id === feedId
+          ? {
+              ...feed,
+              teacher_comments: [optimisticComment, ...feed.teacher_comments]
+            }
+          : feed
+      )
+    );
+    setCommentDrafts((prev) => ({ ...prev, [feedId]: '' }));
     try {
       setSavingCommentFeedId(feedId);
-      await api(`/api/feeds/${feedId}/comments`, {
+      const data = await api<{
+        comment: { id: string; teacher_id: string; content: string; created_at: string };
+      }>(`/api/feeds/${feedId}/comments`, {
         method: 'POST',
         body: JSON.stringify({ content })
       });
-      setCommentDrafts((prev) => ({ ...prev, [feedId]: '' }));
-      if (selectedClassId) {
-        await loadFeeds(selectedClassId, feedDate);
-      }
+      setFeeds((prev) =>
+        prev.map((feed) =>
+          feed.id === feedId
+            ? {
+                ...feed,
+                teacher_comments: feed.teacher_comments.map((item) =>
+                  item.id === optimisticComment.id ? { ...item, ...data.comment } : item
+                )
+              }
+            : feed
+        )
+      );
     } catch (error) {
+      setFeeds(before);
+      setCommentDrafts((prev) => ({ ...prev, [feedId]: content }));
       setAuthError((error as Error).message);
       clearNoticeLater();
     } finally {
@@ -633,12 +663,6 @@ export default function TeacherPage() {
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
-
-                      {feed.image_url ? (
-                        <Image src={feed.image_url} alt="피드 이미지" width={1200} height={900} className="feed-post-image" />
-                      ) : (
-                        <div className="feed-post-placeholder" />
-                      )}
 
                       <div className="feed-post-body">
                         <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>

@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -35,7 +34,9 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 
 export default function StudentPage() {
   const [classId, setClassId] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [studentNumber, setStudentNumber] = useState<number | null>(null);
   const [timelineDate, setTimelineDate] = useState(new Date().toISOString().slice(0, 10));
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [feeds, setFeeds] = useState<FeedRow[]>([]);
@@ -93,7 +94,7 @@ export default function StudentPage() {
     const form = new FormData(event.currentTarget);
     try {
       const data = await api<{
-        student: { name: string };
+        student: { id: string; name: string; studentNumber: number };
         class: { id: string };
       }>('/api/auth/student/login', {
         method: 'POST',
@@ -104,7 +105,9 @@ export default function StudentPage() {
       });
 
       setClassId(data.class.id);
+      setStudentId(data.student.id);
       setStudentName(data.student.name);
+      setStudentNumber(data.student.studentNumber);
       await Promise.all([loadPlans(), loadFeeds(data.class.id, timelineDate)]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
@@ -121,10 +124,11 @@ export default function StudentPage() {
     setPlanLoading(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const title = String(form.get('title'));
     try {
-      await api('/api/plans', { method: 'POST', body: JSON.stringify({ title: String(form.get('title')) }) });
+      const data = await api<{ plan: { id: string; title: string } }>('/api/plans', { method: 'POST', body: JSON.stringify({ title }) });
       formEl.reset();
-      await loadPlans();
+      setPlans((prev) => [...prev, { id: data.plan.id, title: data.plan.title, isCompleted: null }]);
       setMessage('계획이 추가되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -136,25 +140,29 @@ export default function StudentPage() {
   };
 
   const togglePlan = async (planId: string, nextState: boolean | null) => {
+    const before = plans;
+    setPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, isCompleted: nextState } : plan)));
     try {
       await api(`/api/plans/${planId}/check`, {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
-      await loadPlans();
     } catch (err) {
+      setPlans(before);
       setError((err as Error).message);
       clearNoticeLater();
     }
   };
 
   const deletePlan = async (planId: string) => {
+    const before = plans;
+    setPlans((prev) => prev.filter((plan) => plan.id !== planId));
     try {
       await api(`/api/plans/${planId}`, { method: 'DELETE' });
-      await loadPlans();
       setMessage('계획이 삭제되었습니다.');
       clearNoticeLater();
     } catch (err) {
+      setPlans(before);
       setError((err as Error).message);
       clearNoticeLater();
     }
@@ -165,16 +173,38 @@ export default function StudentPage() {
     setFeedLoading(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
+    const content = String(form.get('content'));
     try {
-      await api('/api/feeds', {
+      const data = await api<{
+        feed: {
+          id: string;
+          emotion_type: EmotionType;
+          content: string;
+          image_url: string | null;
+          created_at: string;
+        };
+      }>('/api/feeds', {
         method: 'POST',
         body: JSON.stringify({
           emotionType,
-          content: String(form.get('content'))
+          content
         })
       });
       formEl.reset();
-      if (classId) await loadFeeds(classId, timelineDate);
+      const today = new Date().toISOString().slice(0, 10);
+      if (timelineDate === today && studentNumber !== null) {
+        setFeeds((prev) => [
+          {
+            ...data.feed,
+            students: { id: studentId, name: studentName, student_number: studentNumber },
+            feed_reactions: [],
+            teacher_comments: []
+          },
+          ...prev
+        ]);
+      } else if (classId) {
+        await loadFeeds(classId, timelineDate);
+      }
       setActiveTab('timeline');
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
@@ -187,13 +217,25 @@ export default function StudentPage() {
   };
 
   const reactFeed = async (feedId: string, reactionType: ReactionType) => {
+    if (!studentId) return;
+    const before = feeds;
+    setFeeds((prev) =>
+      prev.map((feed) => {
+        if (feed.id !== feedId) return feed;
+        const withoutMine = feed.feed_reactions.filter((item) => item.student_id !== studentId);
+        return {
+          ...feed,
+          feed_reactions: [...withoutMine, { id: `local-${feedId}-${studentId}`, reaction_type: reactionType, student_id: studentId }]
+        };
+      })
+    );
     try {
       await api(`/api/feeds/${feedId}/reactions`, {
         method: 'POST',
         body: JSON.stringify({ reactionType })
       });
-      if (classId) await loadFeeds(classId, timelineDate);
     } catch (err) {
+      setFeeds(before);
       setError((err as Error).message);
       clearNoticeLater();
     }
@@ -202,7 +244,9 @@ export default function StudentPage() {
   const onLogout = async () => {
     await api('/api/auth/student/logout', { method: 'POST' });
     setClassId('');
+    setStudentId('');
     setStudentName('');
+    setStudentNumber(null);
     setPlans([]);
     setFeeds([]);
     setTimelineDate(new Date().toISOString().slice(0, 10));
@@ -402,12 +446,6 @@ export default function StudentPage() {
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
                         </span>
                       </div>
-
-                      {feed.image_url ? (
-                        <Image src={feed.image_url} alt="피드 이미지" width={1200} height={900} className="feed-post-image" />
-                      ) : (
-                        <div className="feed-post-placeholder" />
-                      )}
 
                       <div className="feed-post-body">
                         <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
