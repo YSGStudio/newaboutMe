@@ -148,6 +148,18 @@ export default function StudentPage() {
     }
   };
 
+  const deletePlan = async (planId: string) => {
+    try {
+      await api(`/api/plans/${planId}`, { method: 'DELETE' });
+      await loadPlans();
+      setMessage('계획이 삭제되었습니다.');
+      clearNoticeLater();
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    }
+  };
+
   const onCreateFeed = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedLoading(true);
@@ -346,6 +358,14 @@ export default function StudentPage() {
                           onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
                         >
                           미완료
+                        </button>
+                        <button
+                          type="button"
+                          className="outline"
+                          style={{ width: 72, minHeight: 40, padding: '8px 10px' }}
+                          onClick={() => deletePlan(plan.id)}
+                        >
+                          삭제
                         </button>
                       </div>
                     </div>
