@@ -574,12 +574,12 @@ export default function StudentPage() {
                 ) : (
                   feeds.map((feed) => (
                     <article key={feed.id} className="card feed-post">
-                      <div className="row space-between feed-post-header">
-                        <strong>
+                      <div className="feed-post-header">
+                        <strong className="feed-post-author">
                           {feed.students.student_number}번 {feed.students.name}
                         </strong>
                         <span className="hint" style={{ margin: 0 }}>
-                          {new Date(feed.created_at).toLocaleString('ko-KR')}
+                          {new Date(feed.created_at).toLocaleDateString('ko-KR')}
                         </span>
                       </div>
 

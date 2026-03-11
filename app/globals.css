@@ -237,8 +237,15 @@ p.hint {
 }
 
 .feed-post-header {
+  display: grid;
+  gap: 4px;
   padding: 12px 14px;
   border-bottom: 1px solid #edf2fb;
+}
+
+.feed-post-author {
+  display: block;
+  line-height: 1.4;
 }
 
 .feed-post-body {
