@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { planCheckSchema } from '@/lib/validators';
-import { todayDate } from '@/lib/utils';
+import { todayDate } from '@/lib/date';
 
 type Params = { params: { id: string } };
 
@@ -29,6 +29,12 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const date = todayDate();
+  const url = new URL(req.url);
+  const requestedDate = url.searchParams.get('date');
+
+  if (requestedDate && requestedDate !== date) {
+    return NextResponse.json({ error: '지난 날짜의 계획 체크는 수정할 수 없습니다.' }, { status: 403 });
+  }
 
   const { data, error } = await supabaseAdmin
     .from('plan_checks')

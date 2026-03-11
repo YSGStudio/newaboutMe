@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { todayDate } from '@/lib/utils';
+import { todayDate } from '@/lib/date';
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireStudentSession();
   if ('error' in auth) return auth.error;
 
-  const date = todayDate();
+  const url = new URL(req.url);
+  const queryDate = url.searchParams.get('date');
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const date = queryDate && datePattern.test(queryDate) ? queryDate : todayDate();
 
   const { data: plans, error } = await supabaseAdmin
     .from('plans')

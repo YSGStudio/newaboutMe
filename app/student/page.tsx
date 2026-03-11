@@ -46,6 +46,7 @@ export default function StudentPage() {
   const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentNumber, setStudentNumber] = useState<number | null>(null);
+  const [planDate, setPlanDate] = useState(getTodayInSeoul);
   const [timelineDate, setTimelineDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
@@ -59,6 +60,8 @@ export default function StudentPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
+  const today = getTodayInSeoul();
+  const isPlanEditable = planDate === today;
 
   const summary = useMemo(() => {
     const completed = plans.filter((plan) => plan.isCompleted === true).length;
@@ -86,16 +89,31 @@ export default function StudentPage() {
       const nextDate = getTodayInSeoul();
       if (nextDate === currentDate) return;
 
+      const shouldRefreshPlanDate = planDate === currentDate;
+      const shouldRefreshTimelineDate = timelineDate === currentDate;
       currentDate = nextDate;
-      setTimelineDate(nextDate);
+
+      if (shouldRefreshPlanDate) {
+        setPlanDate(nextDate);
+      }
+      if (shouldRefreshTimelineDate) {
+        setTimelineDate(nextDate);
+      }
+
+      const loadPlansForDate = api<{ plans: PlanRow[] }>(
+        `/api/plans/today?date=${shouldRefreshPlanDate ? nextDate : planDate}`
+      ).then((data) => {
+        setPlans(data.plans);
+      });
+
       const loadFeedsForDate = classId
-        ? api<{ feeds: FeedRow[] }>(`/api/feeds/class/${classId}?date=${nextDate}`).then((data) => {
+        ? api<{ feeds: FeedRow[] }>(`/api/feeds/class/${classId}?date=${shouldRefreshTimelineDate ? nextDate : timelineDate}`).then((data) => {
             setFeeds(data.feeds);
           })
         : Promise.resolve();
 
       void Promise.all([
-        loadPlans(),
+        loadPlansForDate,
         loadPlanAchievements(),
         loadFeedsForDate
       ]).catch((err) => {
@@ -105,7 +123,7 @@ export default function StudentPage() {
     }, 60 * 1000);
 
     return () => window.clearInterval(timer);
-  }, [classId, studentName]);
+  }, [classId, planDate, studentName, timelineDate]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -114,8 +132,8 @@ export default function StudentPage() {
     }, 2500);
   };
 
-  const loadPlans = async () => {
-    const data = await api<{ plans: PlanRow[] }>('/api/plans/today');
+  const loadPlans = async (date: string = planDate) => {
+    const data = await api<{ plans: PlanRow[] }>(`/api/plans/today?date=${date}`);
     setPlans(data.plans);
   };
 
@@ -152,7 +170,10 @@ export default function StudentPage() {
       setStudentId(data.student.id);
       setStudentName(data.student.name);
       setStudentNumber(data.student.studentNumber);
-      await Promise.all([loadPlans(), loadPlanAchievements(), loadFeeds(data.class.id, timelineDate)]);
+      const loginToday = getTodayInSeoul();
+      setPlanDate(loginToday);
+      setTimelineDate(loginToday);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadFeeds(data.class.id, loginToday)]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -165,6 +186,11 @@ export default function StudentPage() {
 
   const onCreatePlan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isPlanEditable) {
+      setError('지난 날짜의 계획은 수정할 수 없습니다.');
+      clearNoticeLater();
+      return;
+    }
     setPlanLoading(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
@@ -185,10 +211,16 @@ export default function StudentPage() {
   };
 
   const togglePlan = async (planId: string, nextState: boolean | null) => {
+    if (!isPlanEditable) {
+      setError('지난 날짜의 계획은 수정할 수 없습니다.');
+      clearNoticeLater();
+      return;
+    }
+
     const before = plans;
     setPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, isCompleted: nextState } : plan)));
     try {
-      await api(`/api/plans/${planId}/check`, {
+      await api(`/api/plans/${planId}/check?date=${planDate}`, {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
@@ -201,6 +233,12 @@ export default function StudentPage() {
   };
 
   const deletePlan = async (planId: string) => {
+    if (!isPlanEditable) {
+      setError('지난 날짜의 계획은 수정할 수 없습니다.');
+      clearNoticeLater();
+      return;
+    }
+
     const before = plans;
     setPlans((prev) => prev.filter((plan) => plan.id !== planId));
     try {
@@ -293,6 +331,7 @@ export default function StudentPage() {
     setStudentId('');
     setStudentName('');
     setStudentNumber(null);
+    setPlanDate(getTodayInSeoul());
     setPlans([]);
     setPlanAchievements([]);
     setFeeds([]);
@@ -310,6 +349,16 @@ export default function StudentPage() {
         setError((err as Error).message);
         clearNoticeLater();
       }
+    }
+  };
+
+  const onChangePlanDate = async (nextDate: string) => {
+    setPlanDate(nextDate);
+    try {
+      await loadPlans(nextDate);
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
     }
   };
 
@@ -418,7 +467,21 @@ export default function StudentPage() {
 
           {activeTab === 'plan' && (
             <section className="card">
-              <h2>오늘의 계획</h2>
+              <div className="row space-between" style={{ marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>오늘의 계획</h2>
+                <div style={{ width: 180 }}>
+                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
+                  <input
+                    type="date"
+                    value={planDate}
+                    max={today}
+                    onChange={(event) => onChangePlanDate(event.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="hint" style={{ marginTop: 0 }}>
+                {isPlanEditable ? '오늘 계획은 추가, 체크, 삭제가 가능합니다.' : '과거 날짜의 계획은 조회만 가능하며 수정할 수 없습니다.'}
+              </p>
               <div className="grid two" style={{ marginBottom: 12 }}>
                 {planAchievements.length === 0 ? (
                   <EmptyState title="실천률 데이터가 없습니다" description="계획을 추가하면 누적 실천률이 표시됩니다." />
@@ -440,15 +503,18 @@ export default function StudentPage() {
                 )}
               </div>
               <form className="row" onSubmit={onCreatePlan}>
-                <input name="title" placeholder="예: 책 30분 읽기" required />
+                <input name="title" placeholder="예: 책 30분 읽기" required disabled={!isPlanEditable} />
                 <div style={{ width: 140 }}>
-                  <SubmitButton loading={planLoading} idleText="추가" />
+                  <SubmitButton loading={planLoading} idleText="추가" disabled={!isPlanEditable} />
                 </div>
               </form>
 
               <div className="grid" style={{ marginTop: 12 }}>
                 {plans.length === 0 ? (
-                  <EmptyState title="등록된 계획이 없습니다" description="오늘 계획을 하나 추가해보세요." />
+                  <EmptyState
+                    title="등록된 계획이 없습니다"
+                    description={isPlanEditable ? '오늘 계획을 하나 추가해보세요.' : '선택한 날짜에 확인할 계획 데이터가 없습니다.'}
+                  />
                 ) : (
                   plans.map((plan) => (
                     <div key={plan.id} className="card row space-between" style={{ padding: 12 }}>
@@ -458,6 +524,7 @@ export default function StudentPage() {
                           type="button"
                           className={plan.isCompleted === true ? 'ghost' : 'outline'}
                           style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
+                          disabled={!isPlanEditable}
                           onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
                         >
                           완료
@@ -466,6 +533,7 @@ export default function StudentPage() {
                           type="button"
                           className={plan.isCompleted === false ? 'ghost' : 'outline'}
                           style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
+                          disabled={!isPlanEditable}
                           onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
                         >
                           미완료
@@ -474,6 +542,7 @@ export default function StudentPage() {
                           type="button"
                           className="outline"
                           style={{ width: 72, minHeight: 40, padding: '8px 10px' }}
+                          disabled={!isPlanEditable}
                           onClick={() => deletePlan(plan.id)}
                         >
                           삭제
