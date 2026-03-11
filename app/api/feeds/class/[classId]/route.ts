@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSeoulDayRange, todayDate } from '@/lib/date';
 
 type Params = { params: { classId: string } };
 
@@ -9,9 +10,8 @@ export async function GET(req: Request, { params }: Params) {
   const url = new URL(req.url);
   const queryDate = url.searchParams.get('date');
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-  const targetDate = queryDate && datePattern.test(queryDate) ? queryDate : new Date().toISOString().slice(0, 10);
-  const dayStart = `${targetDate}T00:00:00.000Z`;
-  const dayEnd = `${targetDate}T23:59:59.999Z`;
+  const targetDate = queryDate && datePattern.test(queryDate) ? queryDate : todayDate();
+  const { startIso, endIso } = getSeoulDayRange(targetDate);
 
   const teacherAuth = await requireTeacher();
   let allowedClassId: string | null = null;
@@ -42,8 +42,8 @@ export async function GET(req: Request, { params }: Params) {
     )
     .eq('students.class_id', allowedClassId)
     .eq('is_visible', true)
-    .gte('created_at', dayStart)
-    .lte('created_at', dayEnd)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
     .order('created_at', { ascending: false })
     .limit(100);
 

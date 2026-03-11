@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from 'crypto';
+export { formatDateInSeoul, todayDate } from './date';
 
 export const randomCode = (len = 6) => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -8,5 +9,3 @@ export const randomCode = (len = 6) => {
 export const randomToken = () => randomBytes(32).toString('hex');
 
 export const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
-
-export const todayDate = () => new Date().toISOString().slice(0, 10);

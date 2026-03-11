@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSeoulDayRange, todayDate } from '@/lib/date';
 import { feedCreateSchema } from '@/lib/validators';
 
 export async function POST(req: Request) {
@@ -14,14 +15,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const { startIso, endIso } = getSeoulDayRange(todayDate());
 
   const { count } = await supabaseAdmin
     .from('emotion_feeds')
     .select('id', { count: 'exact', head: true })
     .eq('student_id', auth.student.id)
-    .gte('created_at', todayStart.toISOString());
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
 
   if ((count ?? 0) >= 1) {
     return NextResponse.json({ error: '하루 최대 1개의 피드만 작성할 수 있습니다.' }, { status: 400 });

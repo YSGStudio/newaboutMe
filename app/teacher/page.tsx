@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
+import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
 type ClassItem = {
@@ -57,7 +58,7 @@ export default function TeacherPage() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [feeds, setFeeds] = useState<FeedItem[]>([]);
-  const [feedDate, setFeedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [feedDate, setFeedDate] = useState(() => formatDateInSeoul(new Date()));
   const [hasTeacherSession, setHasTeacherSession] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);

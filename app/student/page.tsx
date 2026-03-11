@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
+import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionType, REACTION_META, ReactionType } from '@/types/domain';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
@@ -38,12 +39,14 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   return json;
 };
 
+const getTodayInSeoul = () => formatDateInSeoul(new Date());
+
 export default function StudentPage() {
   const [classId, setClassId] = useState('');
   const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentNumber, setStudentNumber] = useState<number | null>(null);
-  const [timelineDate, setTimelineDate] = useState(new Date().toISOString().slice(0, 10));
+  const [timelineDate, setTimelineDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
   const [feeds, setFeeds] = useState<FeedRow[]>([]);
@@ -74,6 +77,35 @@ export default function StudentPage() {
       setEmotionType(emotionOptions[0] ?? EMOTION_CATEGORIES[0].emotions[0]);
     }
   }, [emotionOptions, emotionType]);
+
+  useEffect(() => {
+    if (!studentName) return;
+
+    let currentDate = getTodayInSeoul();
+    const timer = window.setInterval(() => {
+      const nextDate = getTodayInSeoul();
+      if (nextDate === currentDate) return;
+
+      currentDate = nextDate;
+      setTimelineDate(nextDate);
+      const loadFeedsForDate = classId
+        ? api<{ feeds: FeedRow[] }>(`/api/feeds/class/${classId}?date=${nextDate}`).then((data) => {
+            setFeeds(data.feeds);
+          })
+        : Promise.resolve();
+
+      void Promise.all([
+        loadPlans(),
+        loadPlanAchievements(),
+        loadFeedsForDate
+      ]).catch((err) => {
+        setError((err as Error).message);
+        clearNoticeLater();
+      });
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [classId, studentName]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -206,7 +238,7 @@ export default function StudentPage() {
         })
       });
       formEl.reset();
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getTodayInSeoul();
       if (timelineDate === today && studentNumber !== null) {
         setFeeds((prev) => [
           {
@@ -264,7 +296,7 @@ export default function StudentPage() {
     setPlans([]);
     setPlanAchievements([]);
     setFeeds([]);
-    setTimelineDate(new Date().toISOString().slice(0, 10));
+    setTimelineDate(getTodayInSeoul());
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
