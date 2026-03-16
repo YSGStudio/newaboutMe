@@ -521,7 +521,7 @@ export default function StudentPage() {
                 <div className="card" style={{ padding: 14, background: '#f8fbff' }}>
                   <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
                     <div className="grid" style={{ gap: 6 }}>
-                      <strong>{emotionDate === today ? '오늘 저장한 감정' : `${emotionDate} 감정 기록`}</strong>
+                      {emotionDate !== today ? <strong>{`${emotionDate} 감정 기록`}</strong> : null}
                       <div className="row" style={{ flexWrap: 'wrap' }}>
                         <span className="badge">{EMOTION_META[myFeed.emotion_type].categoryLabel}</span>
                         <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
