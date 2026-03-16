@@ -4,6 +4,30 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
 import { feedCreateSchema } from '@/lib/validators';
 
+export async function GET(req: Request) {
+  const auth = await requireStudentSession();
+  if ('error' in auth) return auth.error;
+
+  const url = new URL(req.url);
+  const queryDate = url.searchParams.get('date');
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const targetDate = queryDate && datePattern.test(queryDate) ? queryDate : todayDate();
+  const { startIso, endIso } = getSeoulDayRange(targetDate);
+
+  const { data, error } = await supabaseAdmin
+    .from('emotion_feeds')
+    .select('id,emotion_type,content,image_url,created_at')
+    .eq('student_id', auth.student.id)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ feed: data, date: targetDate });
+}
+
 export async function POST(req: Request) {
   const auth = await requireStudentSession();
   if ('error' in auth) return auth.error;

@@ -29,6 +29,14 @@ type FeedRow = {
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
 };
 
+type MyFeedRow = {
+  id: string;
+  emotion_type: EmotionType;
+  content: string;
+  image_url?: string | null;
+  created_at: string;
+} | null;
+
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, {
     ...init,
@@ -48,9 +56,11 @@ export default function StudentPage() {
   const [studentNumber, setStudentNumber] = useState<number | null>(null);
   const [planDate, setPlanDate] = useState(getTodayInSeoul);
   const [timelineDate, setTimelineDate] = useState(getTodayInSeoul);
+  const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
   const [feeds, setFeeds] = useState<FeedRow[]>([]);
+  const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'timeline'>('emotion');
@@ -60,8 +70,11 @@ export default function StudentPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [myFeedLoading, setMyFeedLoading] = useState(false);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const today = getTodayInSeoul();
   const isPlanEditable = planDate === today;
+  const isEmotionEditable = emotionDate === today;
 
   const summary = useMemo(() => {
     const completed = plans.filter((plan) => plan.isCompleted === true).length;
@@ -91,6 +104,7 @@ export default function StudentPage() {
 
       const shouldRefreshPlanDate = planDate === currentDate;
       const shouldRefreshTimelineDate = timelineDate === currentDate;
+      const shouldRefreshEmotionDate = emotionDate === currentDate;
       currentDate = nextDate;
 
       if (shouldRefreshPlanDate) {
@@ -98,6 +112,9 @@ export default function StudentPage() {
       }
       if (shouldRefreshTimelineDate) {
         setTimelineDate(nextDate);
+      }
+      if (shouldRefreshEmotionDate) {
+        setEmotionDate(nextDate);
       }
 
       const loadPlansForDate = api<{ plans: PlanRow[] }>(
@@ -111,11 +128,17 @@ export default function StudentPage() {
             setFeeds(data.feeds);
           })
         : Promise.resolve();
+      const loadMyFeedForDate = api<{ feed: MyFeedRow }>(
+        `/api/feeds?date=${shouldRefreshEmotionDate ? nextDate : emotionDate}`
+      ).then((data) => {
+        setMyFeed(data.feed);
+      });
 
       void Promise.all([
         loadPlansForDate,
         loadPlanAchievements(),
-        loadFeedsForDate
+        loadFeedsForDate,
+        loadMyFeedForDate
       ]).catch((err) => {
         setError((err as Error).message);
         clearNoticeLater();
@@ -123,7 +146,7 @@ export default function StudentPage() {
     }, 60 * 1000);
 
     return () => window.clearInterval(timer);
-  }, [classId, planDate, studentName, timelineDate]);
+  }, [classId, emotionDate, planDate, studentName, timelineDate]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -143,8 +166,23 @@ export default function StudentPage() {
   };
 
   const loadFeeds = async (targetClassId: string, date: string = timelineDate) => {
-    const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}?date=${date}`);
-    setFeeds(data.feeds);
+    setTimelineLoading(true);
+    try {
+      const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}?date=${date}`);
+      setFeeds(data.feeds);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  const loadMyFeed = async (date: string = emotionDate) => {
+    setMyFeedLoading(true);
+    try {
+      const data = await api<{ feed: MyFeedRow }>(`/api/feeds?date=${date}`);
+      setMyFeed(data.feed);
+    } finally {
+      setMyFeedLoading(false);
+    }
   };
 
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -173,7 +211,8 @@ export default function StudentPage() {
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setTimelineDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadFeeds(data.class.id, loginToday)]);
+      setEmotionDate(loginToday);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadFeeds(data.class.id, loginToday), loadMyFeed(loginToday)]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -289,6 +328,9 @@ export default function StudentPage() {
       } else if (classId) {
         await loadFeeds(classId, timelineDate);
       }
+      if (emotionDate === today) {
+        setMyFeed(data.feed);
+      }
       setActiveTab('timeline');
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
@@ -332,12 +374,24 @@ export default function StudentPage() {
     setStudentName('');
     setStudentNumber(null);
     setPlanDate(getTodayInSeoul());
+    setEmotionDate(getTodayInSeoul());
     setPlans([]);
     setPlanAchievements([]);
     setFeeds([]);
+    setMyFeed(null);
     setTimelineDate(getTodayInSeoul());
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
+  };
+
+  const onChangeEmotionDate = async (nextDate: string) => {
+    setEmotionDate(nextDate);
+    try {
+      await loadMyFeed(nextDate);
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    }
   };
 
   const onChangeTimelineDate = async (nextDate: string) => {
@@ -349,6 +403,19 @@ export default function StudentPage() {
         setError((err as Error).message);
         clearNoticeLater();
       }
+    }
+  };
+
+  const refreshTimeline = async () => {
+    if (!classId) return;
+
+    try {
+      await loadFeeds(classId, timelineDate);
+      setMessage('감정피드를 새로고침했습니다.');
+      clearNoticeLater();
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
     }
   };
 
@@ -428,40 +495,88 @@ export default function StudentPage() {
 
           {activeTab === 'emotion' && (
             <section className="card">
-              <h2>감정 작성</h2>
-              <form className="grid" onSubmit={onCreateFeed}>
-                <div>
-                  <label>감정 범주</label>
-                  <select value={emotionCategory} onChange={(event) => setEmotionCategory(event.target.value as (typeof EMOTION_CATEGORIES)[number]['key'])}>
-                    {EMOTION_CATEGORIES.map((category) => (
-                      <option key={category.key} value={category.key}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
+              <div className="row space-between" style={{ marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>오늘의 감정</h2>
+                <div style={{ width: 180 }}>
+                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
+                  <input
+                    type="date"
+                    value={emotionDate}
+                    max={today}
+                    onChange={(event) => onChangeEmotionDate(event.target.value)}
+                  />
                 </div>
-                <div>
-                  <label>세부 감정</label>
-                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                    {emotionOptions.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={emotionType === key ? 'ghost' : 'outline'}
-                        style={{ width: 'auto', minHeight: 36, padding: '6px 12px' }}
-                        onClick={() => setEmotionType(key as EmotionType)}
-                      >
-                        {EMOTION_META[key].label}
-                      </button>
-                    ))}
+              </div>
+              <p className="hint" style={{ marginTop: 0 }}>
+                {isEmotionEditable
+                  ? '오늘 선택한 감정과 기록은 저장되며, 달력에서 날짜를 골라 다시 볼 수 있습니다.'
+                  : '선택한 날짜의 감정 기록은 읽기 전용으로 확인할 수 있습니다.'}
+              </p>
+
+              {myFeedLoading ? (
+                <div className="card" style={{ padding: 12 }}>
+                  <p className="hint">감정 기록을 불러오는 중입니다...</p>
+                </div>
+              ) : myFeed ? (
+                <div className="card" style={{ padding: 14, background: '#f8fbff' }}>
+                  <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div className="grid" style={{ gap: 6 }}>
+                      <strong>{emotionDate === today ? '오늘 저장한 감정' : `${emotionDate} 감정 기록`}</strong>
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        <span className="badge">{EMOTION_META[myFeed.emotion_type].categoryLabel}</span>
+                        <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
+                      </div>
+                    </div>
+                    <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
                   </div>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
                 </div>
-                <div>
-                  <label>한 줄 기록 (100자)</label>
-                  <textarea name="content" maxLength={100} required />
-                </div>
-                <SubmitButton loading={feedLoading} idleText="피드 작성" />
-              </form>
+              ) : (
+                <EmptyState
+                  title="저장된 감정 기록이 없습니다"
+                  description={
+                    isEmotionEditable
+                      ? '아래에서 오늘의 감정과 한 줄 기록을 작성해보세요.'
+                      : '선택한 날짜에는 저장된 감정 기록이 없습니다.'
+                  }
+                />
+              )}
+
+              {isEmotionEditable && !myFeed && (
+                <form className="grid" onSubmit={onCreateFeed} style={{ marginTop: 16 }}>
+                  <div>
+                    <label>감정 범주</label>
+                    <select value={emotionCategory} onChange={(event) => setEmotionCategory(event.target.value as (typeof EMOTION_CATEGORIES)[number]['key'])}>
+                      {EMOTION_CATEGORIES.map((category) => (
+                        <option key={category.key} value={category.key}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label>세부 감정</label>
+                    <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                      {emotionOptions.map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={emotionType === key ? 'ghost' : 'outline'}
+                          style={{ width: 'auto', minHeight: 36, padding: '6px 12px' }}
+                          onClick={() => setEmotionType(key as EmotionType)}
+                        >
+                          {EMOTION_META[key].label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label>한 줄 기록 (100자)</label>
+                    <textarea name="content" maxLength={100} required />
+                  </div>
+                  <SubmitButton loading={feedLoading} idleText="피드 작성" />
+                </form>
+              )}
             </section>
           )}
 
@@ -559,13 +674,24 @@ export default function StudentPage() {
             <section className="card">
               <div className="row space-between" style={{ marginBottom: 8 }}>
                 <h2 style={{ margin: 0 }}>감정 타임라인</h2>
-                <div style={{ width: 180 }}>
+                <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="outline"
+                    style={{ width: 'auto', minWidth: 108 }}
+                    onClick={refreshTimeline}
+                    disabled={timelineLoading}
+                  >
+                    {timelineLoading ? '새로고침 중...' : '새로고침'}
+                  </button>
+                  <div style={{ width: 180 }}>
                   <label style={{ marginBottom: 4 }}>날짜 선택</label>
                   <input
                     type="date"
                     value={timelineDate}
                     onChange={(event) => onChangeTimelineDate(event.target.value)}
                   />
+                  </div>
                 </div>
               </div>
               <div className="feed-card-grid">
