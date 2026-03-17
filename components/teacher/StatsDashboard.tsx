@@ -19,6 +19,14 @@ type EmotionDistributionItem = {
   ratio: number;
 };
 
+type EmotionChartItem = {
+  key: string;
+  label: string;
+  count: number;
+  ratio: number;
+  color: string;
+};
+
 type StudentSnapshot = {
   range: {
     period: Period;
@@ -56,6 +64,7 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
 };
 
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
+const otherEmotionColor = '#94a3b8';
 
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
@@ -71,6 +80,34 @@ const escapeHtml = (value: string) =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+
+const buildEmotionChartItems = (distribution: EmotionDistributionItem[]) => {
+  const visibleItems = distribution.filter((item) => item.count > 0);
+  const majorItems = visibleItems.filter((item) => item.ratio >= 5);
+  const minorItems = visibleItems.filter((item) => item.ratio < 5);
+  const minorCount = minorItems.reduce((sum, item) => sum + item.count, 0);
+  const minorRatio = minorItems.reduce((sum, item) => sum + item.ratio, 0);
+
+  const items: EmotionChartItem[] = majorItems.map((item, index) => ({
+    key: item.emotionType,
+    label: `${EMOTION_META[item.emotionType].categoryLabel} / ${EMOTION_META[item.emotionType].label}`,
+    count: item.count,
+    ratio: item.ratio,
+    color: donutColors[index % donutColors.length]
+  }));
+
+  if (minorCount > 0) {
+    items.push({
+      key: 'other',
+      label: '기타',
+      count: minorCount,
+      ratio: minorRatio,
+      color: otherEmotionColor
+    });
+  }
+
+  return items.sort((a, b) => b.ratio - a.ratio);
+};
 
 function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
   return (
@@ -101,62 +138,84 @@ function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
 }
 
 function EmotionDonutChart({ distribution, totalFeeds }: { distribution: EmotionDistributionItem[]; totalFeeds: number }) {
-  const segments = distribution
-    .filter((item) => item.count > 0)
-    .map((item, index) => `${donutColors[index % donutColors.length]} ${item.ratio}%`)
+  const chartItems = buildEmotionChartItems(distribution);
+  const segments = chartItems
+    .map((item) => `${item.color} ${item.ratio}%`)
     .join(', ');
 
   return (
-    <article className="card" style={{ padding: 12 }}>
+    <article className="card" style={{ padding: 20 }}>
       <h3 style={{ marginTop: 0 }}>감정 분포도</h3>
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      {chartItems.length === 0 ? (
+        <EmptyState title="감정 데이터가 없습니다" description="선택한 기간에 기록된 감정이 없습니다." />
+      ) : (
         <div
+          className="grid"
           style={{
-            width: 180,
-            height: 180,
-            borderRadius: '50%',
-            background: totalFeeds > 0 ? `conic-gradient(${segments})` : '#e5e7eb',
-            position: 'relative'
+            gap: 18,
+            justifyItems: 'center',
+            textAlign: 'center'
           }}
         >
           <div
             style={{
-              position: 'absolute',
-              inset: 38,
+              width: 280,
+              height: 280,
               borderRadius: '50%',
-              background: 'white',
-              display: 'grid',
-              placeItems: 'center',
-              textAlign: 'center',
-              fontSize: 12,
-              color: '#64748b'
+              background: totalFeeds > 0 ? `conic-gradient(${segments})` : '#e5e7eb',
+              position: 'relative'
             }}
           >
-            총 {totalFeeds}건
+            <div
+              style={{
+                position: 'absolute',
+                inset: 56,
+                borderRadius: '50%',
+                background: 'white',
+                display: 'grid',
+                placeItems: 'center',
+                textAlign: 'center',
+                color: '#64748b'
+              }}
+            >
+              <div>
+                <strong style={{ display: 'block', fontSize: 32, lineHeight: 1.1, color: '#0f172a' }}>{totalFeeds}</strong>
+                <span style={{ fontSize: 13 }}>총 감정 기록</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid" style={{ gap: 8, width: '100%', maxWidth: 460 }}>
+            {chartItems.map((item) => (
+              <div
+                key={item.key}
+                className="row space-between"
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, textAlign: 'left' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: item.color,
+                      flexShrink: 0
+                    }}
+                  />
+                  <span style={{ color: '#334155' }}>{item.label}</span>
+                </span>
+                <strong style={{ color: '#0f172a', flexShrink: 0 }}>{item.ratio}%</strong>
+              </div>
+            ))}
           </div>
         </div>
-
-        <div className="grid" style={{ gap: 6, flex: 1 }}>
-          {distribution.map((item, index) => (
-            <div key={item.emotionType} className="row space-between">
-              <span>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    marginRight: 6,
-                    background: donutColors[index % donutColors.length]
-                  }}
-                />
-                {EMOTION_META[item.emotionType].categoryLabel} / {EMOTION_META[item.emotionType].label}
-              </span>
-              <span>{item.ratio}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </article>
   );
 }
@@ -208,6 +267,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       return;
     }
 
+    const emotionChartItems = buildEmotionChartItems(snapshot.emotions.distribution);
     const planRows =
       snapshot.plans.length === 0
         ? '<tr><td colspan="3">계획 데이터가 없습니다.</td></tr>'
@@ -218,10 +278,13 @@ export default function StatsDashboard({ classId, students }: { classId: string;
             )
             .join('');
 
-    const emotionRows = snapshot.emotions.distribution
+    const emotionRows =
+      emotionChartItems.length === 0
+        ? '<tr><td colspan="3">감정 데이터가 없습니다.</td></tr>'
+        : emotionChartItems
       .map(
         (item) =>
-          `<tr><td>${escapeHtml(EMOTION_META[item.emotionType].categoryLabel)} / ${escapeHtml(EMOTION_META[item.emotionType].label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`
+          `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`
       )
       .join('');
 
