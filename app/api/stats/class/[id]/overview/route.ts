@@ -88,7 +88,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const planRanking = Array.from(groupByTitle.entries())
     .map(([title, value]) => {
-      const totalPossible = value.planCount * range.days;
+      const totalPossible = value.planCount * range.weekdays;
       return {
         title,
         completed: value.completed,
@@ -99,7 +99,7 @@ export async function GET(req: Request, { params }: Params) {
     .sort((a, b) => b.achievementRate - a.achievementRate);
 
   const totalCompleted = Array.from(completedByPlan.values()).reduce((acc, v) => acc + v, 0);
-  const totalPossible = planList.length * range.days;
+  const totalPossible = planList.length * range.weekdays;
 
   return NextResponse.json({
     range,

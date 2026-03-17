@@ -60,7 +60,7 @@ export async function GET(req: Request, { params }: Params) {
     student: { id: params.id, name: student.name },
     plans: (plans ?? []).map((plan) => {
       const completed = completedMap.get(plan.id) ?? 0;
-      const totalPossible = range.days;
+      const totalPossible = range.weekdays;
       return {
         planId: plan.id,
         title: plan.title,

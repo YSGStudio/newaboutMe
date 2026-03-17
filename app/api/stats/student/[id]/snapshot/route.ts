@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
+import { getPeriodRange, isPeriod, isWeekendDate, safeRate } from '@/lib/stats';
 import { EMOTION_TYPES } from '@/types/domain';
 
 type Params = { params: { id: string } };
@@ -36,7 +36,8 @@ export async function GET(req: Request, { params }: Params) {
   const planList = plans ?? [];
   const planIds = planList.map((plan) => plan.id);
 
-  const todayTotal = planList.length;
+  const isRangeEndWeekend = isWeekendDate(range.endDate);
+  const todayTotal = isRangeEndWeekend ? 0 : planList.length;
   const completedByPlan = new Map<string, number>();
   let todayCompleted = 0;
 
@@ -53,7 +54,7 @@ export async function GET(req: Request, { params }: Params) {
 
     (checks ?? []).forEach((check) => {
       completedByPlan.set(check.plan_id, (completedByPlan.get(check.plan_id) ?? 0) + 1);
-      if (check.check_date === range.endDate) {
+      if (!isRangeEndWeekend && check.check_date === range.endDate) {
         todayCompleted += 1;
       }
     });
@@ -92,7 +93,7 @@ export async function GET(req: Request, { params }: Params) {
     },
     plans: planList.map((plan) => {
       const completed = completedByPlan.get(plan.id) ?? 0;
-      const totalPossible = range.days;
+      const totalPossible = range.weekdays;
       return {
         planId: plan.id,
         title: plan.title,

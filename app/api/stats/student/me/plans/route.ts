@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { safeRate } from '@/lib/stats';
+import { countWeekdaysBetweenInclusive, safeRate } from '@/lib/stats';
 import { todayDate } from '@/lib/utils';
-
-const daysBetweenInclusive = (startDate: string, endDate: string) => {
-  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
-  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
-  if (end < start) return 0;
-  return Math.floor((end - start) / 86400000) + 1;
-};
 
 export async function GET() {
   const auth = await requireStudentSession();
@@ -52,7 +45,7 @@ export async function GET() {
 
   const result = (plans ?? []).map((plan) => {
     const planStart = plan.created_at.slice(0, 10) > monthStart ? plan.created_at.slice(0, 10) : monthStart;
-    const totalPossible = daysBetweenInclusive(planStart, endDate);
+    const totalPossible = countWeekdaysBetweenInclusive(planStart, endDate);
     const completed = completedByPlan.get(plan.id) ?? 0;
     return {
       planId: plan.id,

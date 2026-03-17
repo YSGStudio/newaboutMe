@@ -10,6 +10,31 @@ const formatDate = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+const toUtcDate = (date: string) => new Date(`${date}T00:00:00.000Z`);
+
+export const isWeekendDate = (date: string) => {
+  const day = toUtcDate(date).getUTCDay();
+  return day === 0 || day === 6;
+};
+
+export const enumerateWeekdays = (startDate: string, endDate: string) => {
+  const result: string[] = [];
+  const current = toUtcDate(startDate);
+  const end = toUtcDate(endDate);
+
+  while (current.getTime() <= end.getTime()) {
+    const currentDate = formatDate(current);
+    if (!isWeekendDate(currentDate)) {
+      result.push(currentDate);
+    }
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return result;
+};
+
+export const countWeekdaysBetweenInclusive = (startDate: string, endDate: string) => enumerateWeekdays(startDate, endDate).length;
+
 export function getPeriodRange(period: Period) {
   const now = new Date();
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -29,7 +54,8 @@ export function getPeriodRange(period: Period) {
     endDate: formatDate(end),
     startIso: `${formatDate(start)}T00:00:00.000Z`,
     endIso: `${formatDate(end)}T23:59:59.999Z`,
-    days: Math.floor((end.getTime() - start.getTime()) / 86400000) + 1
+    days: Math.floor((end.getTime() - start.getTime()) / 86400000) + 1,
+    weekdays: countWeekdaysBetweenInclusive(formatDate(start), formatDate(end))
   };
 }
 

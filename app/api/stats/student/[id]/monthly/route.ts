@@ -1,25 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
+import { enumerateWeekdays, getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
 
 type Params = { params: { id: string } };
-
-const enumerateDates = (startDate: string, endDate: string) => {
-  const result: string[] = [];
-  const current = new Date(`${startDate}T00:00:00.000Z`);
-  const end = new Date(`${endDate}T00:00:00.000Z`);
-
-  while (current.getTime() <= end.getTime()) {
-    const y = current.getUTCFullYear();
-    const m = String(current.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(current.getUTCDate()).padStart(2, '0');
-    result.push(`${y}-${m}-${d}`);
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-
-  return result;
-};
 
 export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
@@ -52,7 +36,7 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({
       range,
       student: { id: params.id, name: student.name },
-      points: enumerateDates(range.startDate, range.endDate).map((date) => ({
+      points: enumerateWeekdays(range.startDate, range.endDate).map((date) => ({
         date,
         completed: 0,
         total: 0,
@@ -76,7 +60,7 @@ export async function GET(req: Request, { params }: Params) {
     completedByDate.set(check.check_date, (completedByDate.get(check.check_date) ?? 0) + 1);
   });
 
-  const points = enumerateDates(range.startDate, range.endDate).map((date) => {
+  const points = enumerateWeekdays(range.startDate, range.endDate).map((date) => {
     const completed = completedByDate.get(date) ?? 0;
     return {
       date,
