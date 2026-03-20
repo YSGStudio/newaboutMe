@@ -26,6 +26,7 @@ type StudentItem = {
   todayTotal?: number;
   todayAchievementRate?: number;
   isTodayAllCompleted?: boolean;
+  isTodayAllChecked?: boolean;
 };
 
 type FeedItem = {
@@ -537,11 +538,11 @@ export default function TeacherPage() {
                       const todayCompleted = student.todayCompleted ?? 0;
                       const todayTotal = student.todayTotal ?? 0;
                       const todayAchievementRate = student.todayAchievementRate ?? 0;
-                      const isTodayAllCompleted = Boolean(student.isTodayAllCompleted);
+                      const isTodayAllChecked = Boolean(student.isTodayAllChecked);
                       return (
                         <article
                           key={student.id}
-                          className={`card student-card ${isTodayAllCompleted ? 'student-card-complete' : ''}`}
+                          className={`card student-card ${isTodayAllChecked ? 'student-card-complete' : ''}`}
                           style={{ padding: 12 }}
                         >
                           <div className="row space-between">

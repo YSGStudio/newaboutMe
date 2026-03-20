@@ -56,21 +56,26 @@ export async function GET(_: Request, { params }: Params) {
 
   const planIds = planRows.map((plan) => plan.id);
   const completedByStudent = new Map<string, number>();
+  const checkedByStudent = new Map<string, number>();
 
   if (planIds.length > 0) {
     const { data: checks, error: checkError } = await supabaseAdmin
       .from('plan_checks')
-      .select('plan_id')
+      .select('plan_id,is_completed')
       .in('plan_id', planIds)
-      .eq('check_date', today)
-      .eq('is_completed', true);
+      .eq('check_date', today);
 
     if (checkError) return NextResponse.json({ error: checkError.message }, { status: 500 });
 
     (checks ?? []).forEach((check) => {
       const studentId = planToStudent.get(check.plan_id);
       if (!studentId) return;
-      completedByStudent.set(studentId, (completedByStudent.get(studentId) ?? 0) + 1);
+      if (typeof check.is_completed === 'boolean') {
+        checkedByStudent.set(studentId, (checkedByStudent.get(studentId) ?? 0) + 1);
+      }
+      if (check.is_completed === true) {
+        completedByStudent.set(studentId, (completedByStudent.get(studentId) ?? 0) + 1);
+      }
     });
   }
 
@@ -78,13 +83,15 @@ export async function GET(_: Request, { params }: Params) {
     students: students.map((student) => {
       const todayTotal = totalByStudent.get(student.id) ?? 0;
       const todayCompleted = completedByStudent.get(student.id) ?? 0;
+      const todayChecked = checkedByStudent.get(student.id) ?? 0;
       const todayAchievementRate = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
       return {
         ...student,
         todayCompleted,
         todayTotal,
         todayAchievementRate,
-        isTodayAllCompleted: todayTotal > 0 && todayCompleted === todayTotal
+        isTodayAllCompleted: todayTotal > 0 && todayCompleted === todayTotal,
+        isTodayAllChecked: todayTotal > 0 && todayChecked === todayTotal
       };
     })
   });
