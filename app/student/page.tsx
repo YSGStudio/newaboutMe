@@ -621,21 +621,21 @@ export default function StudentPage() {
                     const isHistoryOpen = openHistoryPlanId === plan.id;
                     const history = planHistoryMap[plan.id];
                     return (
-                      <div key={plan.id} className="card" style={{ padding: 12 }}>
-                        {/* 제목 영역 */}
+                      <div key={plan.id} className="card" style={{ padding: '10px 12px' }}>
+                        {/* 편집 모드 */}
                         {isEditing ? (
-                          <div className="row" style={{ gap: 6, marginBottom: 10 }}>
+                          <div className="row" style={{ gap: 6 }}>
                             <input
                               value={editingTitle}
                               maxLength={50}
                               onChange={(e) => setEditingTitle(e.target.value)}
-                              style={{ flex: 1 }}
+                              style={{ flex: 1, minHeight: 36 }}
                               autoFocus
                             />
                             <button
                               type="button"
                               className="ghost"
-                              style={{ width: 'auto', padding: '8px 14px' }}
+                              style={{ width: 'auto', padding: '6px 12px', flexShrink: 0 }}
                               disabled={editingLoading || !editingTitle.trim()}
                               onClick={() => updatePlan(plan.id)}
                             >
@@ -644,68 +644,66 @@ export default function StudentPage() {
                             <button
                               type="button"
                               className="outline"
-                              style={{ width: 'auto', padding: '8px 14px' }}
+                              style={{ width: 'auto', padding: '6px 12px', flexShrink: 0 }}
                               onClick={cancelEditPlan}
                             >
                               취소
                             </button>
                           </div>
                         ) : (
-                          <div className="row space-between" style={{ marginBottom: 10 }}>
-                            <span style={{ fontWeight: 500 }}>{plan.title}</span>
-                            <div className="row" style={{ gap: 4 }}>
-                              {isPlanEditable && (
-                                <button
-                                  type="button"
-                                  className="outline"
-                                  style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
-                                  onClick={() => startEditPlan(plan)}
-                                >
-                                  수정
-                                </button>
-                              )}
+                          /* 일반 모드: 제목 + 완료/미완료/수정/이력/삭제 한 줄 */
+                          <div className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {plan.title}
+                            </span>
+                            <button
+                              type="button"
+                              className={plan.isCompleted === true ? 'ghost' : 'outline'}
+                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              disabled={!isPlanEditable}
+                              onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
+                            >
+                              완료
+                            </button>
+                            <button
+                              type="button"
+                              className={plan.isCompleted === false ? 'ghost' : 'outline'}
+                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              disabled={!isPlanEditable}
+                              onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
+                            >
+                              미완료
+                            </button>
+                            {isPlanEditable && (
                               <button
                                 type="button"
                                 className="outline"
-                                style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
-                                onClick={() => toggleHistory(plan.id)}
+                                style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                                onClick={() => startEditPlan(plan)}
                               >
-                                {isHistoryOpen ? '이력 닫기' : '변경 이력'}
+                                수정
                               </button>
-                            </div>
+                            )}
+                            <button
+                              type="button"
+                              className="outline"
+                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              onClick={() => toggleHistory(plan.id)}
+                            >
+                              {isHistoryOpen ? '이력▲' : '이력▼'}
+                            </button>
+                            {isPlanEditable && (
+                              <button
+                                type="button"
+                                className="outline"
+                                style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                                onClick={() => deletePlan(plan.id)}
+                              >
+                                삭제
+                              </button>
+                            )}
                           </div>
                         )}
-
-                        {/* 체크 + 삭제 버튼 */}
-                        <div className="row">
-                          <button
-                            type="button"
-                            className={plan.isCompleted === true ? 'ghost' : 'outline'}
-                            style={{ flex: 1, minHeight: 40, padding: '8px 10px' }}
-                            disabled={!isPlanEditable}
-                            onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
-                          >
-                            완료
-                          </button>
-                          <button
-                            type="button"
-                            className={plan.isCompleted === false ? 'ghost' : 'outline'}
-                            style={{ flex: 1, minHeight: 40, padding: '8px 10px' }}
-                            disabled={!isPlanEditable}
-                            onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
-                          >
-                            미완료
-                          </button>
-                          <button
-                            type="button"
-                            className="outline"
-                            style={{ width: 72, minHeight: 40, padding: '8px 10px' }}
-                            disabled={!isPlanEditable}
-                            onClick={() => deletePlan(plan.id)}
-                          >
-                            삭제
-                          </button>
-                        </div>
 
                         {/* 변경 이력 */}
                         {isHistoryOpen && (
