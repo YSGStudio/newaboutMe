@@ -41,6 +41,8 @@ type EmotionStats = {
 
 type EmotionChartItem = { key: string; label: string; count: number; ratio: number; color: string };
 
+type PlanTitleHistory = { id: string; old_title: string; new_title: string; changed_at: string };
+
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
 const otherEmotionColor = '#94a3b8';
 
@@ -91,6 +93,12 @@ export default function StudentPage() {
   const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats'>('emotion');
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
   const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
+
+  const [editingPlanId, setEditingPlanId] = useState('');
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingLoading, setEditingLoading] = useState(false);
+  const [planHistoryMap, setPlanHistoryMap] = useState<Record<string, PlanTitleHistory[]>>({});
+  const [openHistoryPlanId, setOpenHistoryPlanId] = useState('');
 
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
@@ -287,6 +295,54 @@ export default function StudentPage() {
     }
   };
 
+  const startEditPlan = (plan: PlanRow) => {
+    setEditingPlanId(plan.id);
+    setEditingTitle(plan.title);
+  };
+
+  const cancelEditPlan = () => {
+    setEditingPlanId('');
+    setEditingTitle('');
+  };
+
+  const updatePlan = async (planId: string) => {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) return;
+    setEditingLoading(true);
+    try {
+      const data = await api<{ plan: { id: string; title: string } }>(`/api/plans/${planId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: trimmed })
+      });
+      setPlans((prev) => prev.map((p) => (p.id === planId ? { ...p, title: data.plan.title } : p)));
+      // 이력 캐시 초기화 (다음 열람 시 새로 불러옴)
+      setPlanHistoryMap((prev) => { const next = { ...prev }; delete next[planId]; return next; });
+      cancelEditPlan();
+      setMessage('계획이 수정되었습니다.');
+      clearNoticeLater();
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setEditingLoading(false);
+    }
+  };
+
+  const toggleHistory = async (planId: string) => {
+    if (openHistoryPlanId === planId) {
+      setOpenHistoryPlanId('');
+      return;
+    }
+    setOpenHistoryPlanId(planId);
+    if (planHistoryMap[planId]) return; // 이미 로드됨
+    try {
+      const data = await api<{ history: PlanTitleHistory[] }>(`/api/plans/${planId}/history`);
+      setPlanHistoryMap((prev) => ({ ...prev, [planId]: data.history }));
+    } catch {
+      setPlanHistoryMap((prev) => ({ ...prev, [planId]: [] }));
+    }
+  };
+
   const onCreateFeed = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedLoading(true);
@@ -328,6 +384,9 @@ export default function StudentPage() {
     setPlanAchievements([]);
     setMyFeed(null);
     setEmotionStats(null);
+    setEditingPlanId('');
+    setPlanHistoryMap({});
+    setOpenHistoryPlanId('');
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
@@ -557,40 +616,124 @@ export default function StudentPage() {
                     description={isPlanEditable ? '오늘 계획을 하나 추가해보세요.' : '선택한 날짜에 확인할 계획 데이터가 없습니다.'}
                   />
                 ) : (
-                  plans.map((plan) => (
-                    <div key={plan.id} className="card row space-between" style={{ padding: 12 }}>
-                      <span>{plan.title}</span>
-                      <div className="row">
-                        <button
-                          type="button"
-                          className={plan.isCompleted === true ? 'ghost' : 'outline'}
-                          style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
-                          disabled={!isPlanEditable}
-                          onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
-                        >
-                          완료
-                        </button>
-                        <button
-                          type="button"
-                          className={plan.isCompleted === false ? 'ghost' : 'outline'}
-                          style={{ width: 84, minHeight: 40, padding: '8px 10px' }}
-                          disabled={!isPlanEditable}
-                          onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
-                        >
-                          미완료
-                        </button>
-                        <button
-                          type="button"
-                          className="outline"
-                          style={{ width: 72, minHeight: 40, padding: '8px 10px' }}
-                          disabled={!isPlanEditable}
-                          onClick={() => deletePlan(plan.id)}
-                        >
-                          삭제
-                        </button>
+                  plans.map((plan) => {
+                    const isEditing = editingPlanId === plan.id;
+                    const isHistoryOpen = openHistoryPlanId === plan.id;
+                    const history = planHistoryMap[plan.id];
+                    return (
+                      <div key={plan.id} className="card" style={{ padding: 12 }}>
+                        {/* 제목 영역 */}
+                        {isEditing ? (
+                          <div className="row" style={{ gap: 6, marginBottom: 10 }}>
+                            <input
+                              value={editingTitle}
+                              maxLength={50}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              style={{ flex: 1 }}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="ghost"
+                              style={{ width: 'auto', padding: '8px 14px' }}
+                              disabled={editingLoading || !editingTitle.trim()}
+                              onClick={() => updatePlan(plan.id)}
+                            >
+                              {editingLoading ? '저장 중...' : '저장'}
+                            </button>
+                            <button
+                              type="button"
+                              className="outline"
+                              style={{ width: 'auto', padding: '8px 14px' }}
+                              onClick={cancelEditPlan}
+                            >
+                              취소
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="row space-between" style={{ marginBottom: 10 }}>
+                            <span style={{ fontWeight: 500 }}>{plan.title}</span>
+                            <div className="row" style={{ gap: 4 }}>
+                              {isPlanEditable && (
+                                <button
+                                  type="button"
+                                  className="outline"
+                                  style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
+                                  onClick={() => startEditPlan(plan)}
+                                >
+                                  수정
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="outline"
+                                style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
+                                onClick={() => toggleHistory(plan.id)}
+                              >
+                                {isHistoryOpen ? '이력 닫기' : '변경 이력'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 체크 + 삭제 버튼 */}
+                        <div className="row">
+                          <button
+                            type="button"
+                            className={plan.isCompleted === true ? 'ghost' : 'outline'}
+                            style={{ flex: 1, minHeight: 40, padding: '8px 10px' }}
+                            disabled={!isPlanEditable}
+                            onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
+                          >
+                            완료
+                          </button>
+                          <button
+                            type="button"
+                            className={plan.isCompleted === false ? 'ghost' : 'outline'}
+                            style={{ flex: 1, minHeight: 40, padding: '8px 10px' }}
+                            disabled={!isPlanEditable}
+                            onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
+                          >
+                            미완료
+                          </button>
+                          <button
+                            type="button"
+                            className="outline"
+                            style={{ width: 72, minHeight: 40, padding: '8px 10px' }}
+                            disabled={!isPlanEditable}
+                            onClick={() => deletePlan(plan.id)}
+                          >
+                            삭제
+                          </button>
+                        </div>
+
+                        {/* 변경 이력 */}
+                        {isHistoryOpen && (
+                          <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
+                            <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>변경 이력</p>
+                            {!history ? (
+                              <p className="hint" style={{ fontSize: 12 }}>불러오는 중...</p>
+                            ) : history.length === 0 ? (
+                              <p className="hint" style={{ fontSize: 12 }}>변경 이력이 없습니다.</p>
+                            ) : (
+                              <div className="grid" style={{ gap: 4 }}>
+                                {history.map((h) => (
+                                  <div key={h.id} style={{ fontSize: 12, color: '#64748b' }}>
+                                    <span style={{ color: '#dc2626' }}>{h.old_title}</span>
+                                    {' → '}
+                                    <span style={{ color: '#16a34a' }}>{h.new_title}</span>
+                                    <span style={{ marginLeft: 8, color: '#94a3b8' }}>
+                                      {new Date(h.changed_at).toLocaleDateString('ko-KR')}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>

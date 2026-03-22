@@ -49,6 +49,10 @@ export const planCreateSchema = z.object({
   title: z.string().min(1).max(50)
 });
 
+export const planUpdateSchema = z.object({
+  title: z.string().min(1).max(50)
+});
+
 export const planCheckSchema = z.object({
   isCompleted: z.boolean().nullable()
 });

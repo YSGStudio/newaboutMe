@@ -120,6 +120,14 @@ create table if not exists plan_checks (
   unique (plan_id, check_date)
 );
 
+create table if not exists plan_title_history (
+  id uuid primary key default gen_random_uuid(),
+  plan_id uuid not null references plans (id) on delete cascade,
+  old_title varchar(50) not null,
+  new_title varchar(50) not null,
+  changed_at timestamptz not null default now()
+);
+
 create table if not exists teacher_comments (
   id uuid primary key default gen_random_uuid(),
   teacher_id uuid not null references teacher_profiles (id) on delete cascade,
@@ -219,5 +227,6 @@ create index if not exists idx_students_class_id on students (class_id);
 create index if not exists idx_feeds_student_created on emotion_feeds (student_id, created_at desc);
 create index if not exists idx_plans_student on plans (student_id);
 create index if not exists idx_plan_checks_plan_date on plan_checks (plan_id, check_date);
+create index if not exists idx_plan_title_history_plan on plan_title_history (plan_id, changed_at desc);
 create index if not exists idx_teacher_comments_feed_created on teacher_comments (feed_id, created_at desc);
 create index if not exists idx_teacher_comments_teacher_created on teacher_comments (teacher_id, created_at desc);
