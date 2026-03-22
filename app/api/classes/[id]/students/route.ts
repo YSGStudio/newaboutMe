@@ -39,24 +39,30 @@ export async function GET(_: Request, { params }: Params) {
 
   const { data: plans, error: planError } = await supabaseAdmin
     .from('plans')
-    .select('id,student_id')
+    .select('id,student_id,title')
     .in('student_id', studentIds)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .order('created_at', { ascending: true });
 
   if (planError) return NextResponse.json({ error: planError.message }, { status: 500 });
 
   const planRows = plans ?? [];
   const totalByStudent = new Map<string, number>();
   const planToStudent = new Map<string, string>();
+  const plansByStudent = new Map<string, { id: string; title: string }[]>();
 
   planRows.forEach((plan) => {
     totalByStudent.set(plan.student_id, (totalByStudent.get(plan.student_id) ?? 0) + 1);
     planToStudent.set(plan.id, plan.student_id);
+    const list = plansByStudent.get(plan.student_id) ?? [];
+    list.push({ id: plan.id, title: plan.title });
+    plansByStudent.set(plan.student_id, list);
   });
 
   const planIds = planRows.map((plan) => plan.id);
   const completedByStudent = new Map<string, number>();
   const checkedByStudent = new Map<string, number>();
+  const checkStatusByPlan = new Map<string, boolean | null>();
 
   if (planIds.length > 0) {
     const { data: checks, error: checkError } = await supabaseAdmin
@@ -70,6 +76,7 @@ export async function GET(_: Request, { params }: Params) {
     (checks ?? []).forEach((check) => {
       const studentId = planToStudent.get(check.plan_id);
       if (!studentId) return;
+      checkStatusByPlan.set(check.plan_id, check.is_completed);
       if (typeof check.is_completed === 'boolean') {
         checkedByStudent.set(studentId, (checkedByStudent.get(studentId) ?? 0) + 1);
       }
@@ -85,13 +92,19 @@ export async function GET(_: Request, { params }: Params) {
       const todayCompleted = completedByStudent.get(student.id) ?? 0;
       const todayChecked = checkedByStudent.get(student.id) ?? 0;
       const todayAchievementRate = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
+      const studentPlans = (plansByStudent.get(student.id) ?? []).map((plan) => ({
+        id: plan.id,
+        title: plan.title,
+        isCompleted: checkStatusByPlan.has(plan.id) ? checkStatusByPlan.get(plan.id)! : null
+      }));
       return {
         ...student,
         todayCompleted,
         todayTotal,
         todayAchievementRate,
         isTodayAllCompleted: todayTotal > 0 && todayCompleted === todayTotal,
-        isTodayAllChecked: todayTotal > 0 && todayChecked === todayTotal
+        isTodayAllChecked: todayTotal > 0 && todayChecked === todayTotal,
+        plans: studentPlans
       };
     })
   });

@@ -18,6 +18,12 @@ type ClassItem = {
   class_code: string;
 };
 
+type StudentPlan = {
+  id: string;
+  title: string;
+  isCompleted: boolean | null;
+};
+
 type StudentItem = {
   id: string;
   name: string;
@@ -27,6 +33,7 @@ type StudentItem = {
   todayAchievementRate?: number;
   isTodayAllCompleted?: boolean;
   isTodayAllChecked?: boolean;
+  plans?: StudentPlan[];
 };
 
 type FeedItem = {
@@ -539,6 +546,7 @@ export default function TeacherPage() {
                       const todayTotal = student.todayTotal ?? 0;
                       const todayAchievementRate = student.todayAchievementRate ?? 0;
                       const isTodayAllChecked = Boolean(student.isTodayAllChecked);
+                      const plans = student.plans ?? [];
                       return (
                         <article
                           key={student.id}
@@ -560,9 +568,33 @@ export default function TeacherPage() {
                           <p className="hint" style={{ marginTop: 8 }}>
                             {todayCompleted}/{todayTotal} 완료
                           </p>
+
+                          {plans.length > 0 && (
+                            <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
+                              <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>오늘 계획</p>
+                              <div className="grid" style={{ gap: 4 }}>
+                                {plans.map((plan) => {
+                                  const statusLabel =
+                                    plan.isCompleted === true ? '완료' :
+                                    plan.isCompleted === false ? '미완료' : '미선택';
+                                  const statusColor =
+                                    plan.isCompleted === true ? '#16a34a' :
+                                    plan.isCompleted === false ? '#dc2626' : '#94a3b8';
+                                  return (
+                                    <div key={plan.id} className="row space-between" style={{ fontSize: 13, padding: '3px 0' }}>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{plan.title}</span>
+                                      <span style={{ color: statusColor, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{statusLabel}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           <button
                             type="button"
                             className="outline"
+                            style={{ marginTop: 10 }}
                             onClick={() => onDeleteStudent(student)}
                             disabled={deletingStudentId === student.id}
                           >

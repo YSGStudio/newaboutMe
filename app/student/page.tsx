@@ -8,7 +8,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { formatDateInSeoul } from '@/lib/date';
-import { EMOTION_CATEGORIES, EMOTION_META, EmotionType, REACTION_META, ReactionType } from '@/types/domain';
+import { EMOTION_CATEGORIES, EMOTION_META, EmotionType } from '@/types/domain';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
 type PlanAchievementRow = {
@@ -19,16 +19,6 @@ type PlanAchievementRow = {
   achievementRate: number;
 };
 
-type FeedRow = {
-  id: string;
-  emotion_type: EmotionType;
-  content: string;
-  image_url?: string | null;
-  created_at: string;
-  students: { id: string; name: string; student_number: number };
-  feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
-};
-
 type MyFeedRow = {
   id: string;
   emotion_type: EmotionType;
@@ -36,6 +26,45 @@ type MyFeedRow = {
   image_url?: string | null;
   created_at: string;
 } | null;
+
+type EmotionDistributionItem = {
+  emotionType: EmotionType;
+  count: number;
+  ratio: number;
+};
+
+type EmotionStats = {
+  range: { startDate: string; endDate: string };
+  totalFeeds: number;
+  distribution: EmotionDistributionItem[];
+} | null;
+
+type EmotionChartItem = { key: string; label: string; count: number; ratio: number; color: string };
+
+const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
+const otherEmotionColor = '#94a3b8';
+
+const buildEmotionChartItems = (distribution: EmotionDistributionItem[]): EmotionChartItem[] => {
+  const visibleItems = distribution.filter((item) => item.count > 0);
+  const majorItems = visibleItems.filter((item) => item.ratio >= 5);
+  const minorItems = visibleItems.filter((item) => item.ratio < 5);
+  const minorCount = minorItems.reduce((sum, item) => sum + item.count, 0);
+  const minorRatio = minorItems.reduce((sum, item) => sum + item.ratio, 0);
+
+  const items: EmotionChartItem[] = majorItems.map((item, index) => ({
+    key: item.emotionType,
+    label: `${EMOTION_META[item.emotionType].categoryLabel} / ${EMOTION_META[item.emotionType].label}`,
+    count: item.count,
+    ratio: item.ratio,
+    color: donutColors[index % donutColors.length]
+  }));
+
+  if (minorCount > 0) {
+    items.push({ key: 'other', label: '기타', count: minorCount, ratio: minorRatio, color: otherEmotionColor });
+  }
+
+  return items.sort((a, b) => b.ratio - a.ratio);
+};
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, {
@@ -50,20 +79,16 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 const getTodayInSeoul = () => formatDateInSeoul(new Date());
 
 export default function StudentPage() {
-  const [classId, setClassId] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
-  const [studentNumber, setStudentNumber] = useState<number | null>(null);
   const [planDate, setPlanDate] = useState(getTodayInSeoul);
-  const [timelineDate, setTimelineDate] = useState(getTodayInSeoul);
   const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
-  const [feeds, setFeeds] = useState<FeedRow[]>([]);
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
+  const [emotionStats, setEmotionStats] = useState<EmotionStats>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'timeline'>('emotion');
+  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats'>('emotion');
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
   const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
 
@@ -71,7 +96,7 @@ export default function StudentPage() {
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
   const [myFeedLoading, setMyFeedLoading] = useState(false);
-  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
   const today = getTodayInSeoul();
   const isPlanEditable = planDate === today;
   const isEmotionEditable = emotionDate === today;
@@ -103,42 +128,16 @@ export default function StudentPage() {
       if (nextDate === currentDate) return;
 
       const shouldRefreshPlanDate = planDate === currentDate;
-      const shouldRefreshTimelineDate = timelineDate === currentDate;
       const shouldRefreshEmotionDate = emotionDate === currentDate;
       currentDate = nextDate;
 
-      if (shouldRefreshPlanDate) {
-        setPlanDate(nextDate);
-      }
-      if (shouldRefreshTimelineDate) {
-        setTimelineDate(nextDate);
-      }
-      if (shouldRefreshEmotionDate) {
-        setEmotionDate(nextDate);
-      }
-
-      const loadPlansForDate = api<{ plans: PlanRow[] }>(
-        `/api/plans/today?date=${shouldRefreshPlanDate ? nextDate : planDate}`
-      ).then((data) => {
-        setPlans(data.plans);
-      });
-
-      const loadFeedsForDate = classId
-        ? api<{ feeds: FeedRow[] }>(`/api/feeds/class/${classId}?date=${shouldRefreshTimelineDate ? nextDate : timelineDate}`).then((data) => {
-            setFeeds(data.feeds);
-          })
-        : Promise.resolve();
-      const loadMyFeedForDate = api<{ feed: MyFeedRow }>(
-        `/api/feeds?date=${shouldRefreshEmotionDate ? nextDate : emotionDate}`
-      ).then((data) => {
-        setMyFeed(data.feed);
-      });
+      if (shouldRefreshPlanDate) setPlanDate(nextDate);
+      if (shouldRefreshEmotionDate) setEmotionDate(nextDate);
 
       void Promise.all([
-        loadPlansForDate,
+        api<{ plans: PlanRow[] }>(`/api/plans/today?date=${shouldRefreshPlanDate ? nextDate : planDate}`).then((data) => setPlans(data.plans)),
         loadPlanAchievements(),
-        loadFeedsForDate,
-        loadMyFeedForDate
+        api<{ feed: MyFeedRow }>(`/api/feeds?date=${shouldRefreshEmotionDate ? nextDate : emotionDate}`).then((data) => setMyFeed(data.feed))
       ]).catch((err) => {
         setError((err as Error).message);
         clearNoticeLater();
@@ -146,7 +145,7 @@ export default function StudentPage() {
     }, 60 * 1000);
 
     return () => window.clearInterval(timer);
-  }, [classId, emotionDate, planDate, studentName, timelineDate]);
+  }, [emotionDate, planDate, studentName]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -165,16 +164,6 @@ export default function StudentPage() {
     setPlanAchievements(data.plans);
   };
 
-  const loadFeeds = async (targetClassId: string, date: string = timelineDate) => {
-    setTimelineLoading(true);
-    try {
-      const data = await api<{ feeds: FeedRow[] }>(`/api/feeds/class/${targetClassId}?date=${date}`);
-      setFeeds(data.feeds);
-    } finally {
-      setTimelineLoading(false);
-    }
-  };
-
   const loadMyFeed = async (date: string = emotionDate) => {
     setMyFeedLoading(true);
     try {
@@ -182,6 +171,16 @@ export default function StudentPage() {
       setMyFeed(data.feed);
     } finally {
       setMyFeedLoading(false);
+    }
+  };
+
+  const loadEmotionStats = async () => {
+    setStatsLoading(true);
+    try {
+      const data = await api<NonNullable<EmotionStats>>('/api/stats/student/me/emotions');
+      setEmotionStats(data);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -204,15 +203,11 @@ export default function StudentPage() {
         })
       });
 
-      setClassId(data.class.id);
-      setStudentId(data.student.id);
       setStudentName(data.student.name);
-      setStudentNumber(data.student.studentNumber);
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
-      setTimelineDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadFeeds(data.class.id, loginToday), loadMyFeed(loginToday)]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats()]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -309,29 +304,11 @@ export default function StudentPage() {
         };
       }>('/api/feeds', {
         method: 'POST',
-        body: JSON.stringify({
-          emotionType,
-          content
-        })
+        body: JSON.stringify({ emotionType, content })
       });
       formEl.reset();
-      const today = getTodayInSeoul();
-      if (timelineDate === today && studentNumber !== null) {
-        setFeeds((prev) => [
-          {
-            ...data.feed,
-            students: { id: studentId, name: studentName, student_number: studentNumber },
-            feed_reactions: []
-          },
-          ...prev
-        ]);
-      } else if (classId) {
-        await loadFeeds(classId, timelineDate);
-      }
-      if (emotionDate === today) {
-        setMyFeed(data.feed);
-      }
-      setActiveTab('timeline');
+      setMyFeed(data.feed);
+      await loadEmotionStats();
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -342,44 +319,15 @@ export default function StudentPage() {
     }
   };
 
-  const reactFeed = async (feedId: string, reactionType: ReactionType) => {
-    if (!studentId) return;
-    const before = feeds;
-    setFeeds((prev) =>
-      prev.map((feed) => {
-        if (feed.id !== feedId) return feed;
-        const withoutMine = feed.feed_reactions.filter((item) => item.student_id !== studentId);
-        return {
-          ...feed,
-          feed_reactions: [...withoutMine, { id: `local-${feedId}-${studentId}`, reaction_type: reactionType, student_id: studentId }]
-        };
-      })
-    );
-    try {
-      await api(`/api/feeds/${feedId}/reactions`, {
-        method: 'POST',
-        body: JSON.stringify({ reactionType })
-      });
-    } catch (err) {
-      setFeeds(before);
-      setError((err as Error).message);
-      clearNoticeLater();
-    }
-  };
-
   const onLogout = async () => {
     await api('/api/auth/student/logout', { method: 'POST' });
-    setClassId('');
-    setStudentId('');
     setStudentName('');
-    setStudentNumber(null);
     setPlanDate(getTodayInSeoul());
     setEmotionDate(getTodayInSeoul());
     setPlans([]);
     setPlanAchievements([]);
-    setFeeds([]);
     setMyFeed(null);
-    setTimelineDate(getTodayInSeoul());
+    setEmotionStats(null);
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
@@ -388,31 +336,6 @@ export default function StudentPage() {
     setEmotionDate(nextDate);
     try {
       await loadMyFeed(nextDate);
-    } catch (err) {
-      setError((err as Error).message);
-      clearNoticeLater();
-    }
-  };
-
-  const onChangeTimelineDate = async (nextDate: string) => {
-    setTimelineDate(nextDate);
-    if (classId) {
-      try {
-        await loadFeeds(classId, nextDate);
-      } catch (err) {
-        setError((err as Error).message);
-        clearNoticeLater();
-      }
-    }
-  };
-
-  const refreshTimeline = async () => {
-    if (!classId) return;
-
-    try {
-      await loadFeeds(classId, timelineDate);
-      setMessage('감정피드를 새로고침했습니다.');
-      clearNoticeLater();
     } catch (err) {
       setError((err as Error).message);
       clearNoticeLater();
@@ -472,7 +395,7 @@ export default function StudentPage() {
             <div className="grid two">
               <div className="card" style={{ padding: 12 }}>
                 <strong>감정 작성</strong>
-                <p className="hint">오늘 작성 가능한 최대 1회</p>
+                <p className="hint">{myFeed ? '오늘 감정 기록 완료' : '오늘 아직 기록 없음'}</p>
               </div>
               <div className="card" style={{ padding: 12 }}>
                 <strong>계획 달성률</strong>
@@ -486,10 +409,13 @@ export default function StudentPage() {
               items={[
                 { key: 'emotion', label: '오늘의 감정' },
                 { key: 'plan', label: '오늘의 계획' },
-                { key: 'timeline', label: '감정 타임라인' }
+                { key: 'stats', label: '나의 감정통계' }
               ]}
               value={activeTab}
-              onChange={(key) => setActiveTab(key as 'emotion' | 'plan' | 'timeline')}
+              onChange={(key) => {
+                setActiveTab(key as 'emotion' | 'plan' | 'stats');
+                if (key === 'stats' && !emotionStats) loadEmotionStats();
+              }}
             />
           </section>
 
@@ -670,72 +596,95 @@ export default function StudentPage() {
             </section>
           )}
 
-          {activeTab === 'timeline' && (
+          {activeTab === 'stats' && (
             <section className="card">
               <div className="row space-between" style={{ marginBottom: 8 }}>
-                <h2 style={{ margin: 0 }}>감정 타임라인</h2>
-                <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    className="outline"
-                    style={{ width: 'auto', minWidth: 108 }}
-                    onClick={refreshTimeline}
-                    disabled={timelineLoading}
-                  >
-                    {timelineLoading ? '새로고침 중...' : '새로고침'}
-                  </button>
-                  <div style={{ width: 180 }}>
-                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
-                  <input
-                    type="date"
-                    value={timelineDate}
-                    onChange={(event) => onChangeTimelineDate(event.target.value)}
-                  />
-                  </div>
-                </div>
+                <h2 style={{ margin: 0 }}>나의 감정통계</h2>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ width: 'auto' }}
+                  onClick={loadEmotionStats}
+                  disabled={statsLoading}
+                >
+                  {statsLoading ? '불러오는 중...' : '새로고침'}
+                </button>
               </div>
-              <div className="feed-card-grid">
-                {feeds.length === 0 ? (
-                  <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택하거나 새 피드를 작성해보세요." />
-                ) : (
-                  feeds.map((feed) => (
-                    <article key={feed.id} className="card feed-post">
-                      <div className="feed-post-header">
-                        <strong className="feed-post-author">
-                          {feed.students.student_number}번 {feed.students.name}
-                        </strong>
-                        <span className="hint" style={{ margin: 0 }}>
-                          {new Date(feed.created_at).toLocaleDateString('ko-KR')}
-                        </span>
-                      </div>
+              <p className="hint" style={{ marginTop: 0 }}>
+                {emotionStats ? `${emotionStats.range.startDate} ~ ${emotionStats.range.endDate} 이번 달 감정 기록` : ''}
+              </p>
 
-                      <div className="feed-post-body">
-                        <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
-                        {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
-                        </p>
-                        <p style={{ marginTop: 0 }}>{feed.content}</p>
-
-                        <div className="row" style={{ flexWrap: 'wrap' }}>
-                        {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
-                          const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
-                          return (
-                            <button
-                              key={reactionKey}
-                              type="button"
-                              className="ghost"
-                              style={{ width: 'auto', minWidth: 64, minHeight: 44 }}
-                              onClick={() => reactFeed(feed.id, reactionKey)}
-                            >
-                              {REACTION_META[reactionKey].emoji} {count}
-                            </button>
-                          );
-                        })}
+              {statsLoading ? (
+                <p className="hint">감정 통계를 불러오는 중입니다...</p>
+              ) : !emotionStats || emotionStats.totalFeeds === 0 ? (
+                <EmptyState title="감정 기록이 없습니다" description="이번 달 감정을 기록하면 통계가 표시됩니다." />
+              ) : (() => {
+                const chartItems = buildEmotionChartItems(emotionStats.distribution);
+                const segments = chartItems.map((item) => `${item.color} ${item.ratio}%`).join(', ');
+                return (
+                  <div className="grid" style={{ gap: 18, justifyItems: 'center', textAlign: 'center' }}>
+                    <div
+                      style={{
+                        width: 260,
+                        height: 260,
+                        borderRadius: '50%',
+                        background: `conic-gradient(${segments})`,
+                        position: 'relative'
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 52,
+                          borderRadius: '50%',
+                          background: 'white',
+                          display: 'grid',
+                          placeItems: 'center',
+                          textAlign: 'center',
+                          color: '#64748b'
+                        }}
+                      >
+                        <div>
+                          <strong style={{ display: 'block', fontSize: 28, lineHeight: 1.1, color: '#0f172a' }}>
+                            {emotionStats.totalFeeds}
+                          </strong>
+                          <span style={{ fontSize: 13 }}>총 감정 기록</span>
                         </div>
                       </div>
-                    </article>
-                  ))
-                )}
-              </div>
+                    </div>
+
+                    <div className="grid" style={{ gap: 8, width: '100%', maxWidth: 460 }}>
+                      {chartItems.map((item) => (
+                        <div
+                          key={item.key}
+                          className="row space-between"
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            border: '1px solid #e2e8f0',
+                            background: '#f8fafc'
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, textAlign: 'left' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                background: item.color,
+                                flexShrink: 0
+                              }}
+                            />
+                            <span style={{ color: '#334155' }}>{item.label}</span>
+                          </span>
+                          <strong style={{ color: '#0f172a', flexShrink: 0 }}>{item.ratio}%</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </section>
           )}
         </>
