@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
+import EvalDashboard from '@/components/teacher/EvalDashboard';
 import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
@@ -60,7 +61,7 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'stats'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats'>('class');
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -418,10 +419,11 @@ export default function TeacherPage() {
                 { key: 'class', label: '학급 관리' },
                 { key: 'student', label: '학생 관리' },
                 { key: 'feed', label: '마음피드' },
+                { key: 'eval', label: '평가피드백' },
                 { key: 'stats', label: '통계 대시보드' }
               ]}
               value={activeTab}
-              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'feed' | 'stats')}
+              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats')}
             />
           </section>
 
@@ -665,6 +667,8 @@ export default function TeacherPage() {
               )}
             </section>
           )}
+
+          {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} />}
 
           {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
         </>

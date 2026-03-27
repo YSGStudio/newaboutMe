@@ -221,6 +221,69 @@ using (
   )
 );
 
+create type if not exists eval_grade as enum ('high', 'mid', 'low');
+
+create table if not exists eval_rubrics (
+  id uuid primary key default gen_random_uuid(),
+  teacher_id uuid not null references teacher_profiles (id) on delete cascade,
+  title varchar(100) not null,
+  goal varchar(200),
+  task varchar(200),
+  level_high varchar(200),
+  level_mid varchar(200),
+  level_low varchar(200),
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eval_reports (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references students (id) on delete cascade,
+  teacher_id uuid not null references teacher_profiles (id) on delete cascade,
+  title varchar(100) not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eval_report_items (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references eval_reports (id) on delete cascade,
+  rubric_id uuid references eval_rubrics (id) on delete set null,
+  rubric_title_snapshot varchar(100) not null,
+  rubric_goal_snapshot varchar(200),
+  rubric_task_snapshot varchar(200),
+  rubric_level_high_snapshot varchar(200),
+  rubric_level_mid_snapshot varchar(200),
+  rubric_level_low_snapshot varchar(200),
+  grade eval_grade not null,
+  teacher_feedback varchar(200),
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eval_report_images (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references eval_reports (id) on delete cascade,
+  storage_path text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eval_reflections (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null unique references eval_reports (id) on delete cascade,
+  student_id uuid not null references students (id) on delete cascade,
+  content text not null check (char_length(content) <= 500),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists eval_parent_comments (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null unique references eval_reports (id) on delete cascade,
+  content varchar(300) not null,
+  created_at timestamptz not null default now()
+);
+
 -- Student-facing operations are handled by server routes with service role key.
 -- Optional helper indexes.
 create index if not exists idx_students_class_id on students (class_id);

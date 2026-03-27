@@ -43,6 +43,40 @@ type EmotionChartItem = { key: string; label: string; count: number; ratio: numb
 
 type PlanTitleHistory = { id: string; old_title: string; new_title: string; changed_at: string };
 
+type EvalReportSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+  eval_report_items: { id: string; grade: string }[];
+  eval_report_images: { id: string; sort_order: number }[];
+  eval_reflections: { id: string }[];
+  eval_parent_comments: { id: string }[];
+};
+
+type EvalReportDetail = {
+  id: string;
+  title: string;
+  created_at: string;
+  eval_report_items: {
+    id: string;
+    rubric_title_snapshot: string;
+    rubric_goal_snapshot: string | null;
+    rubric_task_snapshot: string | null;
+    rubric_level_high_snapshot: string | null;
+    rubric_level_mid_snapshot: string | null;
+    rubric_level_low_snapshot: string | null;
+    grade: 'high' | 'mid' | 'low';
+    teacher_feedback: string | null;
+    sort_order: number;
+  }[];
+  eval_report_images: { id: string; sort_order: number }[];
+  eval_reflections: { id: string; content: string; created_at: string }[];
+  eval_parent_comments: { id: string; content: string; created_at: string }[];
+};
+
+const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '상', mid: '중', low: '하' };
+const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
+
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
 const otherEmotionColor = '#94a3b8';
 
@@ -90,7 +124,17 @@ export default function StudentPage() {
   const [emotionStats, setEmotionStats] = useState<EmotionStats>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats'>('emotion');
+  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval'>('emotion');
+  const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
+  const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
+  const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
+  const [evalDetailLoading, setEvalDetailLoading] = useState(false);
+  const [reflectionText, setReflectionText] = useState('');
+  const [parentText, setParentText] = useState('');
+  const [reflectionLoading, setReflectionLoading] = useState(false);
+  const [parentLoading, setParentLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxLoadingId, setLightboxLoadingId] = useState('');
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
   const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
 
@@ -375,6 +419,64 @@ export default function StudentPage() {
     }
   };
 
+  const loadEvalReports = async () => {
+    const d = await api<{ reports: EvalReportSummary[] }>('/api/eval/reports/my');
+    setEvalReports(d.reports);
+    setEvalReportsLoaded(true);
+  };
+
+  const openEvalDetail = async (reportId: string) => {
+    setEvalDetailLoading(true);
+    try {
+      const d = await api<{ report: EvalReportDetail }>(`/api/eval/reports/${reportId}/me`);
+      setEvalDetail(d.report);
+      setReflectionText('');
+      setParentText('');
+    } catch { /* ignore */ }
+    finally { setEvalDetailLoading(false); }
+  };
+
+  const openLightbox = async (reportId: string, imageId: string) => {
+    setLightboxLoadingId(imageId);
+    try {
+      const d = await api<{ url: string }>(`/api/eval/reports/${reportId}/images/${imageId}/view`);
+      setLightboxUrl(d.url);
+    } catch { /* ignore */ }
+    finally { setLightboxLoadingId(''); }
+  };
+
+  const submitReflection = async () => {
+    if (!evalDetail || !reflectionText.trim()) return;
+    setReflectionLoading(true);
+    try {
+      const d = await api<{ reflection: { id: string; content: string; created_at: string } }>(
+        `/api/eval/reports/${evalDetail.id}/reflection`,
+        { method: 'POST', body: JSON.stringify({ content: reflectionText.trim() }) }
+      );
+      setEvalDetail((prev) => prev ? { ...prev, eval_reflections: [d.reflection] } : prev);
+      setReflectionText('');
+      setMessage('성찰일기를 저장했습니다.');
+      clearNoticeLater();
+    } catch (err) { setError((err as Error).message); clearNoticeLater(); }
+    finally { setReflectionLoading(false); }
+  };
+
+  const submitParentComment = async () => {
+    if (!evalDetail || !parentText.trim()) return;
+    setParentLoading(true);
+    try {
+      const d = await api<{ parentComment: { id: string; content: string; created_at: string } }>(
+        `/api/eval/reports/${evalDetail.id}/parent-comment`,
+        { method: 'POST', body: JSON.stringify({ content: parentText.trim() }) }
+      );
+      setEvalDetail((prev) => prev ? { ...prev, eval_parent_comments: [d.parentComment] } : prev);
+      setParentText('');
+      setMessage('부모님 응원을 저장했습니다.');
+      clearNoticeLater();
+    } catch (err) { setError((err as Error).message); clearNoticeLater(); }
+    finally { setParentLoading(false); }
+  };
+
   const onLogout = async () => {
     await api('/api/auth/student/logout', { method: 'POST' });
     setStudentName('');
@@ -384,6 +486,9 @@ export default function StudentPage() {
     setPlanAchievements([]);
     setMyFeed(null);
     setEmotionStats(null);
+    setEvalReports([]);
+    setEvalReportsLoaded(false);
+    setEvalDetail(null);
     setEditingPlanId('');
     setPlanHistoryMap({});
     setOpenHistoryPlanId('');
@@ -468,12 +573,14 @@ export default function StudentPage() {
               items={[
                 { key: 'emotion', label: '오늘의 감정' },
                 { key: 'plan', label: '오늘의 계획' },
-                { key: 'stats', label: '나의 감정통계' }
+                { key: 'stats', label: '나의 감정통계' },
+                { key: 'eval', label: '평가기록' }
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'emotion' | 'plan' | 'stats');
+                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval');
                 if (key === 'stats' && !emotionStats) loadEmotionStats();
+                if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
               }}
             />
           </section>
@@ -828,7 +935,198 @@ export default function StudentPage() {
               })()}
             </section>
           )}
+
+          {activeTab === 'eval' && (
+            <section className="card">
+              <h2 style={{ margin: '0 0 12px' }}>평가기록</h2>
+              {evalReports.length === 0 ? (
+                <p className="hint">아직 받은 평가가 없습니다.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  {evalReports.map((r) => {
+                    const gradeColors = (r.eval_report_items ?? []).map((it) => GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'] ?? '#94a3b8');
+                    const topColor = gradeColors[0] ?? '#3b82f6';
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => openEvalDetail(r.id)}
+                        style={{
+                          width: 100,
+                          minHeight: 140,
+                          borderRadius: 8,
+                          border: `3px solid ${topColor}`,
+                          background: topColor + '18',
+                          padding: '10px 8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <strong style={{ fontSize: 13, wordBreak: 'keep-all', color: '#0f172a', lineHeight: 1.3 }}>{r.title}</strong>
+                        <div>
+                          <p className="hint" style={{ margin: '6px 0 2px', fontSize: 11 }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</p>
+                          <p className="hint" style={{ margin: 0, fontSize: 11 }}>
+                            {r.eval_reflections?.length ? '✏️ ' : ''}
+                            {r.eval_parent_comments?.length ? '💌 ' : ''}
+                            {r.eval_report_images?.length ? `🖼️${r.eval_report_images.length} ` : ''}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
         </>
+      )}
+
+      {/* 평가 상세 모달 */}
+      {evalDetail && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setEvalDetail(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+        >
+          <div className="card" style={{ width: 'min(860px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div className="row space-between" style={{ marginBottom: 12 }}>
+              <div>
+                <h3 style={{ margin: 0 }}>{evalDetail.title}</h3>
+                <p className="hint" style={{ margin: '4px 0 0' }}>{new Date(evalDetail.created_at).toLocaleDateString('ko-KR')}</p>
+              </div>
+              <button type="button" className="outline" style={{ width: 'auto' }} onClick={() => setEvalDetail(null)}>닫기</button>
+            </div>
+
+            {/* 교사 평가 항목 */}
+            <div className="grid" style={{ gap: 10 }}>
+              {[...evalDetail.eval_report_items].sort((a, b) => a.sort_order - b.sort_order).map((item) => (
+                <article key={item.id} className="card" style={{ padding: 12 }}>
+                  <div className="row space-between" style={{ marginBottom: 6 }}>
+                    <strong>{item.rubric_title_snapshot}</strong>
+                    <span className="badge" style={{ background: GRADE_COLOR[item.grade] + '22', color: GRADE_COLOR[item.grade], fontWeight: 700 }}>
+                      {GRADE_LABEL[item.grade]}
+                    </span>
+                  </div>
+                  {item.teacher_feedback && <p style={{ margin: '4px 0 0', fontSize: 14 }}>{item.teacher_feedback}</p>}
+                  {(item.rubric_goal_snapshot || item.rubric_task_snapshot) && (
+                    <div style={{ marginTop: 8, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+                      {item.rubric_goal_snapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>도달목표:</strong> {item.rubric_goal_snapshot}</p>}
+                      {item.rubric_task_snapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>수행과제:</strong> {item.rubric_task_snapshot}</p>}
+                      {item[`rubric_level_${item.grade}_snapshot` as keyof typeof item] && (
+                        <p className="hint" style={{ margin: '2px 0', fontSize: 12, color: GRADE_COLOR[item.grade] }}>
+                          <strong>{GRADE_LABEL[item.grade]} 기준:</strong> {String(item[`rubric_level_${item.grade}_snapshot` as keyof typeof item] ?? '')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            {/* 평가 자료 이미지 */}
+            {evalDetail.eval_report_images.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[...evalDetail.eval_report_images].sort((a, b) => a.sort_order - b.sort_order).map((img) => (
+                    <button
+                      key={img.id}
+                      type="button"
+                      className="outline"
+                      style={{ width: 80, height: 80, fontSize: 12 }}
+                      onClick={() => openLightbox(evalDetail.id, img.id)}
+                      disabled={lightboxLoadingId === img.id}
+                    >
+                      {lightboxLoadingId === img.id ? '...' : `자료 ${img.sort_order + 1}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 성찰일기 */}
+            <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
+              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>나의 성찰일기</p>
+              {evalDetail.eval_reflections?.[0] ? (
+                <div className="card" style={{ padding: 12, background: '#f8fbff' }}>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{evalDetail.eval_reflections[0].content}</p>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={reflectionText}
+                    onChange={(e) => setReflectionText(e.target.value)}
+                    maxLength={500}
+                    placeholder="이 평가를 받고 느낀 점, 앞으로의 다짐을 써보세요. (최대 500자, 작성 후 수정 불가)"
+                    style={{ minHeight: 100, resize: 'vertical' }}
+                  />
+                  <p className="hint" style={{ margin: '4px 0 8px', fontSize: 12 }}>{reflectionText.length}/500</p>
+                  <button
+                    type="button"
+                    className="ghost"
+                    style={{ width: '100%' }}
+                    onClick={submitReflection}
+                    disabled={reflectionLoading || !reflectionText.trim()}
+                  >
+                    {reflectionLoading ? '저장 중...' : '성찰일기 저장 (한 번만 작성 가능)'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 부모님 응원 */}
+            <div style={{ marginTop: 14, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
+              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>부모님 응원 / 격려</p>
+              {evalDetail.eval_parent_comments?.[0] ? (
+                <div className="card" style={{ padding: 12, background: '#fffbeb' }}>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{evalDetail.eval_parent_comments[0].content}</p>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={parentText}
+                    onChange={(e) => setParentText(e.target.value)}
+                    maxLength={300}
+                    placeholder="자녀에게 응원 메시지를 남겨주세요. (최대 300자, 작성 후 수정 불가)"
+                    style={{ minHeight: 80, resize: 'vertical' }}
+                  />
+                  <p className="hint" style={{ margin: '4px 0 8px', fontSize: 12 }}>{parentText.length}/300</p>
+                  <button
+                    type="button"
+                    className="outline"
+                    style={{ width: '100%' }}
+                    onClick={submitParentComment}
+                    disabled={parentLoading || !parentText.trim()}
+                  >
+                    {parentLoading ? '저장 중...' : '부모님 응원 저장 (한 번만 작성 가능)'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 라이트박스 */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 2000, display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="평가 자료"
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
+            draggable={false}
+          />
+          <p style={{ position: 'absolute', bottom: 24, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>클릭하여 닫기</p>
+        </div>
       )}
     </main>
   );
