@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: Params) {
     .eq('id', params.studentId)
     .maybeSingle();
 
-  if (!student || (student.classes as { teacher_id: string }).teacher_id !== auth.teacher.id) {
+  if (!student || (student.classes as unknown as { teacher_id: string }).teacher_id !== auth.teacher.id) {
     return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
   }
 
