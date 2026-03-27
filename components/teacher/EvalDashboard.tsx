@@ -553,51 +553,55 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
               <EmptyState title="학생을 선택하세요" description="왼쪽에서 학생을 클릭하면 평가 목록이 표시됩니다." />
             ) : (
               <>
-                <div className="row space-between" style={{ marginBottom: 10 }}>
+                <div className="row space-between" style={{ marginBottom: showRubricSelect ? 0 : 10 }}>
                   <h3 style={{ margin: 0 }}>{selectedStudent?.name} 평가 목록</h3>
-                  <button type="button" className="ghost" style={{ width: 'auto' }} onClick={openCreateForm}>+ 새 평가 작성</button>
+                  <button
+                    type="button"
+                    className={showRubricSelect ? 'outline' : 'ghost'}
+                    style={{ width: 'auto' }}
+                    onClick={showRubricSelect ? () => setShowRubricSelect(false) : openCreateForm}
+                  >
+                    {showRubricSelect ? '✕ 닫기' : '+ 새 평가 작성'}
+                  </button>
                 </div>
 
-                {/* 채점기준 선택 화면 */}
+                {/* 채점기준 토글 드롭다운 */}
                 {showRubricSelect && (
-                  <div className="card" style={{ padding: 14, marginBottom: 12 }}>
-                    <div className="row space-between" style={{ marginBottom: 10 }}>
-                      <h4 style={{ margin: 0 }}>채점기준 선택</h4>
-                      <button type="button" className="outline" style={{ width: 'auto', fontSize: 12 }} onClick={() => setShowRubricSelect(false)}>취소</button>
-                    </div>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 10, overflow: 'hidden' }}>
                     {rubrics.length === 0 ? (
-                      <Notice type="info" message="등록된 채점기준이 없습니다. 채점기준 탭에서 먼저 기준을 등록하세요." />
+                      <p className="hint" style={{ padding: '10px 12px', margin: 0 }}>채점기준 탭에서 먼저 기준을 등록하세요.</p>
                     ) : (
                       <>
-                        <div className="grid" style={{ gap: 6, marginBottom: 12 }}>
-                          {rubrics.map((r) => (
-                            <label
-                              key={r.id}
-                              className="card"
-                              style={{ padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', background: selectedRubricIds.has(r.id) ? '#f0f9ff' : undefined }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedRubricIds.has(r.id)}
-                                onChange={() => toggleRubric(r.id)}
-                                style={{ marginTop: 2, flexShrink: 0 }}
-                              />
-                              <div>
-                                <strong>{r.title}</strong>
-                                {r.goal && <p className="hint" style={{ margin: '2px 0 0', fontSize: 12 }}>도달목표: {r.goal}</p>}
-                              </div>
-                            </label>
-                          ))}
+                        {rubrics.map((r, i) => (
+                          <label
+                            key={r.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '9px 14px', cursor: 'pointer',
+                              borderTop: i === 0 ? 'none' : '1px solid #f3f4f6',
+                              background: selectedRubricIds.has(r.id) ? '#f0f9ff' : '#fff',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedRubricIds.has(r.id)}
+                              onChange={() => toggleRubric(r.id)}
+                              style={{ flexShrink: 0 }}
+                            />
+                            <span style={{ fontSize: 14, fontWeight: 500 }}>{r.title}</span>
+                          </label>
+                        ))}
+                        <div style={{ padding: '8px 10px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                          <button
+                            type="button"
+                            className="ghost"
+                            style={{ width: '100%', padding: '7px 0', fontSize: 13 }}
+                            onClick={confirmRubricSelection}
+                            disabled={selectedRubricIds.size === 0}
+                          >
+                            작성하기 ({selectedRubricIds.size}개 선택)
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="ghost"
-                          style={{ width: '100%' }}
-                          onClick={confirmRubricSelection}
-                          disabled={selectedRubricIds.size === 0}
-                        >
-                          선택 완료 ({selectedRubricIds.size}개)
-                        </button>
                       </>
                     )}
                   </div>
