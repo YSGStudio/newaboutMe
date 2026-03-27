@@ -277,6 +277,15 @@ create table if not exists eval_reflections (
   created_at timestamptz not null default now()
 );
 
+create table if not exists eval_report_links (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references eval_reports (id) on delete cascade,
+  url text not null,
+  label varchar(100),
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists eval_parent_comments (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null unique references eval_reports (id) on delete cascade,
@@ -293,3 +302,4 @@ create index if not exists idx_plan_checks_plan_date on plan_checks (plan_id, ch
 create index if not exists idx_plan_title_history_plan on plan_title_history (plan_id, changed_at desc);
 create index if not exists idx_teacher_comments_feed_created on teacher_comments (feed_id, created_at desc);
 create index if not exists idx_teacher_comments_teacher_created on teacher_comments (teacher_id, created_at desc);
+create index if not exists idx_eval_report_links_report on eval_report_links (report_id, sort_order);

@@ -16,12 +16,15 @@ type Rubric = {
   sort_order: number;
 };
 
+type ReportLink = { id: string; url: string; label: string | null; sort_order: number };
+
 type ReportSummary = {
   id: string;
   title: string;
   created_at: string;
   eval_report_items: { id: string; grade: string; sort_order: number }[];
   eval_report_images: { id: string; sort_order: number }[];
+  eval_report_links: ReportLink[];
 };
 
 type ReportDetail = ReportSummary & {
@@ -181,22 +184,22 @@ function RubricManager() {
       {rubrics.length === 0 ? (
         <EmptyState title="등록된 채점기준이 없습니다" description="+ 기준 추가 버튼을 눌러 채점기준을 등록하세요." />
       ) : (
-        <div className="grid" style={{ gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
           {rubrics.map((r) => (
-            <article key={r.id} className="card" style={{ padding: 12 }}>
-              <div className="row space-between" style={{ marginBottom: 8 }}>
-                <strong>{r.title}</strong>
-                <div className="row" style={{ gap: 4 }}>
-                  <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => onEdit(r)}>수정</button>
-                  <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => onDelete(r.id)} disabled={savingId === r.id}>삭제</button>
+            <article key={r.id} className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{r.title}</p>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {r.goal && <p className="hint" style={{ margin: 0, fontSize: 12 }}><strong>도달목표</strong> {r.goal}</p>}
+                {r.task && <p className="hint" style={{ margin: 0, fontSize: 12 }}><strong>수행과제</strong> {r.task}</p>}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                  {r.level_high && <span className="badge" style={{ background: '#dcfce7', color: '#16a34a', fontSize: 11 }}>상</span>}
+                  {r.level_mid && <span className="badge" style={{ background: '#fef9c3', color: '#a16207', fontSize: 11 }}>중</span>}
+                  {r.level_low && <span className="badge" style={{ background: '#fee2e2', color: '#dc2626', fontSize: 11 }}>하</span>}
                 </div>
               </div>
-              {r.goal && <p className="hint" style={{ margin: '2px 0' }}><strong>도달목표:</strong> {r.goal}</p>}
-              {r.task && <p className="hint" style={{ margin: '2px 0' }}><strong>수행과제:</strong> {r.task}</p>}
-              <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                {r.level_high && <span className="badge" style={{ background: '#dcfce7', color: '#16a34a' }}>상: {r.level_high}</span>}
-                {r.level_mid && <span className="badge" style={{ background: '#fef9c3', color: '#a16207' }}>중: {r.level_mid}</span>}
-                {r.level_low && <span className="badge" style={{ background: '#fee2e2', color: '#dc2626' }}>하: {r.level_low}</span>}
+              <div className="row" style={{ gap: 4 }}>
+                <button type="button" className="outline" style={{ flex: 1, padding: '4px 0', fontSize: 12 }} onClick={() => onEdit(r)}>수정</button>
+                <button type="button" className="outline" style={{ flex: 1, padding: '4px 0', fontSize: 12 }} onClick={() => onDelete(r.id)} disabled={savingId === r.id}>삭제</button>
               </div>
             </article>
           ))}
@@ -214,7 +217,17 @@ function ImageUploader({ reportId, images, onUploaded }: {
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const fetchThumb = async (imageId: string) => {
+    try {
+      const d = await api<{ url: string }>(`/api/eval/reports/${reportId}/images/${imageId}/view`);
+      setThumbUrls((prev) => ({ ...prev, [imageId]: d.url }));
+      return d.url;
+    } catch { return null; }
+  };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -228,21 +241,123 @@ function ImageUploader({ reportId, images, onUploaded }: {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       onUploaded(json.image);
+      fetchThumb(json.image.id);
     } catch (err) { setError((err as Error).message); }
     finally { setUploading(false); if (inputRef.current) inputRef.current.value = ''; }
   };
 
+  const openLightbox = async (imageId: string) => {
+    const url = thumbUrls[imageId] ?? await fetchThumb(imageId);
+    if (url) setLightboxUrl(url);
+  };
+
+  const sorted = [...images].sort((a, b) => a.sort_order - b.sort_order);
+
   return (
     <div style={{ marginTop: 12 }}>
-      <p className="hint" style={{ margin: '0 0 6px', fontWeight: 600 }}>평가 자료 이미지 ({images.length}/5)</p>
+      <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 이미지 ({images.length}/5)</p>
       {error && <Notice type="error" message={error} />}
-      {images.length < 5 && (
-        <>
-          <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFile} />
-          <button type="button" className="outline" style={{ width: 'auto', fontSize: 13 }} onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {uploading ? '업로드 중...' : '이미지 추가'}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
+        {sorted.map((img) => (
+          <button
+            key={img.id}
+            type="button"
+            onClick={() => openLightbox(img.id)}
+            style={{ width: 72, height: 72, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: 'zoom-in' }}
+          >
+            {thumbUrls[img.id] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+            ) : (
+              <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
+            )}
           </button>
-        </>
+        ))}
+        {images.length < 5 && (
+          <>
+            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFile} />
+            <button
+              type="button"
+              className="outline"
+              style={{ width: 72, height: 72, fontSize: 22, color: '#9ca3af', flexShrink: 0 }}
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? '...' : '+'}
+            </button>
+          </>
+        )}
+      </div>
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightboxUrl} alt="평가 자료" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }} onContextMenu={(e) => e.preventDefault()} draggable={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub: 링크 추가 ───────────────────────────────────────────────
+function LinkAdder({ reportId, links, onAdded, onDeleted }: {
+  reportId: string;
+  links: ReportLink[];
+  onAdded: (link: ReportLink) => void;
+  onDeleted: (linkId: string) => void;
+}) {
+  const [url, setUrl] = useState('');
+  const [label, setLabel] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+
+  const onAdd = async () => {
+    if (!url.trim()) return;
+    setAdding(true); setError('');
+    try {
+      const d = await api<{ link: ReportLink }>(`/api/eval/reports/${reportId}/links`, {
+        method: 'POST',
+        body: JSON.stringify({ url: url.trim(), label: label.trim() || null }),
+      });
+      onAdded(d.link);
+      setUrl(''); setLabel('');
+    } catch (err) { setError((err as Error).message); }
+    finally { setAdding(false); }
+  };
+
+  const onDelete = async (linkId: string) => {
+    try {
+      await api(`/api/eval/reports/${reportId}/links/${linkId}`, { method: 'DELETE' });
+      onDeleted(linkId);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크 ({links.length}/10)</p>
+      {links.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+          {[...links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
+            <div key={lk.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f9ff', borderRadius: 6, padding: '5px 10px' }}>
+              <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {lk.label ? <><strong>{lk.label}</strong> — </> : ''}{lk.url}
+              </span>
+              <button type="button" className="outline" style={{ width: 'auto', padding: '2px 8px', fontSize: 11, flexShrink: 0 }} onClick={() => onDelete(lk.id)}>삭제</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {links.length < 10 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="링크 이름 (선택)" maxLength={100} style={{ fontSize: 13 }} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." maxLength={2000} style={{ fontSize: 13, flex: 1 }} />
+            <button type="button" className="ghost" style={{ width: 'auto', padding: '0 14px', fontSize: 13, flexShrink: 0 }} onClick={onAdd} disabled={adding || !url.trim()}>추가</button>
+          </div>
+          {error && <Notice type="error" message={error} />}
+        </div>
       )}
     </div>
   );
@@ -251,16 +366,22 @@ function ImageUploader({ reportId, images, onUploaded }: {
 // ── Sub: 보고서 상세 모달 ────────────────────────────────────────
 function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose: () => void }) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [loadingImageId, setLoadingImageId] = useState('');
   const [expandedItemId, setExpandedItemId] = useState('');
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
 
-  const openImage = async (imageId: string) => {
-    setLoadingImageId(imageId);
-    try {
-      const d = await api<{ url: string }>(`/api/eval/reports/${report.id}/images/${imageId}/view`);
-      setLightboxUrl(d.url);
-    } catch { /* ignore */ }
-    finally { setLoadingImageId(''); }
+  useEffect(() => {
+    report.eval_report_images.forEach(async (img) => {
+      try {
+        const d = await api<{ url: string }>(`/api/eval/reports/${report.id}/images/${img.id}/view`);
+        setThumbUrls((prev) => ({ ...prev, [img.id]: d.url }));
+      } catch { /* ignore */ }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report.id]);
+
+  const openImage = (imageId: string) => {
+    const url = thumbUrls[imageId];
+    if (url) setLightboxUrl(url);
   };
 
   const sortedItems = [...report.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
@@ -324,13 +445,33 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
                   <button
                     key={img.id}
                     type="button"
-                    className="outline"
-                    style={{ width: 80, height: 80, fontSize: 12, padding: 4 }}
                     onClick={() => openImage(img.id)}
-                    disabled={loadingImageId === img.id}
+                    disabled={!thumbUrls[img.id]}
+                    style={{ width: 80, height: 80, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: thumbUrls[img.id] ? 'zoom-in' : 'default' }}
                   >
-                    {loadingImageId === img.id ? '로딩...' : `이미지 ${img.sort_order + 1}`}
+                    {thumbUrls[img.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
+                    )}
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 웹 링크 */}
+          {report.eval_report_links?.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[...report.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
+                  <a key={lk.id} href={lk.url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', background: '#f0f9ff', borderRadius: 6, padding: '6px 12px', fontSize: 13, color: '#2563eb', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {lk.label ? `${lk.label} — ` : ''}{lk.url}
+                  </a>
                 ))}
               </div>
             </div>
@@ -393,10 +534,11 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [reportsLoading, setReportsLoading] = useState(false);
   const [detailReport, setDetailReport] = useState<ReportDetail | null>(null);
   const [showRubricSelect, setShowRubricSelect] = useState(false);
-  const [selectedRubricIds, setSelectedRubricIds] = useState<Set<string>>(new Set());
+  const [selectedRubricId, setSelectedRubricId] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [uploadedImages, setUploadedImages] = useState<{ id: string; sort_order: number }[]>([]);
+  const [uploadedLinks, setUploadedLinks] = useState<ReportLink[]>([]);
   const [createdReportId, setCreatedReportId] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
   const [msg, setMsg] = useState('');
@@ -420,17 +562,17 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const openCreateForm = async () => {
     const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
     setRubrics(d.rubrics);
-    setSelectedRubricIds(new Set(d.rubrics.map((r) => r.id)));
+    setSelectedRubricId('');
     setCreatedReportId('');
     setUploadedImages([]);
+    setUploadedLinks([]);
     setShowCreateForm(false);
     setShowRubricSelect(true);
   };
 
   // 채점기준 선택 완료 → 평가 입력 폼으로
-  const confirmRubricSelection = () => {
-    const selected = rubrics.filter((r) => selectedRubricIds.has(r.id));
-    setDraftItems(selected.map((r, i) => ({
+  const confirmRubricSelectionWith = (r: Rubric) => {
+    setDraftItems([{
       rubricId: r.id,
       rubricTitleSnapshot: r.title,
       rubricGoalSnapshot: r.goal,
@@ -440,18 +582,10 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       rubricLevelLowSnapshot: r.level_low,
       grade: 'mid',
       teacherFeedback: '',
-      sortOrder: i
-    })));
+      sortOrder: 0
+    }]);
     setShowRubricSelect(false);
     setShowCreateForm(true);
-  };
-
-  const toggleRubric = (id: string) => {
-    setSelectedRubricIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
   };
 
   const onSaveReport = async (e: FormEvent) => {
@@ -481,7 +615,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
         })
       });
       setCreatedReportId(d.report.id);
-      setReports((prev) => [{ id: d.report.id, title: d.report.title, created_at: d.report.created_at, eval_report_items: [], eval_report_images: [] }, ...prev]);
+      setReports((prev) => [{ id: d.report.id, title: d.report.title, created_at: d.report.created_at, eval_report_items: [], eval_report_images: [], eval_report_links: [] }, ...prev]);
       setMsg('평가보고서가 저장되었습니다. 이미지를 추가할 수 있습니다.');
       clear();
     } catch (err) { setError((err as Error).message); clear(); }
@@ -501,7 +635,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
   const openDetail = async (reportId: string) => {
     try {
-      const d = await api<{ report: ReportDetail }>(`/api/eval/reports/${reportId}`);
+      const d = await api<{ report: ReportDetail }>(`/api/eval/reports/${reportId}`, { cache: 'no-store' });
       setDetailReport(d.report);
     } catch { /* ignore */ }
   };
@@ -524,7 +658,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       {subTab === 'rubrics' && <RubricManager />}
 
       {subTab === 'reports' && (
-        <div className="grid two" style={{ alignItems: 'start', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 150px) 1fr', alignItems: 'start', gap: 14 }}>
           {/* 왼쪽: 학생 목록 */}
           <div>
             <h3 style={{ marginTop: 0 }}>학생 선택</h3>
@@ -567,42 +701,23 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
                 {/* 채점기준 토글 드롭다운 */}
                 {showRubricSelect && (
-                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 10, overflow: 'hidden' }}>
+                  <div style={{ marginBottom: 10 }}>
                     {rubrics.length === 0 ? (
-                      <p className="hint" style={{ padding: '10px 12px', margin: 0 }}>채점기준 탭에서 먼저 기준을 등록하세요.</p>
+                      <p className="hint" style={{ margin: '6px 0' }}>채점기준 탭에서 먼저 기준을 등록하세요.</p>
                     ) : (
-                      <>
-                        {rubrics.map((r, i) => (
-                          <label
-                            key={r.id}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10,
-                              padding: '9px 14px', cursor: 'pointer',
-                              borderTop: i === 0 ? 'none' : '1px solid #f3f4f6',
-                              background: selectedRubricIds.has(r.id) ? '#f0f9ff' : '#fff',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedRubricIds.has(r.id)}
-                              onChange={() => toggleRubric(r.id)}
-                              style={{ flexShrink: 0 }}
-                            />
-                            <span style={{ fontSize: 14, fontWeight: 500 }}>{r.title}</span>
-                          </label>
-                        ))}
-                        <div style={{ padding: '8px 10px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                        {rubrics.map((r) => (
                           <button
+                            key={r.id}
                             type="button"
-                            className="ghost"
-                            style={{ width: '100%', padding: '7px 0', fontSize: 13 }}
-                            onClick={confirmRubricSelection}
-                            disabled={selectedRubricIds.size === 0}
+                            className={selectedRubricId === r.id ? 'ghost' : 'outline'}
+                            style={{ width: 'auto', padding: '7px 16px', fontSize: 14 }}
+                            onClick={() => { setSelectedRubricId(r.id); confirmRubricSelectionWith(r); }}
                           >
-                            작성하기 ({selectedRubricIds.size}개 선택)
+                            {r.title}
                           </button>
-                        </div>
-                      </>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -662,7 +777,13 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                             images={uploadedImages}
                             onUploaded={(img) => setUploadedImages((prev) => [...prev, img])}
                           />
-                          <button type="button" className="outline" style={{ marginTop: 10, width: '100%' }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
+                          <LinkAdder
+                            reportId={createdReportId}
+                            links={uploadedLinks}
+                            onAdded={(lk) => setUploadedLinks((prev) => [...prev, lk])}
+                            onDeleted={(id) => setUploadedLinks((prev) => prev.filter((l) => l.id !== id))}
+                          />
+                          <button type="button" className="outline" style={{ marginTop: 12, width: '100%' }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
                         </>
                       )}
                     </form>

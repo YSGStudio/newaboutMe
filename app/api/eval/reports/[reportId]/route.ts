@@ -8,22 +8,65 @@ export async function GET(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const { data, error } = await supabaseAdmin
+  // 본인 보고서인지 확인
+  const { data: report, error } = await supabaseAdmin
     .from('eval_reports')
-    .select(`
-      id, title, created_at,
-      students(id, name, student_number),
-      eval_report_items(id, rubric_id, rubric_title_snapshot, rubric_goal_snapshot, rubric_task_snapshot, rubric_level_high_snapshot, rubric_level_mid_snapshot, rubric_level_low_snapshot, grade, teacher_feedback, sort_order),
-      eval_report_images(id, storage_path, sort_order),
-      eval_reflections(id, content, created_at),
-      eval_parent_comments(id, content, created_at)
-    `)
+    .select('id, title, created_at, student_id')
     .eq('id', params.reportId)
     .eq('teacher_id', auth.teacher.id)
     .single();
 
-  if (error) return NextResponse.json({ error: '보고서를 찾을 수 없습니다.' }, { status: 404 });
-  return NextResponse.json({ report: data });
+  if (error || !report) {
+    return NextResponse.json({ error: '보고서를 찾을 수 없습니다.' }, { status: 404 });
+  }
+
+  const [student, items, images, links, reflections, parentComments] = await Promise.all([
+    supabaseAdmin
+      .from('students')
+      .select('id, name, student_number')
+      .eq('id', report.student_id)
+      .single(),
+    supabaseAdmin
+      .from('eval_report_items')
+      .select('id, rubric_id, rubric_title_snapshot, rubric_goal_snapshot, rubric_task_snapshot, rubric_level_high_snapshot, rubric_level_mid_snapshot, rubric_level_low_snapshot, grade, teacher_feedback, sort_order')
+      .eq('report_id', params.reportId)
+      .order('sort_order'),
+    supabaseAdmin
+      .from('eval_report_images')
+      .select('id, storage_path, sort_order')
+      .eq('report_id', params.reportId)
+      .order('sort_order'),
+    supabaseAdmin
+      .from('eval_report_links')
+      .select('id, url, label, sort_order')
+      .eq('report_id', params.reportId)
+      .order('sort_order'),
+    supabaseAdmin
+      .from('eval_reflections')
+      .select('id, content, created_at')
+      .eq('report_id', params.reportId),
+    supabaseAdmin
+      .from('eval_parent_comments')
+      .select('id, content, created_at')
+      .eq('report_id', params.reportId),
+  ]);
+
+  return NextResponse.json(
+    {
+      report: {
+        id: report.id,
+        title: report.title,
+        created_at: report.created_at,
+        students: student.data ?? null,
+        eval_report_items: items.data ?? [],
+        eval_report_images: images.data ?? [],
+        eval_report_links: links.data ?? [],
+        eval_reflections: reflections.data ?? [],
+        eval_parent_comments: parentComments.data ?? [],
+      },
+    },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }
 
 export async function DELETE(_: Request, { params }: Params) {

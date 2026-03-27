@@ -70,6 +70,7 @@ type EvalReportDetail = {
     sort_order: number;
   }[];
   eval_report_images: { id: string; sort_order: number }[];
+  eval_report_links: { id: string; url: string; label: string | null; sort_order: number }[];
   eval_reflections: { id: string; content: string; created_at: string }[];
   eval_parent_comments: { id: string; content: string; created_at: string }[];
 };
@@ -133,6 +134,8 @@ export default function StudentPage() {
   const [parentText, setParentText] = useState('');
   const [reflectionLoading, setReflectionLoading] = useState(false);
   const [parentLoading, setParentLoading] = useState(false);
+  const [evalModalMsg, setEvalModalMsg] = useState('');
+  const [evalModalError, setEvalModalError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxLoadingId, setLightboxLoadingId] = useState('');
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
@@ -427,12 +430,17 @@ export default function StudentPage() {
 
   const openEvalDetail = async (reportId: string) => {
     setEvalDetailLoading(true);
+    setEvalModalMsg('');
+    setEvalModalError('');
     try {
-      const d = await api<{ report: EvalReportDetail }>(`/api/eval/reports/${reportId}/me`);
+      const d = await api<{ report: EvalReportDetail }>(`/api/eval/reports/${reportId}/me`, { cache: 'no-store' });
       setEvalDetail(d.report);
       setReflectionText('');
       setParentText('');
-    } catch { /* ignore */ }
+    } catch (err) {
+      setEvalDetail({ id: reportId, title: '', created_at: '', eval_report_items: [], eval_report_images: [], eval_report_links: [], eval_reflections: [], eval_parent_comments: [] });
+      setEvalModalError('평가 기록을 불러오지 못했습니다. ' + (err as Error).message);
+    }
     finally { setEvalDetailLoading(false); }
   };
 
@@ -445,9 +453,12 @@ export default function StudentPage() {
     finally { setLightboxLoadingId(''); }
   };
 
+  const clearEvalModalNotice = () => window.setTimeout(() => { setEvalModalMsg(''); setEvalModalError(''); }, 3000);
+
   const submitReflection = async () => {
     if (!evalDetail || !reflectionText.trim()) return;
     setReflectionLoading(true);
+    setEvalModalError('');
     try {
       const d = await api<{ reflection: { id: string; content: string; created_at: string } }>(
         `/api/eval/reports/${evalDetail.id}/reflection`,
@@ -455,15 +466,19 @@ export default function StudentPage() {
       );
       setEvalDetail((prev) => prev ? { ...prev, eval_reflections: [d.reflection] } : prev);
       setReflectionText('');
-      setMessage('성찰일기를 저장했습니다.');
-      clearNoticeLater();
-    } catch (err) { setError((err as Error).message); clearNoticeLater(); }
+      setEvalModalMsg('성찰일기를 저장했습니다.');
+      clearEvalModalNotice();
+    } catch (err) {
+      setEvalModalError((err as Error).message);
+      clearEvalModalNotice();
+    }
     finally { setReflectionLoading(false); }
   };
 
   const submitParentComment = async () => {
     if (!evalDetail || !parentText.trim()) return;
     setParentLoading(true);
+    setEvalModalError('');
     try {
       const d = await api<{ parentComment: { id: string; content: string; created_at: string } }>(
         `/api/eval/reports/${evalDetail.id}/parent-comment`,
@@ -471,9 +486,12 @@ export default function StudentPage() {
       );
       setEvalDetail((prev) => prev ? { ...prev, eval_parent_comments: [d.parentComment] } : prev);
       setParentText('');
-      setMessage('부모님 응원을 저장했습니다.');
-      clearNoticeLater();
-    } catch (err) { setError((err as Error).message); clearNoticeLater(); }
+      setEvalModalMsg('부모님 응원을 저장했습니다.');
+      clearEvalModalNotice();
+    } catch (err) {
+      setEvalModalError((err as Error).message);
+      clearEvalModalNotice();
+    }
     finally { setParentLoading(false); }
   };
 
@@ -1011,7 +1029,6 @@ export default function StudentPage() {
                       {GRADE_LABEL[item.grade]}
                     </span>
                   </div>
-                  {item.teacher_feedback && <p style={{ margin: '4px 0 0', fontSize: 14 }}>{item.teacher_feedback}</p>}
                   {(item.rubric_goal_snapshot || item.rubric_task_snapshot) && (
                     <div style={{ marginTop: 8, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
                       {item.rubric_goal_snapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>도달목표:</strong> {item.rubric_goal_snapshot}</p>}
@@ -1036,17 +1053,61 @@ export default function StudentPage() {
                     <button
                       key={img.id}
                       type="button"
-                      className="outline"
-                      style={{ width: 80, height: 80, fontSize: 12 }}
                       onClick={() => openLightbox(evalDetail.id, img.id)}
                       disabled={lightboxLoadingId === img.id}
+                      style={{ width: 80, height: 80, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: 'zoom-in' }}
                     >
-                      {lightboxLoadingId === img.id ? '...' : `자료 ${img.sort_order + 1}`}
+                      {lightboxLoadingId === img.id
+                        ? <span style={{ fontSize: 11, color: '#9ca3af' }}>...</span>
+                        : <span style={{ fontSize: 11, color: '#9ca3af' }}>자료 {img.sort_order + 1}</span>
+                      }
                     </button>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* 웹 링크 */}
+            {evalDetail.eval_report_links?.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[...evalDetail.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
+                    <a
+                      key={lk.id}
+                      href={lk.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'block', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 14, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      {lk.label || lk.url}
+                      <span style={{ fontSize: 11, color: '#93c5fd', marginLeft: 6 }}>↗ 새 창으로 열기</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 교사의 피드백 */}
+            {evalDetail.eval_report_items.some((item) => item.teacher_feedback) && (
+              <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
+                <p className="hint" style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 15 }}>교사의 피드백</p>
+                <div className="grid" style={{ gap: 8 }}>
+                  {[...evalDetail.eval_report_items]
+                    .filter((item) => item.teacher_feedback)
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((item) => (
+                      <div key={item.id} style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px' }}>
+                        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>{item.teacher_feedback}</p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* 모달 내 알림 */}
+            {evalModalMsg && <p style={{ margin: '14px 0 0', padding: '8px 12px', background: '#dcfce7', color: '#16a34a', borderRadius: 6, fontSize: 13 }}>{evalModalMsg}</p>}
+            {evalModalError && <p style={{ margin: '14px 0 0', padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 13 }}>{evalModalError}</p>}
 
             {/* 성찰일기 */}
             <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
