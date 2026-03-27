@@ -392,8 +392,9 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [detailReport, setDetailReport] = useState<ReportDetail | null>(null);
+  const [showRubricSelect, setShowRubricSelect] = useState(false);
+  const [selectedRubricIds, setSelectedRubricIds] = useState<Set<string>>(new Set());
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [createTitle, setCreateTitle] = useState('');
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [uploadedImages, setUploadedImages] = useState<{ id: string; sort_order: number }[]>([]);
   const [createdReportId, setCreatedReportId] = useState('');
@@ -415,11 +416,21 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       .finally(() => setReportsLoading(false));
   }, [selectedStudentId]);
 
-  // 평가 작성 폼 열기 시 채점기준 로드
+  // 채점기준 선택 화면 열기
   const openCreateForm = async () => {
     const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
     setRubrics(d.rubrics);
-    setDraftItems(d.rubrics.map((r, i) => ({
+    setSelectedRubricIds(new Set(d.rubrics.map((r) => r.id)));
+    setCreatedReportId('');
+    setUploadedImages([]);
+    setShowCreateForm(false);
+    setShowRubricSelect(true);
+  };
+
+  // 채점기준 선택 완료 → 평가 입력 폼으로
+  const confirmRubricSelection = () => {
+    const selected = rubrics.filter((r) => selectedRubricIds.has(r.id));
+    setDraftItems(selected.map((r, i) => ({
       rubricId: r.id,
       rubricTitleSnapshot: r.title,
       rubricGoalSnapshot: r.goal,
@@ -431,10 +442,16 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       teacherFeedback: '',
       sortOrder: i
     })));
-    setCreateTitle('');
-    setCreatedReportId('');
-    setUploadedImages([]);
+    setShowRubricSelect(false);
     setShowCreateForm(true);
+  };
+
+  const toggleRubric = (id: string) => {
+    setSelectedRubricIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const onSaveReport = async (e: FormEvent) => {
@@ -443,11 +460,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     setCreateLoading(true);
     setError('');
     try {
+      const autoTitle = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' 평가';
       const d = await api<{ report: { id: string; title: string; created_at: string } }>('/api/eval/reports', {
         method: 'POST',
         body: JSON.stringify({
           studentId: selectedStudentId,
-          title: createTitle,
+          title: autoTitle,
           items: draftItems.map((item) => ({
             rubricId: item.rubricId,
             rubricTitleSnapshot: item.rubricTitleSnapshot,
@@ -520,7 +538,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                     type="button"
                     className={selectedStudentId === s.id ? 'ghost' : 'outline'}
                     style={{ textAlign: 'left', padding: '10px 14px' }}
-                    onClick={() => { setSelectedStudentId(s.id); setShowCreateForm(false); }}
+                    onClick={() => { setSelectedStudentId(s.id); setShowCreateForm(false); setShowRubricSelect(false); }}
                   >
                     <strong>{s.student_number}번 {s.name}</strong>
                   </button>
@@ -540,16 +558,56 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   <button type="button" className="ghost" style={{ width: 'auto' }} onClick={openCreateForm}>+ 새 평가 작성</button>
                 </div>
 
+                {/* 채점기준 선택 화면 */}
+                {showRubricSelect && (
+                  <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+                    <div className="row space-between" style={{ marginBottom: 10 }}>
+                      <h4 style={{ margin: 0 }}>채점기준 선택</h4>
+                      <button type="button" className="outline" style={{ width: 'auto', fontSize: 12 }} onClick={() => setShowRubricSelect(false)}>취소</button>
+                    </div>
+                    {rubrics.length === 0 ? (
+                      <Notice type="info" message="등록된 채점기준이 없습니다. 채점기준 탭에서 먼저 기준을 등록하세요." />
+                    ) : (
+                      <>
+                        <div className="grid" style={{ gap: 6, marginBottom: 12 }}>
+                          {rubrics.map((r) => (
+                            <label
+                              key={r.id}
+                              className="card"
+                              style={{ padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', background: selectedRubricIds.has(r.id) ? '#f0f9ff' : undefined }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedRubricIds.has(r.id)}
+                                onChange={() => toggleRubric(r.id)}
+                                style={{ marginTop: 2, flexShrink: 0 }}
+                              />
+                              <div>
+                                <strong>{r.title}</strong>
+                                {r.goal && <p className="hint" style={{ margin: '2px 0 0', fontSize: 12 }}>도달목표: {r.goal}</p>}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="ghost"
+                          style={{ width: '100%' }}
+                          onClick={confirmRubricSelection}
+                          disabled={selectedRubricIds.size === 0}
+                        >
+                          선택 완료 ({selectedRubricIds.size}개)
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* 평가 작성 폼 */}
                 {showCreateForm && (
                   <div className="card" style={{ padding: 14, marginBottom: 12 }}>
                     <h4 style={{ margin: '0 0 10px' }}>새 평가보고서 작성</h4>
                     <form onSubmit={onSaveReport}>
-                      <div style={{ marginBottom: 10 }}>
-                        <label>보고서 제목</label>
-                        <input value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} placeholder="예: 1학기 중간 평가" required maxLength={100} />
-                      </div>
-
                       {draftItems.length === 0 ? (
                         <Notice type="info" message="등록된 채점기준이 없습니다. 채점기준 탭에서 먼저 기준을 등록하세요." />
                       ) : (
@@ -600,7 +658,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                             images={uploadedImages}
                             onUploaded={(img) => setUploadedImages((prev) => [...prev, img])}
                           />
-                          <button type="button" className="outline" style={{ marginTop: 10, width: '100%' }} onClick={() => { setShowCreateForm(false); setCreatedReportId(''); }}>완료</button>
+                          <button type="button" className="outline" style={{ marginTop: 10, width: '100%' }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
                         </>
                       )}
                     </form>
