@@ -969,6 +969,7 @@ export default function StudentPage() {
                         key={r.id}
                         type="button"
                         onClick={() => openEvalDetail(r.id)}
+                        disabled={evalDetailLoading}
                         style={{
                           width: 100,
                           minHeight: 140,
