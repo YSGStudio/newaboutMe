@@ -65,6 +65,7 @@ type EvalReportDetail = {
     rubric_level_high_snapshot: string | null;
     rubric_level_mid_snapshot: string | null;
     rubric_level_low_snapshot: string | null;
+    criterion_title_snapshot: string | null;
     grade: 'high' | 'mid' | 'low';
     teacher_feedback: string | null;
     sort_order: number;
@@ -1009,165 +1010,154 @@ export default function StudentPage() {
           role="dialog"
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setEvalDetail(null); }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
-          <div className="card" style={{ width: 'min(860px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
-            <div className="row space-between" style={{ marginBottom: 12 }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{evalDetail.title}</h3>
-                <p className="hint" style={{ margin: '4px 0 0' }}>{new Date(evalDetail.created_at).toLocaleDateString('ko-KR')}</p>
+          <div style={{ width: 'min(600px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+
+            {/* 헤더 */}
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
+              <div className="row space-between">
+                <div>
+                  <p style={{ margin: '0 0 2px', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{new Date(evalDetail.created_at).toLocaleDateString('ko-KR')}</p>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>{evalDetail.title}</h3>
+                </div>
+                <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={() => setEvalDetail(null)}>닫기</button>
               </div>
-              <button type="button" className="outline" style={{ width: 'auto' }} onClick={() => setEvalDetail(null)}>닫기</button>
             </div>
 
-            {/* 교사 평가 항목 */}
-            <div className="grid" style={{ gap: 10 }}>
-              {[...evalDetail.eval_report_items].sort((a, b) => a.sort_order - b.sort_order).map((item) => (
-                <article key={item.id} className="card" style={{ padding: 12 }}>
-                  <div className="row space-between" style={{ marginBottom: 6 }}>
-                    <strong>{item.rubric_title_snapshot}</strong>
-                    <span className="badge" style={{ background: GRADE_COLOR[item.grade] + '22', color: GRADE_COLOR[item.grade], fontWeight: 700 }}>
-                      {GRADE_LABEL[item.grade]}
-                    </span>
-                  </div>
-                  {(item.rubric_goal_snapshot || item.rubric_task_snapshot) && (
-                    <div style={{ marginTop: 8, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-                      {item.rubric_goal_snapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>도달목표:</strong> {item.rubric_goal_snapshot}</p>}
-                      {item.rubric_task_snapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>수행과제:</strong> {item.rubric_task_snapshot}</p>}
-                      {item[`rubric_level_${item.grade}_snapshot` as keyof typeof item] && (
-                        <p className="hint" style={{ margin: '2px 0', fontSize: 12, color: GRADE_COLOR[item.grade] }}>
-                          <strong>{GRADE_LABEL[item.grade]} 기준:</strong> {String(item[`rubric_level_${item.grade}_snapshot` as keyof typeof item] ?? '')}
-                        </p>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* 평가 항목 */}
+              <section>
+                <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#374151', letterSpacing: '0.03em' }}>평가 결과</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[...evalDetail.eval_report_items].sort((a, b) => a.sort_order - b.sort_order).map((item) => (
+                    <div key={item.id} style={{ border: `1.5px solid ${GRADE_COLOR[item.grade]}33`, borderRadius: 12, overflow: 'hidden' }}>
+                      {/* 항목 헤더 */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: GRADE_COLOR[item.grade] + '0d' }}>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>
+                          {item.criterion_title_snapshot || item.rubric_title_snapshot}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '1a', padding: '2px 10px', borderRadius: 20 }}>
+                          {GRADE_LABEL[item.grade]}
+                        </span>
+                      </div>
+                      {/* 피드백 */}
+                      {item.teacher_feedback && (
+                        <div style={{ padding: '10px 14px', borderTop: `1px solid ${GRADE_COLOR[item.grade]}22`, background: '#fff' }}>
+                          <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{item.teacher_feedback}</p>
+                        </div>
                       )}
                     </div>
-                  )}
-                </article>
-              ))}
-            </div>
-
-            {/* 평가 자료 이미지 */}
-            {evalDetail.eval_report_images.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료</p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {[...evalDetail.eval_report_images].sort((a, b) => a.sort_order - b.sort_order).map((img) => (
-                    <button
-                      key={img.id}
-                      type="button"
-                      onClick={() => openLightbox(evalDetail.id, img.id)}
-                      disabled={lightboxLoadingId === img.id}
-                      style={{ width: 80, height: 80, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: 'zoom-in' }}
-                    >
-                      {lightboxLoadingId === img.id
-                        ? <span style={{ fontSize: 11, color: '#9ca3af' }}>...</span>
-                        : <span style={{ fontSize: 11, color: '#9ca3af' }}>자료 {img.sort_order + 1}</span>
-                      }
-                    </button>
                   ))}
                 </div>
-              </div>
-            )}
+              </section>
 
-            {/* 웹 링크 */}
-            {evalDetail.eval_report_links?.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {[...evalDetail.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
-                    <a
-                      key={lk.id}
-                      href={lk.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'block', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 14, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
-                    >
-                      {lk.label || lk.url}
-                      <span style={{ fontSize: 11, color: '#93c5fd', marginLeft: 6 }}>↗ 새 창으로 열기</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 교사의 피드백 */}
-            {evalDetail.eval_report_items.some((item) => item.teacher_feedback) && (
-              <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-                <p className="hint" style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 15 }}>교사의 피드백</p>
-                <div className="grid" style={{ gap: 8 }}>
-                  {[...evalDetail.eval_report_items]
-                    .filter((item) => item.teacher_feedback)
-                    .sort((a, b) => a.sort_order - b.sort_order)
-                    .map((item) => (
-                      <div key={item.id} style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px' }}>
-                        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>{item.teacher_feedback}</p>
-                      </div>
+              {/* 평가 자료 이미지 */}
+              {evalDetail.eval_report_images.length > 0 && (
+                <section>
+                  <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#374151' }}>평가 자료</p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[...evalDetail.eval_report_images].sort((a, b) => a.sort_order - b.sort_order).map((img) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => openLightbox(evalDetail.id, img.id)}
+                        disabled={lightboxLoadingId === img.id}
+                        style={{ width: 72, height: 72, padding: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#f8fafc', flexShrink: 0, cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{lightboxLoadingId === img.id ? '...' : `자료 ${img.sort_order + 1}`}</span>
+                      </button>
                     ))}
-                </div>
-              </div>
-            )}
-
-            {/* 모달 내 알림 */}
-            {evalModalMsg && <p style={{ margin: '14px 0 0', padding: '8px 12px', background: '#dcfce7', color: '#16a34a', borderRadius: 6, fontSize: 13 }}>{evalModalMsg}</p>}
-            {evalModalError && <p style={{ margin: '14px 0 0', padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 13 }}>{evalModalError}</p>}
-
-            {/* 성찰일기 */}
-            <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>나의 성찰일기</p>
-              {evalDetail.eval_reflections?.[0] ? (
-                <div className="card" style={{ padding: 12, background: '#f8fbff' }}>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{evalDetail.eval_reflections[0].content}</p>
-                </div>
-              ) : (
-                <>
-                  <textarea
-                    value={reflectionText}
-                    onChange={(e) => setReflectionText(e.target.value)}
-                    maxLength={500}
-                    placeholder="이 평가를 받고 느낀 점, 앞으로의 다짐을 써보세요. (최대 500자, 작성 후 수정 불가)"
-                    style={{ minHeight: 100, resize: 'vertical' }}
-                  />
-                  <p className="hint" style={{ margin: '4px 0 8px', fontSize: 12 }}>{reflectionText.length}/500</p>
-                  <button
-                    type="button"
-                    className="ghost"
-                    style={{ width: '100%' }}
-                    onClick={submitReflection}
-                    disabled={reflectionLoading || !reflectionText.trim()}
-                  >
-                    {reflectionLoading ? '저장 중...' : '성찰일기 저장 (한 번만 작성 가능)'}
-                  </button>
-                </>
+                  </div>
+                </section>
               )}
-            </div>
 
-            {/* 부모님 응원 */}
-            <div style={{ marginTop: 14, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>부모님 응원 / 격려</p>
-              {evalDetail.eval_parent_comments?.[0] ? (
-                <div className="card" style={{ padding: 12, background: '#fffbeb' }}>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{evalDetail.eval_parent_comments[0].content}</p>
-                </div>
-              ) : (
-                <>
-                  <textarea
-                    value={parentText}
-                    onChange={(e) => setParentText(e.target.value)}
-                    maxLength={300}
-                    placeholder="자녀에게 응원 메시지를 남겨주세요. (최대 300자, 작성 후 수정 불가)"
-                    style={{ minHeight: 80, resize: 'vertical' }}
-                  />
-                  <p className="hint" style={{ margin: '4px 0 8px', fontSize: 12 }}>{parentText.length}/300</p>
-                  <button
-                    type="button"
-                    className="outline"
-                    style={{ width: '100%' }}
-                    onClick={submitParentComment}
-                    disabled={parentLoading || !parentText.trim()}
-                  >
-                    {parentLoading ? '저장 중...' : '부모님 응원 저장 (한 번만 작성 가능)'}
-                  </button>
-                </>
+              {/* 웹 링크 */}
+              {evalDetail.eval_report_links?.length > 0 && (
+                <section>
+                  <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#374151' }}>참고 자료</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {[...evalDetail.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
+                      <a
+                        key={lk.id}
+                        href={lk.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
+                      >
+                        <span>{lk.label || lk.url}</span>
+                        <span style={{ fontSize: 12, color: '#60a5fa', flexShrink: 0, marginLeft: 8 }}>↗ 열기</span>
+                      </a>
+                    ))}
+                  </div>
+                </section>
               )}
+
+              {/* 알림 */}
+              {evalModalMsg && <p style={{ margin: 0, padding: '8px 12px', background: '#dcfce7', color: '#16a34a', borderRadius: 8, fontSize: 13 }}>{evalModalMsg}</p>}
+              {evalModalError && <p style={{ margin: 0, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>{evalModalError}</p>}
+
+              {/* 성찰일기 */}
+              <section style={{ background: '#f8fbff', borderRadius: 12, padding: '14px 16px' }}>
+                <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#1e40af' }}>✏️ 나의 성찰일기</p>
+                {evalDetail.eval_reflections?.[0] ? (
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7, color: '#374151' }}>{evalDetail.eval_reflections[0].content}</p>
+                ) : (
+                  <>
+                    <textarea
+                      value={reflectionText}
+                      onChange={(e) => setReflectionText(e.target.value)}
+                      maxLength={500}
+                      placeholder="이 평가를 받고 느낀 점, 앞으로의 다짐을 써보세요. (최대 500자, 작성 후 수정 불가)"
+                      style={{ minHeight: 96, resize: 'vertical', background: '#fff' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span className="hint" style={{ fontSize: 12 }}>{reflectionText.length}/500</span>
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ width: 'auto', padding: '6px 18px' }}
+                        onClick={submitReflection}
+                        disabled={reflectionLoading || !reflectionText.trim()}
+                      >
+                        {reflectionLoading ? '저장 중...' : '저장'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+
+              {/* 부모님 응원 */}
+              <section style={{ background: '#fffbeb', borderRadius: 12, padding: '14px 16px' }}>
+                <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#92400e' }}>💌 부모님 응원 / 격려</p>
+                {evalDetail.eval_parent_comments?.[0] ? (
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7, color: '#374151' }}>{evalDetail.eval_parent_comments[0].content}</p>
+                ) : (
+                  <>
+                    <textarea
+                      value={parentText}
+                      onChange={(e) => setParentText(e.target.value)}
+                      maxLength={300}
+                      placeholder="자녀에게 응원 메시지를 남겨주세요. (최대 300자, 작성 후 수정 불가)"
+                      style={{ minHeight: 80, resize: 'vertical', background: '#fff' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span className="hint" style={{ fontSize: 12 }}>{parentText.length}/300</span>
+                      <button
+                        type="button"
+                        className="outline"
+                        style={{ width: 'auto', padding: '6px 18px' }}
+                        onClick={submitParentComment}
+                        disabled={parentLoading || !parentText.trim()}
+                      >
+                        {parentLoading ? '저장 중...' : '저장'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+
             </div>
           </div>
         </div>

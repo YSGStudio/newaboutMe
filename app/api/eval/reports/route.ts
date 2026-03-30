@@ -14,6 +14,7 @@ const reportCreateSchema = z.object({
     rubricLevelHighSnapshot: z.string().max(200).nullable().optional(),
     rubricLevelMidSnapshot: z.string().max(200).nullable().optional(),
     rubricLevelLowSnapshot: z.string().max(200).nullable().optional(),
+    criterionTitleSnapshot: z.string().max(100).nullable().optional(),
     grade: z.enum(['high', 'mid', 'low']),
     teacherFeedback: z.string().max(200).nullable().optional(),
     sortOrder: z.number().int().default(0)
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
     rubric_level_high_snapshot: item.rubricLevelHighSnapshot ?? null,
     rubric_level_mid_snapshot: item.rubricLevelMidSnapshot ?? null,
     rubric_level_low_snapshot: item.rubricLevelLowSnapshot ?? null,
+    criterion_title_snapshot: item.criterionTitleSnapshot ?? null,
     grade: item.grade,
     teacher_feedback: item.teacherFeedback ?? null,
     sort_order: item.sortOrder ?? idx

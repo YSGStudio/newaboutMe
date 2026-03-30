@@ -229,9 +229,7 @@ create table if not exists eval_rubrics (
   title varchar(100) not null,
   goal varchar(200),
   task varchar(200),
-  level_high varchar(200),
-  level_mid varchar(200),
-  level_low varchar(200),
+  criteria jsonb not null default '[]'::jsonb,
   sort_order int not null default 0,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
@@ -255,6 +253,7 @@ create table if not exists eval_report_items (
   rubric_level_high_snapshot varchar(200),
   rubric_level_mid_snapshot varchar(200),
   rubric_level_low_snapshot varchar(200),
+  criterion_title_snapshot varchar(100),
   grade eval_grade not null,
   teacher_feedback varchar(200),
   sort_order int not null default 0,

@@ -3,13 +3,18 @@ import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
+const criterionSchema = z.object({
+  title: z.string().min(1).max(100),
+  levelHigh: z.string().max(200).optional().nullable(),
+  levelMid: z.string().max(200).optional().nullable(),
+  levelLow: z.string().max(200).optional().nullable(),
+});
+
 const rubricSchema = z.object({
   title: z.string().min(1).max(100),
   goal: z.string().max(200).optional().nullable(),
   task: z.string().max(200).optional().nullable(),
-  levelHigh: z.string().max(200).optional().nullable(),
-  levelMid: z.string().max(200).optional().nullable(),
-  levelLow: z.string().max(200).optional().nullable()
+  criteria: z.array(criterionSchema).default([]),
 });
 
 export async function GET() {
@@ -18,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('eval_rubrics')
-    .select('id,title,goal,task,level_high,level_mid,level_low,sort_order,created_at')
+    .select('id,title,goal,task,criteria,sort_order,created_at')
     .eq('teacher_id', auth.teacher.id)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
@@ -42,6 +47,13 @@ export async function POST(req: Request) {
     .eq('teacher_id', auth.teacher.id)
     .eq('is_active', true);
 
+  const criteria = parsed.data.criteria.map((c) => ({
+    title: c.title,
+    level_high: c.levelHigh ?? null,
+    level_mid: c.levelMid ?? null,
+    level_low: c.levelLow ?? null,
+  }));
+
   const { data, error } = await supabaseAdmin
     .from('eval_rubrics')
     .insert({
@@ -49,12 +61,10 @@ export async function POST(req: Request) {
       title: parsed.data.title,
       goal: parsed.data.goal ?? null,
       task: parsed.data.task ?? null,
-      level_high: parsed.data.levelHigh ?? null,
-      level_mid: parsed.data.levelMid ?? null,
-      level_low: parsed.data.levelLow ?? null,
-      sort_order: (count ?? 0)
+      criteria,
+      sort_order: (count ?? 0),
     })
-    .select('id,title,goal,task,level_high,level_mid,level_low,sort_order,created_at')
+    .select('id,title,goal,task,criteria,sort_order,created_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

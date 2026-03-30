@@ -5,14 +5,19 @@ import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 
 // ── Types ──────────────────────────────────────────────────────────
+type RubricCriterion = {
+  title: string;
+  level_high: string | null;
+  level_mid: string | null;
+  level_low: string | null;
+};
+
 type Rubric = {
   id: string;
   title: string;
   goal: string | null;
   task: string | null;
-  level_high: string | null;
-  level_mid: string | null;
-  level_low: string | null;
+  criteria: RubricCriterion[];
   sort_order: number;
 };
 
@@ -52,6 +57,7 @@ type DraftItem = {
   rubricTitleSnapshot: string;
   rubricGoalSnapshot: string | null;
   rubricTaskSnapshot: string | null;
+  criterionTitleSnapshot: string | null;
   rubricLevelHighSnapshot: string | null;
   rubricLevelMidSnapshot: string | null;
   rubricLevelLowSnapshot: string | null;
@@ -75,6 +81,8 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 };
 
 // ── Sub: 채점기준 관리 ────────────────────────────────────────────
+type FormCriterion = { title: string; levelHigh: string; levelMid: string; levelLow: string };
+
 function RubricManager() {
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,7 +90,9 @@ function RubricManager() {
   const [msg, setMsg] = useState('');
   const [editingId, setEditingId] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', goal: '', task: '', levelHigh: '', levelMid: '', levelLow: '' });
+  const [form, setForm] = useState<{ title: string; goal: string; task: string; criteria: FormCriterion[] }>({
+    title: '', goal: '', task: '', criteria: []
+  });
   const [savingId, setSavingId] = useState('');
 
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
@@ -91,25 +101,46 @@ function RubricManager() {
     api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
   }, []);
 
-  const resetForm = () => setForm({ title: '', goal: '', task: '', levelHigh: '', levelMid: '', levelLow: '' });
+  const resetForm = () => setForm({ title: '', goal: '', task: '', criteria: [] });
+
+  const addCriterion = () => setForm((prev) => ({
+    ...prev,
+    criteria: [...prev.criteria, { title: '', levelHigh: '', levelMid: '', levelLow: '' }]
+  }));
+
+  const removeCriterion = (idx: number) => setForm((prev) => ({
+    ...prev,
+    criteria: prev.criteria.filter((_, i) => i !== idx)
+  }));
+
+  const updateCriterion = (idx: number, field: keyof FormCriterion, value: string) =>
+    setForm((prev) => ({
+      ...prev,
+      criteria: prev.criteria.map((c, i) => i === idx ? { ...c, [field]: value } : c)
+    }));
 
   const onSave = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
+      const body = JSON.stringify({
+        title: form.title,
+        goal: form.goal || null,
+        task: form.task || null,
+        criteria: form.criteria.map((c) => ({
+          title: c.title,
+          levelHigh: c.levelHigh || null,
+          levelMid: c.levelMid || null,
+          levelLow: c.levelLow || null,
+        }))
+      });
       if (editingId) {
-        const d = await api<{ rubric: Rubric }>(`/api/eval/rubrics/${editingId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ title: form.title, goal: form.goal || null, task: form.task || null, levelHigh: form.levelHigh || null, levelMid: form.levelMid || null, levelLow: form.levelLow || null })
-        });
+        const d = await api<{ rubric: Rubric }>(`/api/eval/rubrics/${editingId}`, { method: 'PATCH', body });
         setRubrics((prev) => prev.map((r) => (r.id === editingId ? d.rubric : r)));
         setMsg('수정되었습니다.');
       } else {
-        const d = await api<{ rubric: Rubric }>('/api/eval/rubrics', {
-          method: 'POST',
-          body: JSON.stringify({ title: form.title, goal: form.goal || null, task: form.task || null, levelHigh: form.levelHigh || null, levelMid: form.levelMid || null, levelLow: form.levelLow || null })
-        });
+        const d = await api<{ rubric: Rubric }>('/api/eval/rubrics', { method: 'POST', body });
         setRubrics((prev) => [...prev, d.rubric]);
         setMsg('채점기준이 등록되었습니다.');
       }
@@ -122,7 +153,17 @@ function RubricManager() {
   };
 
   const onEdit = (r: Rubric) => {
-    setForm({ title: r.title, goal: r.goal ?? '', task: r.task ?? '', levelHigh: r.level_high ?? '', levelMid: r.level_mid ?? '', levelLow: r.level_low ?? '' });
+    setForm({
+      title: r.title,
+      goal: r.goal ?? '',
+      task: r.task ?? '',
+      criteria: r.criteria.map((c) => ({
+        title: c.title,
+        levelHigh: c.level_high ?? '',
+        levelMid: c.level_mid ?? '',
+        levelLow: c.level_low ?? '',
+      }))
+    });
     setEditingId(r.id);
     setShowForm(true);
   };
@@ -139,67 +180,99 @@ function RubricManager() {
   };
 
   return (
-    <div className="grid" style={{ gap: 14 }}>
-      <div className="row space-between">
-        <h3 style={{ margin: 0 }}>채점기준 목록</h3>
-        <button type="button" className="ghost" style={{ width: 'auto' }} onClick={() => { resetForm(); setEditingId(''); setShowForm((v) => !v); }}>
-          {showForm ? '닫기' : '+ 기준 추가'}
-        </button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Notice type="success" message={msg} />
       <Notice type="error" message={error} />
 
-      {showForm && (
-        <form className="card grid" style={{ padding: 16, gap: 10 }} onSubmit={onSave}>
-          <h4 style={{ margin: 0 }}>{editingId ? '채점기준 수정' : '새 채점기준 등록'}</h4>
-          {[
-            { key: 'title', label: '기준명', required: true, placeholder: '예: 발표 태도' },
-            { key: 'goal', label: '도달목표', placeholder: '학생이 달성해야 할 목표를 입력하세요' },
-            { key: 'task', label: '수행과제', placeholder: '평가에 사용되는 구체적인 과제를 입력하세요' },
-            { key: 'levelHigh', label: '상', placeholder: '"상" 등급 수행 수준을 입력하세요' },
-            { key: 'levelMid', label: '중', placeholder: '"중" 등급 수행 수준을 입력하세요' },
-            { key: 'levelLow', label: '하', placeholder: '"하" 등급 수행 수준을 입력하세요' }
-          ].map(({ key, label, required, placeholder }) => (
-            <div key={key}>
-              <label>{label}{required && <span style={{ color: '#ef4444' }}> *</span>}</label>
-              <textarea
-                value={(form as Record<string, string>)[key]}
-                onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                placeholder={placeholder}
-                required={required}
-                maxLength={key === 'title' ? 100 : 200}
-                style={{ minHeight: 56, resize: 'vertical' }}
-              />
-            </div>
-          ))}
-          <div className="row">
-            <button type="submit" className="ghost" style={{ flex: 1 }} disabled={loading}>
-              {loading ? '저장 중...' : editingId ? '수정 저장' : '등록'}
-            </button>
-            <button type="button" className="outline" style={{ flex: 1 }} onClick={() => { setShowForm(false); resetForm(); setEditingId(''); }}>취소</button>
+      {/* 등록 폼 */}
+      {showForm ? (
+        <form onSubmit={onSave} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h4 style={{ margin: 0, fontSize: 16 }}>{editingId ? '채점기준 수정' : '새 채점기준 등록'}</h4>
+            <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => { setShowForm(false); resetForm(); setEditingId(''); }}>취소</button>
           </div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>기준명 <span style={{ color: '#ef4444' }}>*</span></label>
+              <input value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="예: 발표하기" required maxLength={100} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>도달목표</label>
+                <textarea value={form.goal} onChange={(e) => setForm((prev) => ({ ...prev, goal: e.target.value }))} placeholder="학생이 달성해야 할 목표" maxLength={200} style={{ minHeight: 60, resize: 'vertical' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>수행과제</label>
+                <textarea value={form.task} onChange={(e) => setForm((prev) => ({ ...prev, task: e.target.value }))} placeholder="구체적인 평가 과제" maxLength={200} style={{ minHeight: 60, resize: 'vertical' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* 평가기준 카드들 */}
+          {form.criteria.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#475569' }}>평가기준</p>
+              {form.criteria.map((c, idx) => (
+                <div key={idx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '2px 10px' }}>{idx + 1}</span>
+                    <input value={c.title} onChange={(e) => updateCriterion(idx, 'title', e.target.value)} placeholder="평가기준명 (예: 목소리 크기)" required maxLength={100} style={{ flex: 1, margin: 0 }} />
+                    <button type="button" onClick={() => removeCriterion(idx)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18, padding: '0 4px', flexShrink: 0 }}>×</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {([['levelHigh', '상', '#16a34a', '#dcfce7'], ['levelMid', '중', '#a16207', '#fef9c3'], ['levelLow', '하', '#dc2626', '#fee2e2']] as const).map(([field, label, color, bg]) => (
+                      <div key={field} style={{ background: bg, borderRadius: 8, padding: 8 }}>
+                        <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color }}>{label}</p>
+                        <textarea value={c[field]} onChange={(e) => updateCriterion(idx, field, e.target.value)} placeholder={`"${label}" 수준 설명`} maxLength={200} style={{ minHeight: 52, resize: 'vertical', fontSize: 12, background: '#fff' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="button" onClick={addCriterion} style={{ background: 'none', border: '1.5px dashed #cbd5e1', borderRadius: 8, padding: '10px 0', fontSize: 13, color: '#64748b', cursor: 'pointer', width: '100%' }}>
+            + 평가기준 추가
+          </button>
+
+          <button type="submit" className="ghost" style={{ width: '100%' }} disabled={loading}>
+            {loading ? '저장 중...' : editingId ? '수정 완료' : '채점기준 등록'}
+          </button>
         </form>
+      ) : (
+        <button type="button" className="ghost" style={{ width: '100%', padding: '10px 0' }} onClick={() => { resetForm(); setEditingId(''); setShowForm(true); }}>
+          + 새 채점기준 등록
+        </button>
       )}
 
+      {/* 채점기준 목록 */}
       {rubrics.length === 0 ? (
-        <EmptyState title="등록된 채점기준이 없습니다" description="+ 기준 추가 버튼을 눌러 채점기준을 등록하세요." />
+        <EmptyState title="등록된 채점기준이 없습니다" description="위 버튼을 눌러 채점기준을 등록하세요." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rubrics.map((r) => (
-            <article key={r.id} className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{r.title}</p>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {r.goal && <p className="hint" style={{ margin: 0, fontSize: 12 }}><strong>도달목표</strong> {r.goal}</p>}
-                {r.task && <p className="hint" style={{ margin: 0, fontSize: 12 }}><strong>수행과제</strong> {r.task}</p>}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                  {r.level_high && <span className="badge" style={{ background: '#dcfce7', color: '#16a34a', fontSize: 11 }}>상</span>}
-                  {r.level_mid && <span className="badge" style={{ background: '#fef9c3', color: '#a16207', fontSize: 11 }}>중</span>}
-                  {r.level_low && <span className="badge" style={{ background: '#fee2e2', color: '#dc2626', fontSize: 11 }}>하</span>}
+            <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>{r.title}</p>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {r.goal && <span style={{ fontSize: 12, color: '#64748b' }}><strong>목표</strong> {r.goal}</span>}
+                    {r.task && <span style={{ fontSize: 12, color: '#64748b' }}><strong>과제</strong> {r.task}</span>}
+                  </div>
+                  {r.criteria.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      {r.criteria.map((c, i) => (
+                        <span key={i} style={{ fontSize: 12, background: '#f0f9ff', color: '#0369a1', borderRadius: 6, padding: '2px 8px', fontWeight: 500 }}>{c.title}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="row" style={{ gap: 4 }}>
-                <button type="button" className="outline" style={{ flex: 1, padding: '4px 0', fontSize: 12 }} onClick={() => onEdit(r)}>수정</button>
-                <button type="button" className="outline" style={{ flex: 1, padding: '4px 0', fontSize: 12 }} onClick={() => onDelete(r.id)} disabled={savingId === r.id}>삭제</button>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => onEdit(r)}>수정</button>
+                  <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => onDelete(r.id)} disabled={savingId === r.id}>삭제</button>
+                </div>
               </div>
             </article>
           ))}
@@ -393,132 +466,167 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
         role="dialog"
         aria-modal="true"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
       >
-        <div className="card" style={{ width: 'min(860px, 96vw)', maxHeight: '92vh', overflowY: 'auto' }}>
-          <div className="row space-between" style={{ marginBottom: 12 }}>
+        <div style={{ width: 'min(620px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
+
+          {/* 헤더 */}
+          <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
-              <h3 style={{ margin: 0 }}>{report.title}</h3>
-              <p className="hint" style={{ margin: '4px 0 0' }}>{new Date(report.created_at).toLocaleDateString('ko-KR')}</p>
+              <p style={{ margin: '0 0 2px', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+                {report.students?.name} · {new Date(report.created_at).toLocaleDateString('ko-KR')}
+              </p>
+              <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
             </div>
-            <button type="button" className="outline" style={{ width: 'auto' }} onClick={onClose}>닫기</button>
+            <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={onClose}>닫기</button>
           </div>
 
-          {/* 채점기준별 평가 */}
-          <div className="grid" style={{ gap: 10 }}>
-            {sortedItems.map((item) => {
-              const isExpanded = expandedItemId === item.id;
-              return (
-                <article key={item.id} className="card" style={{ padding: 12 }}>
-                  <div className="row space-between" style={{ marginBottom: 6 }}>
-                    <strong>{item.rubric_title_snapshot}</strong>
-                    <div className="row" style={{ gap: 6 }}>
-                      <span className="badge" style={{ background: GRADE_COLOR[item.grade] + '22', color: GRADE_COLOR[item.grade], fontWeight: 700 }}>
-                        {GRADE_LABEL[item.grade]}
-                      </span>
-                      <button type="button" className="outline" style={{ width: 'auto', padding: '3px 8px', fontSize: 12 }} onClick={() => setExpandedItemId(isExpanded ? '' : item.id)}>
-                        기준 {isExpanded ? '▲' : '▼'}
-                      </button>
+          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+            {/* 평가 결과 */}
+            <section>
+              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#374151', letterSpacing: '0.02em' }}>평가 결과</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sortedItems.map((item) => {
+                  const isExpanded = expandedItemId === item.id;
+                  const levelDesc = item.grade === 'high' ? item.rubric_level_high_snapshot
+                    : item.grade === 'mid' ? item.rubric_level_mid_snapshot
+                    : item.rubric_level_low_snapshot;
+                  return (
+                    <div key={item.id} style={{ border: `1.5px solid ${GRADE_COLOR[item.grade]}33`, borderRadius: 12, overflow: 'hidden' }}>
+                      {/* 항목 헤더 */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: GRADE_COLOR[item.grade] + '0d', gap: 8 }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>
+                          {item.rubric_title_snapshot}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '1a', padding: '2px 10px', borderRadius: 20 }}>
+                            {GRADE_LABEL[item.grade]}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedItemId(isExpanded ? '' : item.id)}
+                            style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '2px 8px', fontSize: 11, color: '#64748b', cursor: 'pointer' }}
+                          >
+                            채점기준 {isExpanded ? '▲' : '▼'}
+                          </button>
+                        </div>
+                      </div>
+                      {/* 피드백 */}
+                      {item.teacher_feedback && (
+                        <div style={{ padding: '8px 14px', background: '#fff', borderTop: `1px solid ${GRADE_COLOR[item.grade]}1a` }}>
+                          <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{item.teacher_feedback}</p>
+                        </div>
+                      )}
+                      {/* 채점기준 상세 */}
+                      {isExpanded && (
+                        <div style={{ padding: '10px 14px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {item.rubric_goal_snapshot && (
+                            <p style={{ margin: 0, fontSize: 12, color: '#475569' }}><strong>도달목표</strong> {item.rubric_goal_snapshot}</p>
+                          )}
+                          {item.rubric_task_snapshot && (
+                            <p style={{ margin: 0, fontSize: 12, color: '#475569' }}><strong>수행과제</strong> {item.rubric_task_snapshot}</p>
+                          )}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                            {([['rubric_level_high_snapshot', '상', '#16a34a', '#dcfce7'], ['rubric_level_mid_snapshot', '중', '#a16207', '#fef9c3'], ['rubric_level_low_snapshot', '하', '#dc2626', '#fee2e2']] as const).map(([field, label, color, bg]) =>
+                              item[field] ? (
+                                <div key={field} style={{ background: bg, borderRadius: 8, padding: '6px 8px', border: item.grade === (field === 'rubric_level_high_snapshot' ? 'high' : field === 'rubric_level_mid_snapshot' ? 'mid' : 'low') ? `2px solid ${color}` : '1.5px solid transparent' }}>
+                                  <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color }}>{label}</p>
+                                  <p style={{ margin: 0, fontSize: 11, color: '#374151', lineHeight: 1.4 }}>{item[field]}</p>
+                                </div>
+                              ) : null
+                            )}
+                          </div>
+                          {levelDesc && (
+                            <p style={{ margin: '2px 0 0', fontSize: 12, color: GRADE_COLOR[item.grade], fontWeight: 600 }}>
+                              → 이 학생의 수준: &quot;{levelDesc}&quot;
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  {item.teacher_feedback && <p style={{ margin: '4px 0 0', fontSize: 14 }}>{item.teacher_feedback}</p>}
-                  {isExpanded && (
-                    <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
-                      {item.rubric_goal_snapshot && <p className="hint" style={{ margin: '2px 0' }}><strong>도달목표:</strong> {item.rubric_goal_snapshot}</p>}
-                      {item.rubric_task_snapshot && <p className="hint" style={{ margin: '2px 0' }}><strong>수행과제:</strong> {item.rubric_task_snapshot}</p>}
-                      {item.rubric_level_high_snapshot && <p className="hint" style={{ margin: '2px 0', color: '#16a34a' }}><strong>상:</strong> {item.rubric_level_high_snapshot}</p>}
-                      {item.rubric_level_mid_snapshot && <p className="hint" style={{ margin: '2px 0', color: '#a16207' }}><strong>중:</strong> {item.rubric_level_mid_snapshot}</p>}
-                      {item.rubric_level_low_snapshot && <p className="hint" style={{ margin: '2px 0', color: '#dc2626' }}><strong>하:</strong> {item.rubric_level_low_snapshot}</p>}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-
-          {/* 평가 자료 이미지 */}
-          {sortedImages.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 이미지</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {sortedImages.map((img) => (
-                  <button
-                    key={img.id}
-                    type="button"
-                    onClick={() => openImage(img.id)}
-                    disabled={!thumbUrls[img.id]}
-                    style={{ width: 80, height: 80, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: thumbUrls[img.id] ? 'zoom-in' : 'default' }}
-                  >
-                    {thumbUrls[img.id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
-                    ) : (
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
-                    )}
-                  </button>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-          )}
+            </section>
 
-          {/* 웹 링크 */}
-          {report.eval_report_links?.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {[...report.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
-                  <a key={lk.id} href={lk.url} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', background: '#f0f9ff', borderRadius: 6, padding: '6px 12px', fontSize: 13, color: '#2563eb', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  >
-                    {lk.label ? `${lk.label} — ` : ''}{lk.url}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 성찰일기 */}
-          <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-            <p className="hint" style={{ margin: '0 0 6px', fontWeight: 600 }}>학생 성찰일기</p>
-            {report.eval_reflections?.[0] ? (
-              <div className="card" style={{ padding: 12, background: '#f8fbff' }}>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{report.eval_reflections[0].content}</p>
-                <p className="hint" style={{ margin: '6px 0 0', fontSize: 12 }}>{new Date(report.eval_reflections[0].created_at).toLocaleDateString('ko-KR')}</p>
-              </div>
-            ) : (
-              <p className="hint">아직 성찰일기를 작성하지 않았습니다.</p>
+            {/* 평가 자료 이미지 */}
+            {sortedImages.length > 0 && (
+              <section>
+                <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#374151' }}>평가 자료</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {sortedImages.map((img) => (
+                    <button
+                      key={img.id}
+                      type="button"
+                      onClick={() => openImage(img.id)}
+                      disabled={!thumbUrls[img.id]}
+                      style={{ width: 80, height: 80, padding: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#f8fafc', flexShrink: 0, cursor: thumbUrls[img.id] ? 'zoom-in' : 'default' }}
+                    >
+                      {thumbUrls[img.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                      ) : (
+                        <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
             )}
-          </div>
 
-          {/* 부모님 응원 */}
-          <div style={{ marginTop: 14, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-            <p className="hint" style={{ margin: '0 0 6px', fontWeight: 600 }}>부모님 응원</p>
-            {report.eval_parent_comments?.[0] ? (
-              <div className="card" style={{ padding: 12, background: '#fffbeb' }}>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{report.eval_parent_comments[0].content}</p>
-                <p className="hint" style={{ margin: '6px 0 0', fontSize: 12 }}>{new Date(report.eval_parent_comments[0].created_at).toLocaleDateString('ko-KR')}</p>
-              </div>
-            ) : (
-              <p className="hint">아직 부모님 응원이 없습니다.</p>
+            {/* 웹 링크 */}
+            {report.eval_report_links?.length > 0 && (
+              <section>
+                <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#374151' }}>참고 자료</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[...report.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
+                    <a key={lk.id} href={lk.url} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lk.label || lk.url}</span>
+                      <span style={{ fontSize: 11, color: '#93c5fd', flexShrink: 0, marginLeft: 8 }}>↗ 열기</span>
+                    </a>
+                  ))}
+                </div>
+              </section>
             )}
+
+            {/* 학생 성찰일기 */}
+            <section style={{ background: '#f8fbff', border: '1.5px solid #dbeafe', borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#1e40af' }}>✏️ 학생 성찰일기</p>
+              {report.eval_reflections?.[0] ? (
+                <>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7, color: '#1e293b' }}>{report.eval_reflections[0].content}</p>
+                  <p style={{ margin: '8px 0 0', fontSize: 11, color: '#94a3b8' }}>{new Date(report.eval_reflections[0].created_at).toLocaleDateString('ko-KR')} 작성</p>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>아직 작성하지 않았습니다.</p>
+              )}
+            </section>
+
+            {/* 부모님 응원 */}
+            <section style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#92400e' }}>💌 부모님 응원</p>
+              {report.eval_parent_comments?.[0] ? (
+                <>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7, color: '#1e293b' }}>{report.eval_parent_comments[0].content}</p>
+                  <p style={{ margin: '8px 0 0', fontSize: 11, color: '#94a3b8' }}>{new Date(report.eval_parent_comments[0].created_at).toLocaleDateString('ko-KR')} 작성</p>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>아직 작성하지 않았습니다.</p>
+              )}
+            </section>
+
           </div>
         </div>
       </div>
 
       {/* 라이트박스 */}
       {lightboxUrl && (
-        <div
-          onClick={() => setLightboxUrl(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}
-        >
+        <div onClick={() => setLightboxUrl(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt="평가 자료"
-            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }}
-            onContextMenu={(e) => e.preventDefault()}
-            draggable={false}
-          />
+          <img src={lightboxUrl} alt="평가 자료" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }} onContextMenu={(e) => e.preventDefault()} draggable={false} />
         </div>
       )}
     </>
@@ -534,7 +642,6 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [reportsLoading, setReportsLoading] = useState(false);
   const [detailReport, setDetailReport] = useState<ReportDetail | null>(null);
   const [showRubricSelect, setShowRubricSelect] = useState(false);
-  const [selectedRubricId, setSelectedRubricId] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [uploadedImages, setUploadedImages] = useState<{ id: string; sort_order: number }[]>([]);
@@ -562,7 +669,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const openCreateForm = async () => {
     const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
     setRubrics(d.rubrics);
-    setSelectedRubricId('');
+
     setCreatedReportId('');
     setUploadedImages([]);
     setUploadedLinks([]);
@@ -572,18 +679,34 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
   // 채점기준 선택 완료 → 평가 입력 폼으로
   const confirmRubricSelectionWith = (r: Rubric) => {
-    setDraftItems([{
-      rubricId: r.id,
-      rubricTitleSnapshot: r.title,
-      rubricGoalSnapshot: r.goal,
-      rubricTaskSnapshot: r.task,
-      rubricLevelHighSnapshot: r.level_high,
-      rubricLevelMidSnapshot: r.level_mid,
-      rubricLevelLowSnapshot: r.level_low,
-      grade: 'mid',
-      teacherFeedback: '',
-      sortOrder: 0
-    }]);
+    const items: DraftItem[] = r.criteria.length > 0
+      ? r.criteria.map((c, i) => ({
+          rubricId: r.id,
+          rubricTitleSnapshot: r.title,
+          rubricGoalSnapshot: r.goal,
+          rubricTaskSnapshot: r.task,
+          criterionTitleSnapshot: c.title,
+          rubricLevelHighSnapshot: c.level_high,
+          rubricLevelMidSnapshot: c.level_mid,
+          rubricLevelLowSnapshot: c.level_low,
+          grade: 'mid' as const,
+          teacherFeedback: '',
+          sortOrder: i,
+        }))
+      : [{
+          rubricId: r.id,
+          rubricTitleSnapshot: r.title,
+          rubricGoalSnapshot: r.goal,
+          rubricTaskSnapshot: r.task,
+          criterionTitleSnapshot: null,
+          rubricLevelHighSnapshot: null,
+          rubricLevelMidSnapshot: null,
+          rubricLevelLowSnapshot: null,
+          grade: 'mid' as const,
+          teacherFeedback: '',
+          sortOrder: 0,
+        }];
+    setDraftItems(items);
     setShowRubricSelect(false);
     setShowCreateForm(true);
   };
@@ -608,6 +731,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
             rubricLevelHighSnapshot: item.rubricLevelHighSnapshot,
             rubricLevelMidSnapshot: item.rubricLevelMidSnapshot,
             rubricLevelLowSnapshot: item.rubricLevelLowSnapshot,
+            criterionTitleSnapshot: item.criterionTitleSnapshot,
             grade: item.grade,
             teacherFeedback: item.teacherFeedback || null,
             sortOrder: item.sortOrder
@@ -643,76 +767,98 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   if (!classId) return <EmptyState title="학급을 선택하세요" description="평가피드백은 학급 선택 후 확인할 수 있습니다." />;
 
   return (
-    <section className="card">
-      <div className="row space-between" style={{ marginBottom: 12 }}>
-        <h2 style={{ margin: 0 }}>평가피드백</h2>
-        <div className="row" style={{ gap: 6, width: 'auto' }}>
-          <button type="button" className={subTab === 'reports' ? 'ghost' : 'outline'} style={{ width: 'auto' }} onClick={() => setSubTab('reports')}>평가 관리</button>
-          <button type="button" className={subTab === 'rubrics' ? 'ghost' : 'outline'} style={{ width: 'auto' }} onClick={() => setSubTab('rubrics')}>채점기준</button>
-        </div>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* 탭 헤더 */}
+      <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: 20 }}>
+        {([['reports', '평가 작성'], ['rubrics', '채점기준 관리']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSubTab(key)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '10px 20px', fontSize: 14, fontWeight: 600,
+              color: subTab === key ? '#2563eb' : '#94a3b8',
+              borderBottom: subTab === key ? '2px solid #2563eb' : '2px solid transparent',
+              marginBottom: -2,
+            }}
+          >{label}</button>
+        ))}
       </div>
 
       <Notice type="success" message={msg} />
       <Notice type="error" message={error} />
 
+      {/* ── 채점기준 관리 탭 ── */}
       {subTab === 'rubrics' && <RubricManager />}
 
+      {/* ── 평가 작성 탭 ── */}
       {subTab === 'reports' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 150px) 1fr', alignItems: 'start', gap: 14 }}>
-          {/* 왼쪽: 학생 목록 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
+
+          {/* 학생 목록 */}
           <div>
-            <h3 style={{ marginTop: 0 }}>학생 선택</h3>
+            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
             {students.length === 0 ? (
-              <EmptyState title="학생이 없습니다" description="학생을 먼저 등록하세요." />
+              <p className="hint" style={{ fontSize: 12 }}>등록된 학생이 없습니다.</p>
             ) : (
-              <div className="grid" style={{ gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {students.map((s) => (
                   <button
                     key={s.id}
                     type="button"
-                    className={selectedStudentId === s.id ? 'ghost' : 'outline'}
-                    style={{ textAlign: 'left', padding: '10px 14px' }}
                     onClick={() => { setSelectedStudentId(s.id); setShowCreateForm(false); setShowRubricSelect(false); }}
+                    style={{
+                      background: selectedStudentId === s.id ? '#eff6ff' : '#fff',
+                      border: `1.5px solid ${selectedStudentId === s.id ? '#3b82f6' : '#e2e8f0'}`,
+                      borderRadius: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
+                      color: selectedStudentId === s.id ? '#1d4ed8' : '#374151',
+                      fontWeight: selectedStudentId === s.id ? 700 : 400, fontSize: 13,
+                    }}
                   >
-                    <strong>{s.student_number}번 {s.name}</strong>
+                    {s.student_number}번 {s.name}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 오른쪽: 보고서 목록 */}
-          <div>
+          {/* 오른쪽 영역 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {!selectedStudentId ? (
-              <EmptyState title="학생을 선택하세요" description="왼쪽에서 학생을 클릭하면 평가 목록이 표시됩니다." />
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                <p style={{ margin: 0, fontSize: 14 }}>왼쪽에서 학생을 선택하세요</p>
+              </div>
             ) : (
               <>
-                <div className="row space-between" style={{ marginBottom: showRubricSelect ? 0 : 10 }}>
-                  <h3 style={{ margin: 0 }}>{selectedStudent?.name} 평가 목록</h3>
-                  <button
-                    type="button"
-                    className={showRubricSelect ? 'outline' : 'ghost'}
-                    style={{ width: 'auto' }}
-                    onClick={showRubricSelect ? () => setShowRubricSelect(false) : openCreateForm}
-                  >
-                    {showRubricSelect ? '✕ 닫기' : '+ 새 평가 작성'}
-                  </button>
+                {/* 학생명 + 새 평가 버튼 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{selectedStudent?.name} 학생</p>
+                  {!showCreateForm && !showRubricSelect && (
+                    <button type="button" className="ghost" style={{ width: 'auto' }} onClick={openCreateForm}>+ 새 평가 작성</button>
+                  )}
                 </div>
 
-                {/* 채점기준 토글 드롭다운 */}
+                {/* STEP 1: 채점기준 선택 */}
                 {showRubricSelect && (
-                  <div style={{ marginBottom: 10 }}>
+                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>채점기준을 선택하세요</p>
+                      <button type="button" onClick={() => setShowRubricSelect(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 18 }}>×</button>
+                    </div>
                     {rubrics.length === 0 ? (
-                      <p className="hint" style={{ margin: '6px 0' }}>채점기준 탭에서 먼저 기준을 등록하세요.</p>
+                      <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
                     ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {rubrics.map((r) => (
                           <button
                             key={r.id}
                             type="button"
-                            className={selectedRubricId === r.id ? 'ghost' : 'outline'}
-                            style={{ width: 'auto', padding: '7px 16px', fontSize: 14 }}
-                            onClick={() => { setSelectedRubricId(r.id); confirmRubricSelectionWith(r); }}
+                            onClick={() => confirmRubricSelectionWith(r)}
+                            style={{
+                              background: '#fff', border: '1.5px solid #cbd5e1', borderRadius: 8,
+                              padding: '8px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151',
+                            }}
                           >
                             {r.title}
                           </button>
@@ -722,98 +868,114 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   </div>
                 )}
 
-                {/* 평가 작성 폼 */}
+                {/* STEP 2: 평가 입력 폼 */}
                 {showCreateForm && (
-                  <div className="card" style={{ padding: 14, marginBottom: 12 }}>
-                    <h4 style={{ margin: '0 0 10px' }}>새 평가보고서 작성</h4>
-                    <form onSubmit={onSaveReport}>
-                      {draftItems.length === 0 ? (
-                        <Notice type="info" message="등록된 채점기준이 없습니다. 채점기준 탭에서 먼저 기준을 등록하세요." />
-                      ) : (
-                        <div className="grid" style={{ gap: 10, marginBottom: 12 }}>
-                          {draftItems.map((item, idx) => (
-                            <article key={item.rubricId ?? idx} className="card" style={{ padding: 12 }}>
-                              <strong style={{ display: 'block', marginBottom: 8 }}>{item.rubricTitleSnapshot}</strong>
-                              {item.rubricGoalSnapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>도달목표:</strong> {item.rubricGoalSnapshot}</p>}
-                              {item.rubricTaskSnapshot && <p className="hint" style={{ margin: '2px 0', fontSize: 12 }}><strong>수행과제:</strong> {item.rubricTaskSnapshot}</p>}
-
-                              <div className="row" style={{ gap: 6, margin: '10px 0 8px' }}>
-                                {(['high', 'mid', 'low'] as const).map((g) => {
-                                  const desc = g === 'high' ? item.rubricLevelHighSnapshot : g === 'mid' ? item.rubricLevelMidSnapshot : item.rubricLevelLowSnapshot;
-                                  return (
-                                    <button
-                                      key={g}
-                                      type="button"
-                                      className={item.grade === g ? 'ghost' : 'outline'}
-                                      style={{ flex: 1, fontSize: 13, padding: '6px 4px', color: item.grade === g ? undefined : GRADE_COLOR[g] }}
-                                      onClick={() => setDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, grade: g } : d))}
-                                      title={desc ?? undefined}
-                                    >
-                                      {GRADE_LABEL[g]}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              <textarea
-                                placeholder="이 학생에 대한 피드백 (선택, 200자)"
-                                maxLength={200}
-                                value={item.teacherFeedback}
-                                onChange={(e) => setDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, teacherFeedback: e.target.value } : d))}
-                                style={{ minHeight: 52, resize: 'vertical' }}
-                              />
-                            </article>
-                          ))}
+                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                    {/* 채점기준 헤더 + 변경 버튼 */}
+                    {draftItems[0] && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}>
+                        <div>
+                          <p style={{ margin: '0 0 2px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>채점기준</p>
+                          <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{draftItems[0].rubricTitleSnapshot}</p>
+                          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                            {draftItems[0].rubricGoalSnapshot && <span style={{ fontSize: 12, color: '#64748b' }}><strong>목표</strong> {draftItems[0].rubricGoalSnapshot}</span>}
+                            {draftItems[0].rubricTaskSnapshot && <span style={{ fontSize: 12, color: '#64748b' }}><strong>과제</strong> {draftItems[0].rubricTaskSnapshot}</span>}
+                          </div>
                         </div>
-                      )}
+                        <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
+                          onClick={() => { setShowCreateForm(false); setShowRubricSelect(true); }}>변경</button>
+                      </div>
+                    )}
+
+                    <form onSubmit={onSaveReport} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {draftItems.map((item, idx) => (
+                        <div key={idx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                          {item.criterionTitleSnapshot && (
+                            <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14 }}>{item.criterionTitleSnapshot}</p>
+                          )}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                            {(['high', 'mid', 'low'] as const).map((g) => {
+                              const desc = g === 'high' ? item.rubricLevelHighSnapshot : g === 'mid' ? item.rubricLevelMidSnapshot : item.rubricLevelLowSnapshot;
+                              const selected = item.grade === g;
+                              return (
+                                <button
+                                  key={g}
+                                  type="button"
+                                  onClick={() => setDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, grade: g } : d))}
+                                  style={{
+                                    padding: '8px 6px', border: `2px solid ${GRADE_COLOR[g]}`,
+                                    borderRadius: 8, background: selected ? GRADE_COLOR[g] + '18' : '#fff',
+                                    cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 3,
+                                    outline: selected ? `2px solid ${GRADE_COLOR[g]}` : 'none',
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[g] }}>{GRADE_LABEL[g]}</span>
+                                  {desc && <span style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, wordBreak: 'keep-all' }}>{desc}</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <textarea
+                            placeholder="피드백 입력 (선택, 200자)"
+                            maxLength={200}
+                            value={item.teacherFeedback}
+                            onChange={(e) => setDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, teacherFeedback: e.target.value } : d))}
+                            style={{ minHeight: 48, resize: 'vertical' }}
+                          />
+                        </div>
+                      ))}
 
                       {!createdReportId ? (
-                        <button type="submit" className="ghost" style={{ width: '100%' }} disabled={createLoading || draftItems.length === 0}>
-                          {createLoading ? '저장 중...' : '보고서 저장'}
+                        <button type="submit" className="ghost" style={{ width: '100%', marginTop: 4 }} disabled={createLoading}>
+                          {createLoading ? '저장 중...' : '평가 저장'}
                         </button>
                       ) : (
-                        <>
-                          <ImageUploader
-                            reportId={createdReportId}
-                            images={uploadedImages}
-                            onUploaded={(img) => setUploadedImages((prev) => [...prev, img])}
-                          />
-                          <LinkAdder
-                            reportId={createdReportId}
-                            links={uploadedLinks}
-                            onAdded={(lk) => setUploadedLinks((prev) => [...prev, lk])}
-                            onDeleted={(id) => setUploadedLinks((prev) => prev.filter((l) => l.id !== id))}
-                          />
-                          <button type="button" className="outline" style={{ marginTop: 12, width: '100%' }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
-                        </>
+                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginTop: 4 }}>
+                          <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#16a34a' }}>평가가 저장되었습니다. 자료를 추가할 수 있습니다.</p>
+                          <ImageUploader reportId={createdReportId} images={uploadedImages} onUploaded={(img) => setUploadedImages((prev) => [...prev, img])} />
+                          <LinkAdder reportId={createdReportId} links={uploadedLinks} onAdded={(lk) => setUploadedLinks((prev) => [...prev, lk])} onDeleted={(id) => setUploadedLinks((prev) => prev.filter((l) => l.id !== id))} />
+                          <button type="button" className="outline" style={{ width: '100%', marginTop: 12 }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
+                        </div>
                       )}
                     </form>
                   </div>
                 )}
 
-                {reportsLoading ? (
-                  <p className="hint">불러오는 중...</p>
-                ) : reports.length === 0 ? (
-                  <EmptyState title="평가 기록이 없습니다" description="+ 새 평가 작성 버튼으로 평가를 시작하세요." />
-                ) : (
-                  <div className="grid" style={{ gap: 8 }}>
-                    {reports.map((r) => (
-                      <article key={r.id} className="card" style={{ padding: 12 }}>
-                        <div className="row space-between">
-                          <div>
-                            <strong>{r.title}</strong>
-                            <p className="hint" style={{ margin: '2px 0 0', fontSize: 12 }}>
-                              {new Date(r.created_at).toLocaleDateString('ko-KR')} · 항목 {r.eval_report_items.length}개
-                              {r.eval_report_images.length > 0 && ` · 이미지 ${r.eval_report_images.length}장`}
-                            </p>
-                          </div>
-                          <div className="row" style={{ gap: 4 }}>
-                            <button type="button" className="ghost" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => openDetail(r.id)}>상세</button>
-                            <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => onDeleteReport(r.id)} disabled={deletingId === r.id}>삭제</button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                {/* 평가 목록 */}
+                {!showCreateForm && !showRubricSelect && (
+                  reportsLoading ? (
+                    <p className="hint">불러오는 중...</p>
+                  ) : reports.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
+                      <p style={{ margin: 0, fontSize: 14 }}>아직 작성된 평가가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {reports.map((r) => {
+                        const grades = [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
+                        return (
+                          <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 14 }}>{r.title}</p>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+                                {grades.map((item, i) => (
+                                  <span key={i} style={{ fontSize: 11, fontWeight: 700, color: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'], background: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'] + '18', borderRadius: 20, padding: '1px 8px' }}>
+                                    {GRADE_LABEL[item.grade as 'high' | 'mid' | 'low']}
+                                  </span>
+                                ))}
+                                {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b' }}>이미지 {r.eval_report_images.length}장</span>}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                              <button type="button" className="ghost" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => openDetail(r.id)}>상세</button>
+                              <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => onDeleteReport(r.id)} disabled={deletingId === r.id}>삭제</button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </>
             )}
