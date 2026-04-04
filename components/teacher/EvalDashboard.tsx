@@ -651,9 +651,16 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [pinnedRubric, setPinnedRubric] = useState<Rubric | null>(null);
+  const [showPinPanel, setShowPinPanel] = useState(false);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
+
+  // 채점기준 초기 로드
+  useEffect(() => {
+    api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
+  }, []);
 
   // 학생 선택 시 보고서 목록 로드
   useEffect(() => {
@@ -667,14 +674,19 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
   // 채점기준 선택 화면 열기
   const openCreateForm = async () => {
-    const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
-    setRubrics(d.rubrics);
-
     setCreatedReportId('');
     setUploadedImages([]);
     setUploadedLinks([]);
-    setShowCreateForm(false);
-    setShowRubricSelect(true);
+    if (pinnedRubric) {
+      confirmRubricSelectionWith(pinnedRubric);
+    } else {
+      if (!rubrics.length) {
+        const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
+        setRubrics(d.rubrics);
+      }
+      setShowCreateForm(false);
+      setShowRubricSelect(true);
+    }
   };
 
   // 채점기준 선택 완료 → 평가 입력 폼으로
@@ -717,7 +729,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     setCreateLoading(true);
     setError('');
     try {
-      const autoTitle = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' 평가';
+      const autoTitle = draftItems[0]?.rubricTitleSnapshot ?? new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' 평가';
       const d = await api<{ report: { id: string; title: string; created_at: string } }>('/api/eval/reports', {
         method: 'POST',
         body: JSON.stringify({
@@ -794,10 +806,72 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
       {/* ── 평가 작성 탭 ── */}
       {subTab === 'reports' && (
+        <>
+        {/* 채점기준 고정 패널 */}
+        <div style={{ background: pinnedRubric ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${pinnedRubric ? '#86efac' : '#e2e8f0'}`, borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
+          {pinnedRubric ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <p style={{ margin: '0 0 1px', fontSize: 12, color: '#16a34a', fontWeight: 600 }}>채점기준 고정됨 — 학생 클릭 시 바로 평가 폼이 열립니다</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>{pinnedRubric.title}</p>
+                {pinnedRubric.criteria.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                    {pinnedRubric.criteria.map((c, i) => (
+                      <span key={i} style={{ fontSize: 11, background: '#dcfce7', color: '#166534', borderRadius: 20, padding: '1px 8px' }}>{c.title}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
+                  onClick={() => setShowPinPanel((v) => !v)}>변경</button>
+                <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12, color: '#94a3b8' }}
+                  onClick={() => { setPinnedRubric(null); setShowPinPanel(false); }}>해제</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>채점기준을 고정하면 학생 클릭 시 바로 평가할 수 있습니다.</p>
+                <button type="button" className="ghost" style={{ width: 'auto', padding: '4px 14px', fontSize: 13 }}
+                  onClick={() => setShowPinPanel((v) => !v)}>채점기준 선택</button>
+              </div>
+            </div>
+          )}
+          {showPinPanel && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+              {rubrics.length === 0 ? (
+                <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {rubrics.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => {
+                        setPinnedRubric(r);
+                        setShowPinPanel(false);
+                        if (showCreateForm) confirmRubricSelectionWith(r);
+                      }}
+                      style={{
+                        background: pinnedRubric?.id === r.id ? '#dcfce7' : '#fff',
+                        border: `1.5px solid ${pinnedRubric?.id === r.id ? '#16a34a' : '#cbd5e1'}`,
+                        borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+                        fontWeight: pinnedRubric?.id === r.id ? 700 : 500,
+                        color: pinnedRubric?.id === r.id ? '#15803d' : '#374151',
+                      }}
+                    >{r.title}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
 
           {/* 학생 목록 */}
-          <div>
+          <div style={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: 2 }}>
             <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
             {students.length === 0 ? (
               <p className="hint" style={{ fontSize: 12 }}>등록된 학생이 없습니다.</p>
@@ -807,7 +881,18 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => { setSelectedStudentId(s.id); setShowCreateForm(false); setShowRubricSelect(false); }}
+                    onClick={() => {
+                      setSelectedStudentId(s.id);
+                      setCreatedReportId('');
+                      setUploadedImages([]);
+                      setUploadedLinks([]);
+                      if (pinnedRubric) {
+                        confirmRubricSelectionWith(pinnedRubric);
+                      } else {
+                        setShowCreateForm(false);
+                        setShowRubricSelect(false);
+                      }
+                    }}
                     style={{
                       background: selectedStudentId === s.id ? '#eff6ff' : '#fff',
                       border: `1.5px solid ${selectedStudentId === s.id ? '#3b82f6' : '#e2e8f0'}`,
@@ -824,7 +909,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           </div>
 
           {/* 오른쪽 영역 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
             {!selectedStudentId ? (
               <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
                 <p style={{ margin: 0, fontSize: 14 }}>왼쪽에서 학생을 선택하세요</p>
@@ -981,6 +1066,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
             )}
           </div>
         </div>
+        </>
       )}
 
       {detailReport && <ReportDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}

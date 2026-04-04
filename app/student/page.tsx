@@ -47,7 +47,7 @@ type EvalReportSummary = {
   id: string;
   title: string;
   created_at: string;
-  eval_report_items: { id: string; grade: string }[];
+  eval_report_items: { id: string; grade: string; sort_order: number; rubric_title_snapshot: string }[];
   eval_report_images: { id: string; sort_order: number }[];
   eval_reflections: { id: string }[];
   eval_parent_comments: { id: string }[];
@@ -131,6 +131,7 @@ export default function StudentPage() {
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
   const [evalDetailLoading, setEvalDetailLoading] = useState(false);
+  const [loadingEvalId, setLoadingEvalId] = useState('');
   const [reflectionText, setReflectionText] = useState('');
   const [parentText, setParentText] = useState('');
   const [reflectionLoading, setReflectionLoading] = useState(false);
@@ -431,6 +432,7 @@ export default function StudentPage() {
 
   const openEvalDetail = async (reportId: string) => {
     setEvalDetailLoading(true);
+    setLoadingEvalId(reportId);
     setEvalModalMsg('');
     setEvalModalError('');
     try {
@@ -442,7 +444,7 @@ export default function StudentPage() {
       setEvalDetail({ id: reportId, title: '', created_at: '', eval_report_items: [], eval_report_images: [], eval_report_links: [], eval_reflections: [], eval_parent_comments: [] });
       setEvalModalError('평가 기록을 불러오지 못했습니다. ' + (err as Error).message);
     }
-    finally { setEvalDetailLoading(false); }
+    finally { setEvalDetailLoading(false); setLoadingEvalId(''); }
   };
 
   const openLightbox = async (reportId: string, imageId: string) => {
@@ -961,10 +963,12 @@ export default function StudentPage() {
               {evalReports.length === 0 ? (
                 <p className="hint">아직 받은 평가가 없습니다.</p>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
                   {evalReports.map((r) => {
-                    const gradeColors = (r.eval_report_items ?? []).map((it) => GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'] ?? '#94a3b8');
-                    const topColor = gradeColors[0] ?? '#3b82f6';
+                    const sortedItems = [...(r.eval_report_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+                    const topColor = GRADE_COLOR[sortedItems[0]?.grade as 'high' | 'mid' | 'low'] ?? '#3b82f6';
+                    const cardTitle = sortedItems[0]?.rubric_title_snapshot ?? r.title;
+                    const isLoading = loadingEvalId === r.id;
                     return (
                       <button
                         key={r.id}
@@ -972,28 +976,79 @@ export default function StudentPage() {
                         onClick={() => openEvalDetail(r.id)}
                         disabled={evalDetailLoading}
                         style={{
-                          width: 100,
-                          minHeight: 140,
-                          borderRadius: 8,
-                          border: `3px solid ${topColor}`,
-                          background: topColor + '18',
-                          padding: '10px 8px',
-                          cursor: 'pointer',
+                          width: 112,
+                          minHeight: 158,
+                          borderRadius: 14,
+                          border: 'none',
+                          background: '#fff',
+                          padding: 0,
+                          cursor: evalDetailLoading ? 'default' : 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          textAlign: 'left'
+                          overflow: 'hidden',
+                          boxShadow: isLoading
+                            ? `0 0 0 3px ${topColor}, 0 6px 20px ${topColor}50`
+                            : '0 2px 10px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
+                          opacity: evalDetailLoading && !isLoading ? 0.45 : 1,
+                          transition: 'opacity 0.15s, box-shadow 0.15s',
+                          textAlign: 'left',
                         }}
                       >
-                        <strong style={{ fontSize: 13, wordBreak: 'keep-all', color: '#0f172a', lineHeight: 1.3 }}>{r.title}</strong>
-                        <div>
-                          <p className="hint" style={{ margin: '6px 0 2px', fontSize: 11 }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</p>
-                          <p className="hint" style={{ margin: 0, fontSize: 11 }}>
-                            {r.eval_reflections?.length ? '✏️ ' : ''}
-                            {r.eval_parent_comments?.length ? '💌 ' : ''}
-                            {r.eval_report_images?.length ? `🖼️${r.eval_report_images.length} ` : ''}
-                          </p>
+                        {/* 카드 상단 컬러 영역 */}
+                        <div style={{
+                          height: 64,
+                          background: `linear-gradient(135deg, ${topColor}, ${topColor}aa)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          position: 'relative',
+                        }}>
+                          {isLoading ? (
+                            <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>불러오는 중…</span>
+                          ) : (
+                            <>
+                              <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+                                <rect x="5" y="2" width="11" height="20" rx="2" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"/>
+                                <rect x="7" y="2" width="9" height="20" rx="1.5" fill="rgba(255,255,255,0.35)" stroke="rgba(255,255,255,0.85)" strokeWidth="1"/>
+                                <line x1="9" y1="7.5" x2="14" y2="7.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
+                                <line x1="9" y1="10.5" x2="14" y2="10.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
+                                <line x1="9" y1="13.5" x2="12" y2="13.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
+                              </svg>
+                              {/* 등급 뱃지들 */}
+                              <div style={{ position: 'absolute', top: 6, right: 7, display: 'flex', gap: 3 }}>
+                                {sortedItems.map((it, i) => (
+                                  <span key={i} style={{
+                                    fontSize: 9, fontWeight: 800,
+                                    color: '#fff',
+                                    background: 'rgba(0,0,0,0.22)',
+                                    borderRadius: 4,
+                                    padding: '1px 4px',
+                                    lineHeight: 1.4,
+                                  }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
+                        {/* 카드 하단 내용 */}
+                        {!isLoading && (
+                          <div style={{ flex: 1, padding: '9px 10px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <strong style={{ fontSize: 12, wordBreak: 'keep-all', color: '#0f172a', lineHeight: 1.4 }}>
+                              {cardTitle}
+                            </strong>
+                            <div>
+                              <p className="hint" style={{ margin: '5px 0 2px', fontSize: 10 }}>
+                                {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                              </p>
+                              <p style={{ margin: 0, fontSize: 12, lineHeight: 1 }}>
+                                {r.eval_reflections?.length ? '✏️' : ''}
+                                {r.eval_parent_comments?.length ? '💌' : ''}
+                                {r.eval_report_images?.length ? '🖼️' : ''}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
