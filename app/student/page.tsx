@@ -1085,27 +1085,97 @@ export default function StudentPage() {
               {/* 평가 항목 */}
               <section>
                 <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: '#374151', letterSpacing: '0.03em' }}>평가 결과</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[...evalDetail.eval_report_items].sort((a, b) => a.sort_order - b.sort_order).map((item) => (
-                    <div key={item.id} style={{ border: `1.5px solid ${GRADE_COLOR[item.grade]}33`, borderRadius: 12, overflow: 'hidden' }}>
-                      {/* 항목 헤더 */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: GRADE_COLOR[item.grade] + '0d' }}>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>
-                          {item.criterion_title_snapshot || item.rubric_title_snapshot}
-                        </span>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '1a', padding: '2px 10px', borderRadius: 20 }}>
-                          {GRADE_LABEL[item.grade]}
-                        </span>
-                      </div>
-                      {/* 피드백 */}
-                      {item.teacher_feedback && (
-                        <div style={{ padding: '10px 14px', borderTop: `1px solid ${GRADE_COLOR[item.grade]}22`, background: '#fff' }}>
-                          <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{item.teacher_feedback}</p>
+                {(() => {
+                  const sorted = [...evalDetail.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
+                  // rubric_title_snapshot 기준으로 그룹핑 (순서 유지)
+                  const groups: { rubricTitle: string; items: typeof sorted }[] = [];
+                  for (const item of sorted) {
+                    const last = groups[groups.length - 1];
+                    if (last && last.rubricTitle === item.rubric_title_snapshot) {
+                      last.items.push(item);
+                    } else {
+                      groups.push({ rubricTitle: item.rubric_title_snapshot, items: [item] });
+                    }
+                  }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {groups.map((group) => (
+                        <div key={group.rubricTitle} style={{ border: '1.5px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
+                          {/* 기준명 헤더 — 그룹당 1번만 */}
+                          <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{group.rubricTitle}</p>
+                          </div>
+
+                          {/* 평가기준 항목들 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                            {group.items.map((item, itemIdx) => {
+                              const levels: { key: 'high' | 'mid' | 'low'; label: string; desc: string | null; bg: string; color: string }[] = [
+                                { key: 'high', label: '잘함', desc: item.rubric_level_high_snapshot, bg: '#f0fdf4', color: '#16a34a' },
+                                { key: 'mid',  label: '보통', desc: item.rubric_level_mid_snapshot,  bg: '#fefce8', color: '#d97706' },
+                                { key: 'low',  label: '노력', desc: item.rubric_level_low_snapshot,  bg: '#fff1f2', color: '#dc2626' },
+                              ];
+                              const hasLevels = levels.some((l) => l.desc);
+                              return (
+                                <div key={item.id} style={{ borderTop: itemIdx > 0 ? '1px solid #f1f5f9' : undefined }}>
+                                  {/* 평가기준명 + 등급 */}
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: GRADE_COLOR[item.grade] + '0e' }}>
+                                    {item.criterion_title_snapshot && (
+                                      <span style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>{item.criterion_title_snapshot}</span>
+                                    )}
+                                    <span style={{ fontWeight: 800, fontSize: 13, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '22', padding: '3px 12px', borderRadius: 20, flexShrink: 0, marginLeft: 'auto' }}>
+                                      {GRADE_LABEL[item.grade]}
+                                    </span>
+                                  </div>
+
+                                  {/* 수준별 설명 */}
+                                  {hasLevels && (
+                                    <div style={{ padding: '10px 16px', background: '#fafafa', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                      {levels.map((lv) => {
+                                        const isMyLevel = item.grade === lv.key;
+                                        return (
+                                          <div
+                                            key={lv.key}
+                                            style={{
+                                              display: 'flex', alignItems: 'flex-start', gap: 8,
+                                              background: isMyLevel ? lv.bg : '#fff',
+                                              border: `${isMyLevel ? '2px' : '1px'} solid ${isMyLevel ? lv.color : '#e5e7eb'}`,
+                                              borderRadius: 8, padding: '7px 10px',
+                                            }}
+                                          >
+                                            <span style={{
+                                              fontSize: 11, fontWeight: 800,
+                                              color: isMyLevel ? '#fff' : lv.color,
+                                              background: isMyLevel ? lv.color : lv.color + '18',
+                                              borderRadius: 6, padding: '2px 7px', flexShrink: 0, lineHeight: 1.6,
+                                            }}>{lv.label}</span>
+                                            <span style={{ fontSize: 13, color: isMyLevel ? '#111827' : '#6b7280', lineHeight: 1.5, flex: 1 }}>
+                                              {lv.desc || '—'}
+                                            </span>
+                                            {isMyLevel && (
+                                              <span style={{ fontSize: 11, fontWeight: 700, color: lv.color, flexShrink: 0 }}>← 내 수준</span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* 교사 피드백 */}
+                                  {item.teacher_feedback && (
+                                    <div style={{ padding: '10px 16px', borderTop: '1px solid #f1f5f9', background: '#fff' }}>
+                                      <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>선생님 피드백</p>
+                                      <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{item.teacher_feedback}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </section>
 
               {/* 평가 자료 이미지 */}
