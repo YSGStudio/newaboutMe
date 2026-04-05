@@ -66,7 +66,7 @@ type DraftItem = {
   sortOrder: number;
 };
 
-const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '상', mid: '중', low: '하' };
+const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = {
   high: '#16a34a',
   mid: '#d97706',
@@ -83,7 +83,7 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 // ── Sub: 채점기준 관리 ────────────────────────────────────────────
 type FormCriterion = { title: string; levelHigh: string; levelMid: string; levelLow: string };
 
-function RubricManager() {
+function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric[]) => void }) {
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -113,7 +113,7 @@ function RubricManager() {
     criteria: prev.criteria.filter((_, i) => i !== idx)
   }));
 
-  const updateCriterion = (idx: number, field: keyof FormCriterion, value: string) =>
+  const updateCriterion = (idx: number, field: 'title' | 'levelHigh' | 'levelMid' | 'levelLow', value: string) =>
     setForm((prev) => ({
       ...prev,
       criteria: prev.criteria.map((c, i) => i === idx ? { ...c, [field]: value } : c)
@@ -137,11 +137,15 @@ function RubricManager() {
       });
       if (editingId) {
         const d = await api<{ rubric: Rubric }>(`/api/eval/rubrics/${editingId}`, { method: 'PATCH', body });
-        setRubrics((prev) => prev.map((r) => (r.id === editingId ? d.rubric : r)));
+        const updated = rubrics.map((r) => (r.id === editingId ? d.rubric : r));
+        setRubrics(updated);
+        onRubricsChange?.(updated);
         setMsg('수정되었습니다.');
       } else {
         const d = await api<{ rubric: Rubric }>('/api/eval/rubrics', { method: 'POST', body });
-        setRubrics((prev) => [...prev, d.rubric]);
+        const added = [...rubrics, d.rubric];
+        setRubrics(added);
+        onRubricsChange?.(added);
         setMsg('채점기준이 등록되었습니다.');
       }
       resetForm();
@@ -173,7 +177,9 @@ function RubricManager() {
     setSavingId(id);
     try {
       await api(`/api/eval/rubrics/${id}`, { method: 'DELETE' });
-      setRubrics((prev) => prev.filter((r) => r.id !== id));
+      const removed = rubrics.filter((r) => r.id !== id);
+      setRubrics(removed);
+      onRubricsChange?.(removed);
       setMsg('삭제되었습니다.'); clear();
     } catch (err) { setError((err as Error).message); clear(); }
     finally { setSavingId(''); }
@@ -195,7 +201,12 @@ function RubricManager() {
           <div style={{ display: 'grid', gap: 10 }}>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600 }}>기준명 <span style={{ color: '#ef4444' }}>*</span></label>
-              <input value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="예: 발표하기" required maxLength={100} />
+              <input
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                placeholder="예: 발표하기" required maxLength={100}
+              />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
@@ -217,16 +228,47 @@ function RubricManager() {
                 <div key={idx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '2px 10px' }}>{idx + 1}</span>
-                    <input value={c.title} onChange={(e) => updateCriterion(idx, 'title', e.target.value)} placeholder="평가기준명 (예: 목소리 크기)" required maxLength={100} style={{ flex: 1, margin: 0 }} />
-                    <button type="button" onClick={() => removeCriterion(idx)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18, padding: '0 4px', flexShrink: 0 }}>×</button>
+                    <input
+                      value={c.title}
+                      onChange={(e) => updateCriterion(idx, 'title', e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                      placeholder="평가기준명 (예: 목소리 크기)"
+                      maxLength={100}
+                      style={{ flex: 1, margin: 0 }}
+                    />
+                    <button type="button" onClick={() => removeCriterion(idx)} style={{ background: 'none', border: 'none', width: 'auto', color: '#94a3b8', cursor: 'pointer', fontSize: 18, padding: '0 4px', flexShrink: 0 }}>×</button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                    {([['levelHigh', '상', '#16a34a', '#dcfce7'], ['levelMid', '중', '#a16207', '#fef9c3'], ['levelLow', '하', '#dc2626', '#fee2e2']] as const).map(([field, label, color, bg]) => (
-                      <div key={field} style={{ background: bg, borderRadius: 8, padding: 8 }}>
-                        <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color }}>{label}</p>
-                        <textarea value={c[field]} onChange={(e) => updateCriterion(idx, field, e.target.value)} placeholder={`"${label}" 수준 설명`} maxLength={200} style={{ minHeight: 52, resize: 'vertical', fontSize: 12, background: '#fff' }} />
-                      </div>
-                    ))}
+                    <div style={{ background: '#dcfce7', borderRadius: 8, padding: 8 }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#16a34a' }}>잘함</p>
+                      <textarea
+                        value={c.levelHigh}
+                        onChange={(e) => updateCriterion(idx, 'levelHigh', e.target.value)}
+                        placeholder='"잘함" 수준 설명'
+                        maxLength={200}
+                        style={{ minHeight: 52, resize: 'vertical', fontSize: 12, background: '#fff' }}
+                      />
+                    </div>
+                    <div style={{ background: '#fef9c3', borderRadius: 8, padding: 8 }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#a16207' }}>보통</p>
+                      <textarea
+                        value={c.levelMid}
+                        onChange={(e) => updateCriterion(idx, 'levelMid', e.target.value)}
+                        placeholder='"보통" 수준 설명'
+                        maxLength={200}
+                        style={{ minHeight: 52, resize: 'vertical', fontSize: 12, background: '#fff' }}
+                      />
+                    </div>
+                    <div style={{ background: '#fee2e2', borderRadius: 8, padding: 8 }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#dc2626' }}>노력</p>
+                      <textarea
+                        value={c.levelLow}
+                        onChange={(e) => updateCriterion(idx, 'levelLow', e.target.value)}
+                        placeholder='"노력" 수준 설명'
+                        maxLength={200}
+                        style={{ minHeight: 52, resize: 'vertical', fontSize: 12, background: '#fff' }}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -528,7 +570,7 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
                             <p style={{ margin: 0, fontSize: 12, color: '#475569' }}><strong>수행과제</strong> {item.rubric_task_snapshot}</p>
                           )}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                            {([['rubric_level_high_snapshot', '상', '#16a34a', '#dcfce7'], ['rubric_level_mid_snapshot', '중', '#a16207', '#fef9c3'], ['rubric_level_low_snapshot', '하', '#dc2626', '#fee2e2']] as const).map(([field, label, color, bg]) =>
+                            {([['rubric_level_high_snapshot', '잘함', '#16a34a', '#dcfce7'], ['rubric_level_mid_snapshot', '보통', '#a16207', '#fef9c3'], ['rubric_level_low_snapshot', '노력', '#dc2626', '#fee2e2']] as const).map(([field, label, color, bg]) =>
                               item[field] ? (
                                 <div key={field} style={{ background: bg, borderRadius: 8, padding: '6px 8px', border: item.grade === (field === 'rubric_level_high_snapshot' ? 'high' : field === 'rubric_level_mid_snapshot' ? 'mid' : 'low') ? `2px solid ${color}` : '1.5px solid transparent' }}>
                                   <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color }}>{label}</p>
@@ -802,7 +844,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       <Notice type="error" message={error} />
 
       {/* ── 채점기준 관리 탭 ── */}
-      {subTab === 'rubrics' && <RubricManager />}
+      {subTab === 'rubrics' && <RubricManager onRubricsChange={(updated) => setRubrics(updated)} />}
 
       {/* ── 평가 작성 탭 ── */}
       {subTab === 'reports' && (

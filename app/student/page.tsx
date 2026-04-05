@@ -76,7 +76,7 @@ type EvalReportDetail = {
   eval_parent_comments: { id: string; content: string; created_at: string }[];
 };
 
-const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '상', mid: '중', low: '하' };
+const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
 
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
