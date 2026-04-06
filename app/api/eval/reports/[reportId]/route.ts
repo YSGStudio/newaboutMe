@@ -28,7 +28,7 @@ export async function GET(_: Request, { params }: Params) {
       .single(),
     supabaseAdmin
       .from('eval_report_items')
-      .select('id, rubric_id, rubric_title_snapshot, rubric_goal_snapshot, rubric_task_snapshot, rubric_level_high_snapshot, rubric_level_mid_snapshot, rubric_level_low_snapshot, grade, teacher_feedback, sort_order')
+      .select('id, rubric_id, rubric_title_snapshot, rubric_goal_snapshot, rubric_task_snapshot, rubric_level_high_snapshot, rubric_level_mid_snapshot, rubric_level_low_snapshot, criterion_title_snapshot, grade, teacher_feedback, sort_order')
       .eq('report_id', params.reportId)
       .order('sort_order'),
     supabaseAdmin

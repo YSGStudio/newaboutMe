@@ -32,20 +32,23 @@ type ReportSummary = {
   eval_report_links: ReportLink[];
 };
 
+type ReportDetailItem = {
+  id: string;
+  rubric_title_snapshot: string;
+  rubric_goal_snapshot: string | null;
+  rubric_task_snapshot: string | null;
+  rubric_level_high_snapshot: string | null;
+  rubric_level_mid_snapshot: string | null;
+  rubric_level_low_snapshot: string | null;
+  criterion_title_snapshot: string | null;
+  grade: 'high' | 'mid' | 'low';
+  teacher_feedback: string | null;
+  sort_order: number;
+};
+
 type ReportDetail = ReportSummary & {
   students: { id: string; name: string; student_number: number };
-  eval_report_items: {
-    id: string;
-    rubric_title_snapshot: string;
-    rubric_goal_snapshot: string | null;
-    rubric_task_snapshot: string | null;
-    rubric_level_high_snapshot: string | null;
-    rubric_level_mid_snapshot: string | null;
-    rubric_level_low_snapshot: string | null;
-    grade: 'high' | 'mid' | 'low';
-    teacher_feedback: string | null;
-    sort_order: number;
-  }[];
+  eval_report_items: ReportDetailItem[];
   eval_reflections: { id: string; content: string; created_at: string }[];
   eval_parent_comments: { id: string; content: string; created_at: string }[];
 };
@@ -392,11 +395,19 @@ function LinkAdder({ reportId, links, onAdded, onDeleted }: {
 }
 
 // ── Sub: 보고서 상세 모달 ────────────────────────────────────────
-function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose: () => void }) {
+function ReportDetailModal({ report, onClose, onUpdated }: {
+  report: ReportDetail;
+  onClose: () => void;
+  onUpdated: (items: ReportDetailItem[]) => void;
+}) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState('');
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [links, setLinks] = useState<ReportLink[]>(report.eval_report_links ?? []);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editItems, setEditItems] = useState<ReportDetailItem[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     report.eval_report_images.forEach(async (img) => {
@@ -413,7 +424,38 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
     if (url) setLightboxUrl(url);
   };
 
-  const sortedItems = [...report.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
+  const startEdit = () => {
+    setEditItems([...report.eval_report_items].sort((a, b) => a.sort_order - b.sort_order).map((item) => ({ ...item })));
+    setEditError('');
+    setIsEditing(true);
+  };
+
+  const onSaveEdit = async () => {
+    setSaving(true);
+    setEditError('');
+    try {
+      await api(`/api/eval/reports/${report.id}/items`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          items: editItems.map((item) => ({
+            id: item.id,
+            grade: item.grade,
+            teacherFeedback: item.teacher_feedback ?? null,
+          })),
+        }),
+      });
+      onUpdated(editItems);
+      setIsEditing(false);
+    } catch (err) {
+      setEditError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sortedItems = isEditing
+    ? editItems
+    : [...report.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
   const sortedImages = [...report.eval_report_images].sort((a, b) => a.sort_order - b.sort_order);
 
   return (
@@ -421,7 +463,7 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
       <div
         role="dialog"
         aria-modal="true"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        onClick={(e) => { if (e.target === e.currentTarget && !isEditing) onClose(); }}
         style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
       >
         <div style={{ width: 'min(620px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
@@ -434,26 +476,83 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
               </p>
               <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
             </div>
-            <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={onClose}>닫기</button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              {!isEditing ? (
+                <>
+                  <button type="button" className="ghost" style={{ width: 'auto', padding: '5px 14px', fontSize: 13 }} onClick={startEdit}>수정</button>
+                  <button type="button" className="outline" style={{ width: 'auto', padding: '5px 14px', fontSize: 13 }} onClick={onClose}>닫기</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="ghost" style={{ width: 'auto', padding: '5px 14px', fontSize: 13 }} onClick={onSaveEdit} disabled={saving}>{saving ? '저장 중...' : '수정 저장'}</button>
+                  <button type="button" className="outline" style={{ width: 'auto', padding: '5px 14px', fontSize: 13 }} onClick={() => setIsEditing(false)} disabled={saving}>취소</button>
+                </>
+              )}
+            </div>
           </div>
 
           <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-            {/* 평가 결과 */}
+            {editError && <Notice type="error" message={editError} />}
+
+            {/* 평가 결과 (조회 / 수정) */}
             <section>
-              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#374151', letterSpacing: '0.02em' }}>평가 결과</p>
+              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: isEditing ? '#2563eb' : '#374151', letterSpacing: '0.02em' }}>
+                {isEditing ? '평가 수정 중' : '평가 결과'}
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sortedItems.map((item) => {
+                {sortedItems.map((item, idx) => {
+                  if (isEditing) {
+                    return (
+                      <div key={item.id} style={{ background: '#fff', border: '1.5px solid #bfdbfe', borderRadius: 12, padding: 14 }}>
+                        {item.criterion_title_snapshot && (
+                          <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 14 }}>{item.criterion_title_snapshot}</p>
+                        )}
+                        {!item.criterion_title_snapshot && (
+                          <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 14, color: '#374151' }}>{item.rubric_title_snapshot}</p>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                          {(['high', 'mid', 'low'] as const).map((g) => {
+                            const desc = g === 'high' ? item.rubric_level_high_snapshot : g === 'mid' ? item.rubric_level_mid_snapshot : item.rubric_level_low_snapshot;
+                            const selected = item.grade === g;
+                            return (
+                              <button
+                                key={g}
+                                type="button"
+                                onClick={() => setEditItems((prev) => prev.map((d, i) => i === idx ? { ...d, grade: g } : d))}
+                                style={{
+                                  padding: '8px 6px', border: `2px solid ${GRADE_COLOR[g]}`,
+                                  borderRadius: 8, background: selected ? GRADE_COLOR[g] + '18' : '#fff',
+                                  cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 3,
+                                  outline: selected ? `2px solid ${GRADE_COLOR[g]}` : 'none',
+                                }}
+                              >
+                                <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[g] }}>{GRADE_LABEL[g]}</span>
+                                {desc && <span style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, wordBreak: 'keep-all' }}>{desc}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <textarea
+                          placeholder="피드백 입력 (선택, 200자)"
+                          maxLength={200}
+                          value={item.teacher_feedback ?? ''}
+                          onChange={(e) => setEditItems((prev) => prev.map((d, i) => i === idx ? { ...d, teacher_feedback: e.target.value } : d))}
+                          style={{ minHeight: 48, resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    );
+                  }
+
                   const isExpanded = expandedItemId === item.id;
                   const levelDesc = item.grade === 'high' ? item.rubric_level_high_snapshot
                     : item.grade === 'mid' ? item.rubric_level_mid_snapshot
                     : item.rubric_level_low_snapshot;
                   return (
                     <div key={item.id} style={{ border: `1.5px solid ${GRADE_COLOR[item.grade]}33`, borderRadius: 12, overflow: 'hidden' }}>
-                      {/* 항목 헤더 */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: GRADE_COLOR[item.grade] + '0d', gap: 8 }}>
                         <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>
-                          {item.rubric_title_snapshot}
+                          {item.criterion_title_snapshot ?? item.rubric_title_snapshot}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                           <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '1a', padding: '2px 10px', borderRadius: 20 }}>
@@ -468,13 +567,11 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
                           </button>
                         </div>
                       </div>
-                      {/* 피드백 */}
                       {item.teacher_feedback && (
                         <div style={{ padding: '8px 14px', background: '#fff', borderTop: `1px solid ${GRADE_COLOR[item.grade]}1a` }}>
                           <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{item.teacher_feedback}</p>
                         </div>
                       )}
-                      {/* 채점기준 상세 */}
                       {isExpanded && (
                         <div style={{ padding: '10px 14px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {item.rubric_goal_snapshot && (
@@ -531,7 +628,7 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
               </section>
             )}
 
-            {/* 웹 링크 — 기존 보고서에도 추가/삭제 가능 */}
+            {/* 웹 링크 */}
             <section>
               <LinkAdder
                 reportId={report.id}
@@ -1096,7 +1193,13 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
         </>
       )}
 
-      {detailReport && <ReportDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}
+      {detailReport && (
+        <ReportDetailModal
+          report={detailReport}
+          onClose={() => setDetailReport(null)}
+          onUpdated={(updatedItems) => setDetailReport((prev) => prev ? { ...prev, eval_report_items: updatedItems } : prev)}
+        />
+      )}
     </section>
   );
 }
