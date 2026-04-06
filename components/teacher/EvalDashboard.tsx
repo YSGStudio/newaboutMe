@@ -483,6 +483,7 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState('');
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
+  const [links, setLinks] = useState<ReportLink[]>(report.eval_report_links ?? []);
 
   useEffect(() => {
     report.eval_report_images.forEach(async (img) => {
@@ -617,22 +618,15 @@ function ReportDetailModal({ report, onClose }: { report: ReportDetail; onClose:
               </section>
             )}
 
-            {/* 웹 링크 */}
-            {report.eval_report_links?.length > 0 && (
-              <section>
-                <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#374151' }}>참고 자료</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {[...report.eval_report_links].sort((a, b) => a.sort_order - b.sort_order).map((lk) => (
-                    <a key={lk.id} href={lk.url} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}
-                    >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lk.label || lk.url}</span>
-                      <span style={{ fontSize: 11, color: '#93c5fd', flexShrink: 0, marginLeft: 8 }}>↗ 열기</span>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
+            {/* 웹 링크 — 기존 보고서에도 추가/삭제 가능 */}
+            <section>
+              <LinkAdder
+                reportId={report.id}
+                links={links}
+                onAdded={(lk) => setLinks((prev) => [...prev, lk])}
+                onDeleted={(id) => setLinks((prev) => prev.filter((l) => l.id !== id))}
+              />
+            </section>
 
             {/* 학생 성찰일기 */}
             <section style={{ background: '#f8fbff', border: '1.5px solid #dbeafe', borderRadius: 12, padding: '14px 16px' }}>
