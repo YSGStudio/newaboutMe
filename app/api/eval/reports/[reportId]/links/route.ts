@@ -6,7 +6,13 @@ import { z } from 'zod';
 type Params = { params: { reportId: string } };
 
 const schema = z.object({
-  url: z.string().url().max(2000),
+  url: z.string().max(2000).transform((v) => {
+    const s = v.trim();
+    if (s && !/^https?:\/\//i.test(s)) return `https://${s}`;
+    return s;
+  }).refine((v) => {
+    try { new URL(v); return true; } catch { return false; }
+  }, { message: '올바른 URL을 입력하세요.' }),
   label: z.string().max(100).optional().nullable(),
 });
 

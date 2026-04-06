@@ -324,98 +324,6 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
   );
 }
 
-// ── Sub: 이미지 업로드 & 라이트박스 ──────────────────────────────
-function ImageUploader({ reportId, images, onUploaded }: {
-  reportId: string;
-  images: { id: string; sort_order: number }[];
-  onUploaded: (img: { id: string; sort_order: number }) => void;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const fetchThumb = async (imageId: string) => {
-    try {
-      const d = await api<{ url: string }>(`/api/eval/reports/${reportId}/images/${imageId}/view`);
-      setThumbUrls((prev) => ({ ...prev, [imageId]: d.url }));
-      return d.url;
-    } catch { return null; }
-  };
-
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError('');
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`/api/eval/reports/${reportId}/images`, { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
-      onUploaded(json.image);
-      fetchThumb(json.image.id);
-    } catch (err) { setError((err as Error).message); }
-    finally { setUploading(false); if (inputRef.current) inputRef.current.value = ''; }
-  };
-
-  const openLightbox = async (imageId: string) => {
-    const url = thumbUrls[imageId] ?? await fetchThumb(imageId);
-    if (url) setLightboxUrl(url);
-  };
-
-  const sorted = [...images].sort((a, b) => a.sort_order - b.sort_order);
-
-  return (
-    <div style={{ marginTop: 12 }}>
-      <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 이미지 ({images.length}/5)</p>
-      {error && <Notice type="error" message={error} />}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
-        {sorted.map((img) => (
-          <button
-            key={img.id}
-            type="button"
-            onClick={() => openLightbox(img.id)}
-            style={{ width: 72, height: 72, padding: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, cursor: 'zoom-in' }}
-          >
-            {thumbUrls[img.id] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
-            ) : (
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
-            )}
-          </button>
-        ))}
-        {images.length < 5 && (
-          <>
-            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={onFile} />
-            <button
-              type="button"
-              className="outline"
-              style={{ width: 72, height: 72, fontSize: 22, color: '#9ca3af', flexShrink: 0 }}
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? '...' : '+'}
-            </button>
-          </>
-        )}
-      </div>
-      {lightboxUrl && (
-        <div
-          onClick={() => setLightboxUrl(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightboxUrl} alt="평가 자료" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }} onContextMenu={(e) => e.preventDefault()} draggable={false} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Sub: 링크 추가 ───────────────────────────────────────────────
 function LinkAdder({ reportId, links, onAdded, onDeleted }: {
   reportId: string;
@@ -428,13 +336,18 @@ function LinkAdder({ reportId, links, onAdded, onDeleted }: {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
 
+  const normalizeUrl = (raw: string) => {
+    const s = raw.trim();
+    return s && !/^https?:\/\//i.test(s) ? `https://${s}` : s;
+  };
+
   const onAdd = async () => {
     if (!url.trim()) return;
     setAdding(true); setError('');
     try {
       const d = await api<{ link: ReportLink }>(`/api/eval/reports/${reportId}/links`, {
         method: 'POST',
-        body: JSON.stringify({ url: url.trim(), label: label.trim() || null }),
+        body: JSON.stringify({ url: normalizeUrl(url), label: label.trim() || null }),
       });
       onAdded(d.link);
       setUrl(''); setLabel('');
@@ -680,10 +593,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [showRubricSelect, setShowRubricSelect] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
-  const [uploadedImages, setUploadedImages] = useState<{ id: string; sort_order: number }[]>([]);
-  const [uploadedLinks, setUploadedLinks] = useState<ReportLink[]>([]);
-  const [createdReportId, setCreatedReportId] = useState('');
+  const [localFiles, setLocalFiles] = useState<{ file: File; previewUrl: string }[]>([]);
+  const [localLinks, setLocalLinks] = useState<{ url: string; label: string }[]>([]);
+  const [localLinkUrl, setLocalLinkUrl] = useState('');
+  const [localLinkLabel, setLocalLinkLabel] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
+  const localFileInputRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
@@ -710,9 +625,10 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
   // 채점기준 선택 화면 열기
   const openCreateForm = async () => {
-    setCreatedReportId('');
-    setUploadedImages([]);
-    setUploadedLinks([]);
+    setLocalFiles([]);
+    setLocalLinks([]);
+    setLocalLinkUrl('');
+    setLocalLinkLabel('');
     if (pinnedRubric) {
       confirmRubricSelectionWith(pinnedRubric);
     } else {
@@ -786,9 +702,31 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           }))
         })
       });
-      setCreatedReportId(d.report.id);
+      const reportId = d.report.id;
+      // 이미지·링크를 병렬로 저장
+      await Promise.all([
+        ...localFiles.map((lf) => {
+          const fd = new FormData();
+          fd.append('file', lf.file);
+          return fetch(`/api/eval/reports/${reportId}/images`, { method: 'POST', body: fd });
+        }),
+        ...localLinks.map((lk) =>
+          fetch(`/api/eval/reports/${reportId}/links`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: lk.url, label: lk.label || null }),
+          })
+        ),
+      ]);
+      localFiles.forEach((lf) => URL.revokeObjectURL(lf.previewUrl));
+      setLocalFiles([]);
+      setLocalLinks([]);
+      setLocalLinkUrl('');
+      setLocalLinkLabel('');
       setReports((prev) => [{ id: d.report.id, title: d.report.title, created_at: d.report.created_at, eval_report_items: [], eval_report_images: [], eval_report_links: [] }, ...prev]);
-      setMsg('평가보고서가 저장되었습니다. 이미지를 추가할 수 있습니다.');
+      setShowCreateForm(false);
+      setShowRubricSelect(false);
+      setMsg('평가보고서가 저장되었습니다.');
       clear();
     } catch (err) { setError((err as Error).message); clear(); }
     finally { setCreateLoading(false); }
@@ -919,9 +857,10 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                     type="button"
                     onClick={() => {
                       setSelectedStudentId(s.id);
-                      setCreatedReportId('');
-                      setUploadedImages([]);
-                      setUploadedLinks([]);
+                      setLocalFiles([]);
+                      setLocalLinks([]);
+                      setLocalLinkUrl('');
+                      setLocalLinkLabel('');
                       if (pinnedRubric) {
                         confirmRubricSelectionWith(pinnedRubric);
                       } else {
@@ -1046,18 +985,70 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                         </div>
                       ))}
 
-                      {!createdReportId ? (
-                        <button type="submit" className="ghost" style={{ width: '100%', marginTop: 4 }} disabled={createLoading}>
-                          {createLoading ? '저장 중...' : '평가 저장'}
-                        </button>
-                      ) : (
-                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginTop: 4 }}>
-                          <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#16a34a' }}>평가가 저장되었습니다. 자료를 추가할 수 있습니다.</p>
-                          <ImageUploader reportId={createdReportId} images={uploadedImages} onUploaded={(img) => setUploadedImages((prev) => [...prev, img])} />
-                          <LinkAdder reportId={createdReportId} links={uploadedLinks} onAdded={(lk) => setUploadedLinks((prev) => [...prev, lk])} onDeleted={(id) => setUploadedLinks((prev) => prev.filter((l) => l.id !== id))} />
-                          <button type="button" className="outline" style={{ width: '100%', marginTop: 12 }} onClick={() => { setShowCreateForm(false); setShowRubricSelect(false); setCreatedReportId(''); }}>완료</button>
+                      {/* 이미지 첨부 */}
+                      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                        <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 이미지 ({localFiles.length}/5)</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
+                          {localFiles.map((lf, i) => (
+                            <div key={i} style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={lf.previewUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} draggable={false} />
+                              <button
+                                type="button"
+                                onClick={() => { URL.revokeObjectURL(lf.previewUrl); setLocalFiles((prev) => prev.filter((_, j) => j !== i)); }}
+                                style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                              >×</button>
+                            </div>
+                          ))}
+                          {localFiles.length < 5 && (
+                            <>
+                              <input ref={localFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setLocalFiles((prev) => [...prev, { file, previewUrl: URL.createObjectURL(file) }]);
+                                  if (localFileInputRef.current) localFileInputRef.current.value = '';
+                                }}
+                              />
+                              <button type="button" className="outline" style={{ width: 72, height: 72, fontSize: 22, color: '#9ca3af', flexShrink: 0 }} onClick={() => localFileInputRef.current?.click()}>+</button>
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
+
+                      {/* 웹 링크 첨부 */}
+                      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                        <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크 ({localLinks.length}/10)</p>
+                        {localLinks.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                            {localLinks.map((lk, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f9ff', borderRadius: 6, padding: '5px 10px' }}>
+                                <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {lk.label ? <><strong>{lk.label}</strong> — </> : ''}{lk.url}
+                                </span>
+                                <button type="button" className="outline" style={{ width: 'auto', padding: '2px 8px', fontSize: 11, flexShrink: 0 }} onClick={() => setLocalLinks((prev) => prev.filter((_, j) => j !== i))}>삭제</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {localLinks.length < 10 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <input value={localLinkLabel} onChange={(e) => setLocalLinkLabel(e.target.value)} placeholder="링크 이름 (선택)" maxLength={100} style={{ fontSize: 13 }} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }} />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <input value={localLinkUrl} onChange={(e) => setLocalLinkUrl(e.target.value)} placeholder="주소 입력 (예: youtube.com/...)" maxLength={2000} style={{ fontSize: 13, flex: 1 }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const u = localLinkUrl.trim(); if (u) { const norm = /^https?:\/\//i.test(u) ? u : `https://${u}`; setLocalLinks((prev) => [...prev, { url: norm, label: localLinkLabel.trim() }]); setLocalLinkUrl(''); setLocalLinkLabel(''); } } }}
+                              />
+                              <button type="button" className="ghost" style={{ width: 'auto', padding: '0 14px', fontSize: 13, flexShrink: 0 }}
+                                onClick={() => { const u = localLinkUrl.trim(); if (!u) return; const norm = /^https?:\/\//i.test(u) ? u : `https://${u}`; setLocalLinks((prev) => [...prev, { url: norm, label: localLinkLabel.trim() }]); setLocalLinkUrl(''); setLocalLinkLabel(''); }}
+                                disabled={!localLinkUrl.trim()}>추가</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <button type="submit" className="ghost" style={{ width: '100%', marginTop: 4 }} disabled={createLoading}>
+                        {createLoading ? '저장 중...' : '평가 저장'}
+                      </button>
                     </form>
                   </div>
                 )}
