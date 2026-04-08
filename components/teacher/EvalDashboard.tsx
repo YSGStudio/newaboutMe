@@ -29,7 +29,9 @@ type ReportSummary = {
   created_at: string;
   eval_report_items: { id: string; grade: string; sort_order: number }[];
   eval_report_images: { id: string; sort_order: number }[];
-  eval_report_links: ReportLink[];
+  eval_report_links: { id: string }[];
+  eval_reflections: { id: string }[];
+  eval_parent_comments: { id: string }[];
 };
 
 type ReportDetailItem = {
@@ -46,9 +48,10 @@ type ReportDetailItem = {
   sort_order: number;
 };
 
-type ReportDetail = ReportSummary & {
+type ReportDetail = Omit<ReportSummary, 'eval_report_links'> & {
   students: { id: string; name: string; student_number: number };
   eval_report_items: ReportDetailItem[];
+  eval_report_links: ReportLink[];
   eval_reflections: { id: string; content: string; created_at: string }[];
   eval_parent_comments: { id: string; content: string; created_at: string }[];
 };
@@ -820,7 +823,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       setLocalLinks([]);
       setLocalLinkUrl('');
       setLocalLinkLabel('');
-      setReports((prev) => [{ id: d.report.id, title: d.report.title, created_at: d.report.created_at, eval_report_items: [], eval_report_images: [], eval_report_links: [] }, ...prev]);
+      setReports((prev) => [{ id: d.report.id, title: d.report.title, created_at: d.report.created_at, eval_report_items: [], eval_report_images: [], eval_report_links: [], eval_reflections: [], eval_parent_comments: [] }, ...prev]);
       setShowCreateForm(false);
       setShowRubricSelect(false);
       setMsg('평가보고서가 저장되었습니다.');
@@ -1174,6 +1177,8 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                                   </span>
                                 ))}
                                 {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b' }}>이미지 {r.eval_report_images.length}장</span>}
+                                {r.eval_reflections?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 20, padding: '1px 7px' }}>학생확인</span>}
+                                {r.eval_parent_comments?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#9333ea', background: '#faf5ff', borderRadius: 20, padding: '1px 7px' }}>부모확인</span>}
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

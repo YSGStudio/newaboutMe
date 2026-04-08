@@ -20,7 +20,7 @@ export async function GET(_: Request, { params }: Params) {
 
   const { data, error } = await supabaseAdmin
     .from('eval_reports')
-    .select('id,title,created_at, eval_report_items(id,grade,sort_order), eval_report_images(id,sort_order)')
+    .select('id,title,created_at, eval_report_items(id,grade,sort_order), eval_report_images(id,sort_order), eval_report_links(id), eval_reflections(id), eval_parent_comments(id)')
     .eq('student_id', params.studentId)
     .eq('teacher_id', auth.teacher.id)
     .order('created_at', { ascending: false });
