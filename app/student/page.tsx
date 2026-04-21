@@ -43,6 +43,35 @@ type EmotionChartItem = { key: string; label: string; count: number; ratio: numb
 
 type PlanTitleHistory = { id: string; old_title: string; new_title: string; changed_at: string };
 
+type Classmate = { id: string; name: string; student_number: number };
+
+type ReceivedLetter = {
+  id: string;
+  title: string;
+  is_read: boolean;
+  created_at: string;
+  sender_id: string;
+  sender: Classmate | null;
+};
+
+type SentLetter = {
+  id: string;
+  title: string;
+  created_at: string;
+  recipient_id: string;
+  recipient: Classmate | null;
+};
+
+type LetterDetail = {
+  id: string;
+  title: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  sender: Classmate | null;
+  recipient: Classmate | null;
+};
+
 type EvalReportSummary = {
   id: string;
   title: string;
@@ -126,7 +155,7 @@ export default function StudentPage() {
   const [emotionStats, setEmotionStats] = useState<EmotionStats>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval'>('emotion');
+  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval' | 'letters'>('emotion');
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
@@ -140,6 +169,22 @@ export default function StudentPage() {
   const [evalModalError, setEvalModalError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxLoadingId, setLightboxLoadingId] = useState('');
+
+  // 편지함 상태
+  const [letterBox, setLetterBox] = useState<'received' | 'sent'>('received');
+  const [receivedLetters, setReceivedLetters] = useState<ReceivedLetter[]>([]);
+  const [sentLetters, setSentLetters] = useState<SentLetter[]>([]);
+  const [receivedLoaded, setReceivedLoaded] = useState(false);
+  const [sentLoaded, setSentLoaded] = useState(false);
+  const [classmates, setClassmates] = useState<Classmate[]>([]);
+  const [classmatesLoaded, setClassmatesLoaded] = useState(false);
+  const [letterDetail, setLetterDetail] = useState<LetterDetail | null>(null);
+  const [letterDetailLoading, setLetterDetailLoading] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeContent, setComposeContent] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
+  const [composeError, setComposeError] = useState('');
+  const [letterMsg, setLetterMsg] = useState('');
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
   const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
 
@@ -424,6 +469,68 @@ export default function StudentPage() {
     }
   };
 
+  const loadReceived = async () => {
+    const d = await api<{ letters: ReceivedLetter[] }>('/api/letters/received');
+    setReceivedLetters(d.letters);
+    setReceivedLoaded(true);
+  };
+
+  const loadSent = async () => {
+    const d = await api<{ letters: SentLetter[] }>('/api/letters/sent');
+    setSentLetters(d.letters);
+    setSentLoaded(true);
+  };
+
+  const loadClassmates = async () => {
+    const d = await api<{ classmates: Classmate[] }>('/api/letters/classmates');
+    setClassmates(d.classmates);
+    setClassmatesLoaded(true);
+  };
+
+  const openLetterDetail = async (letterId: string) => {
+    setLetterDetailLoading(true);
+    try {
+      const d = await api<{ letter: LetterDetail }>(`/api/letters/${letterId}`);
+      setLetterDetail(d.letter);
+      // 받은 편지함에서 읽음 처리 반영
+      setReceivedLetters((prev) => prev.map((l) => l.id === letterId ? { ...l, is_read: true } : l));
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setLetterDetailLoading(false);
+    }
+  };
+
+  const onSendLetter = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSendLoading(true);
+    setComposeError('');
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    try {
+      await api('/api/letters', {
+        method: 'POST',
+        body: JSON.stringify({
+          recipientId: String(form.get('recipientId')),
+          title: String(form.get('title')),
+          content: composeContent.trim(),
+        }),
+      });
+      formEl.reset();
+      setComposeContent('');
+      setComposeOpen(false);
+      setLetterMsg('편지를 보냈습니다.');
+      // 보낸 편지함 캐시 초기화
+      setSentLoaded(false);
+      window.setTimeout(() => setLetterMsg(''), 2500);
+    } catch (err) {
+      setComposeError((err as Error).message);
+    } finally {
+      setSendLoading(false);
+    }
+  };
+
   const loadEvalReports = async () => {
     const d = await api<{ reports: EvalReportSummary[] }>('/api/eval/reports/my');
     setEvalReports(d.reports);
@@ -513,6 +620,15 @@ export default function StudentPage() {
     setEditingPlanId('');
     setPlanHistoryMap({});
     setOpenHistoryPlanId('');
+    setReceivedLetters([]);
+    setSentLetters([]);
+    setReceivedLoaded(false);
+    setSentLoaded(false);
+    setClassmates([]);
+    setClassmatesLoaded(false);
+    setLetterDetail(null);
+    setComposeOpen(false);
+    setComposeContent('');
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
@@ -595,13 +711,21 @@ export default function StudentPage() {
                 { key: 'emotion', label: '오늘의 감정' },
                 { key: 'plan', label: '오늘의 계획' },
                 { key: 'stats', label: '나의 감정통계' },
-                { key: 'eval', label: '평가기록' }
+                { key: 'eval', label: '평가기록' },
+                {
+                  key: 'letters',
+                  label: `편지함${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
+                },
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval');
+                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval' | 'letters');
                 if (key === 'stats' && !emotionStats) loadEmotionStats();
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
+                if (key === 'letters') {
+                  if (!receivedLoaded) loadReceived().catch(() => null);
+                  if (!classmatesLoaded) loadClassmates().catch(() => null);
+                }
               }}
             />
           </section>
@@ -957,6 +1081,140 @@ export default function StudentPage() {
             </section>
           )}
 
+          {activeTab === 'letters' && (
+            <section className="card">
+              <div className="row space-between" style={{ marginBottom: 12 }}>
+                <h2 style={{ margin: 0 }}>편지함</h2>
+                <button
+                  type="button"
+                  className="ghost"
+                  style={{ width: 'auto', padding: '8px 18px' }}
+                  onClick={() => {
+                    if (!classmatesLoaded) loadClassmates().catch(() => null);
+                    setComposeOpen(true);
+                    setComposeError('');
+                  }}
+                >
+                  ✉ 편지 쓰기
+                </button>
+              </div>
+
+              {letterMsg && (
+                <p style={{ margin: '0 0 12px', padding: '8px 12px', background: '#dcfce7', color: '#16a34a', borderRadius: 8, fontSize: 13 }}>
+                  {letterMsg}
+                </p>
+              )}
+
+              {/* 받은편지함 / 보낸편지함 전환 */}
+              <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+                <button
+                  type="button"
+                  className={letterBox === 'received' ? 'ghost' : 'outline'}
+                  style={{ width: 'auto', padding: '6px 16px' }}
+                  onClick={() => {
+                    setLetterBox('received');
+                    if (!receivedLoaded) loadReceived().catch(() => null);
+                  }}
+                >
+                  받은편지함
+                  {receivedLetters.filter((l) => !l.is_read).length > 0 && (
+                    <span style={{ marginLeft: 6, background: '#ef4444', color: '#fff', borderRadius: 99, padding: '0 6px', fontSize: 11, fontWeight: 700 }}>
+                      {receivedLetters.filter((l) => !l.is_read).length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={letterBox === 'sent' ? 'ghost' : 'outline'}
+                  style={{ width: 'auto', padding: '6px 16px' }}
+                  onClick={() => {
+                    setLetterBox('sent');
+                    if (!sentLoaded) loadSent().catch(() => null);
+                  }}
+                >
+                  보낸편지함
+                </button>
+              </div>
+
+              {/* 받은편지함 목록 */}
+              {letterBox === 'received' && (
+                !receivedLoaded ? (
+                  <p className="hint">불러오는 중...</p>
+                ) : receivedLetters.length === 0 ? (
+                  <EmptyState title="받은 편지가 없습니다" description="학급 친구가 편지를 보내면 여기에 표시됩니다." />
+                ) : (
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                    {receivedLetters.map((letter, idx) => (
+                      <button
+                        key={letter.id}
+                        type="button"
+                        onClick={() => openLetterDetail(letter.id)}
+                        disabled={letterDetailLoading}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '13px 16px', width: '100%', textAlign: 'left',
+                          background: letter.is_read ? '#fff' : '#eff6ff',
+                          borderBottom: idx < receivedLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
+                          border: 'none', cursor: letterDetailLoading ? 'default' : 'pointer',
+                        }}
+                      >
+                        {!letter.is_read && (
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                        )}
+                        <span style={{ flex: 1, fontWeight: letter.is_read ? 400 : 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0f172a' }}>
+                          {letter.title}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>
+                          {letter.sender?.name ?? '알 수 없음'}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
+                          {new Date(letter.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* 보낸편지함 목록 */}
+              {letterBox === 'sent' && (
+                !sentLoaded ? (
+                  <p className="hint">불러오는 중...</p>
+                ) : sentLetters.length === 0 ? (
+                  <EmptyState title="보낸 편지가 없습니다" description="편지 쓰기를 눌러 친구에게 편지를 보내보세요." />
+                ) : (
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                    {sentLetters.map((letter, idx) => (
+                      <button
+                        key={letter.id}
+                        type="button"
+                        onClick={() => openLetterDetail(letter.id)}
+                        disabled={letterDetailLoading}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '13px 16px', width: '100%', textAlign: 'left',
+                          background: '#fff',
+                          borderBottom: idx < sentLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
+                          border: 'none', cursor: letterDetailLoading ? 'default' : 'pointer',
+                        }}
+                      >
+                        <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0f172a' }}>
+                          {letter.title}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>
+                          → {letter.recipient?.name ?? '알 수 없음'}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
+                          {new Date(letter.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+            </section>
+          )}
+
           {activeTab === 'eval' && (
             <section className="card">
               <h2 style={{ margin: '0 0 12px' }}>평가기록</h2>
@@ -1284,6 +1542,84 @@ export default function StudentPage() {
               </section>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 편지 상세 모달 */}
+      {letterDetail && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setLetterDetail(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+        >
+          <div style={{ width: 'min(480px, 96vw)', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+              <div className="row space-between" style={{ alignItems: 'flex-start' }}>
+                <div style={{ minWidth: 0, flex: 1, marginRight: 12 }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>
+                    {letterDetail.sender?.name ?? '?'} → {letterDetail.recipient?.name ?? '?'}
+                    {' · '}
+                    {new Date(letterDetail.created_at).toLocaleDateString('ko-KR')}
+                  </p>
+                  <h3 style={{ margin: 0, fontSize: 17, wordBreak: 'break-all' }}>{letterDetail.title}</h3>
+                </div>
+                <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={() => setLetterDetail(null)}>닫기</button>
+              </div>
+            </div>
+            <div style={{ padding: '20px 20px 24px' }}>
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.9, color: '#374151', fontSize: 15 }}>{letterDetail.content}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 편지 쓰기 모달 */}
+      {composeOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) { setComposeOpen(false); setComposeError(''); } }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+        >
+          <div style={{ width: 'min(480px, 96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            <div className="row space-between" style={{ marginBottom: 18 }}>
+              <h3 style={{ margin: 0 }}>✉ 편지 쓰기</h3>
+              <button type="button" className="outline" style={{ width: 'auto' }} onClick={() => { setComposeOpen(false); setComposeError(''); }}>닫기</button>
+            </div>
+            <form className="grid" style={{ gap: 12 }} onSubmit={onSendLetter}>
+              <div>
+                <label>받는 사람</label>
+                <select name="recipientId" required>
+                  <option value="">선택하세요</option>
+                  {classmates.map((s) => (
+                    <option key={s.id} value={s.id}>{s.student_number}번 {s.name}</option>
+                  ))}
+                </select>
+                {!classmatesLoaded && <p className="hint" style={{ margin: '4px 0 0', fontSize: 12 }}>학급 정보 불러오는 중...</p>}
+              </div>
+              <div>
+                <label>제목 (50자)</label>
+                <input name="title" maxLength={50} required />
+              </div>
+              <div>
+                <label>내용 (1000자)</label>
+                <textarea
+                  name="content"
+                  maxLength={1000}
+                  required
+                  style={{ minHeight: 130, resize: 'vertical' }}
+                  value={composeContent}
+                  onChange={(e) => setComposeContent(e.target.value)}
+                />
+                <p className="hint" style={{ margin: '4px 0 0', fontSize: 12, textAlign: 'right' }}>{composeContent.length}/1000</p>
+              </div>
+              {composeError && (
+                <p style={{ margin: 0, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>{composeError}</p>
+              )}
+              <SubmitButton loading={sendLoading} idleText="보내기" />
+            </form>
           </div>
         </div>
       )}

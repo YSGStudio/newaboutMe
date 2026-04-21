@@ -11,6 +11,17 @@ import EvalDashboard from '@/components/teacher/EvalDashboard';
 import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
+type LetterRow = {
+  id: string;
+  title: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+  sender: { id: string; name: string; student_number: number } | null;
+  recipient: { id: string; name: string; student_number: number } | null;
+};
+
 type ClassItem = {
   id: string;
   class_name: string;
@@ -61,7 +72,7 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters'>('class');
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -77,6 +88,18 @@ export default function TeacherPage() {
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
+
+  // 관계회복의 날 — 편지 관련 상태
+  const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
+  const [lettersLoading, setLettersLoading] = useState(false);
+  const [lettersLoaded, setLettersLoaded] = useState(false);
+  const [letterDetail, setLetterDetail] = useState<LetterRow | null>(null);
+  const [isEditingLetter, setIsEditingLetter] = useState(false);
+  const [editLetterTitle, setEditLetterTitle] = useState('');
+  const [editLetterContent, setEditLetterContent] = useState('');
+  const [letterSaving, setLetterSaving] = useState(false);
+  const [letterError, setLetterError] = useState('');
+  const [deletingLetterId, setDeletingLetterId] = useState('');
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -114,6 +137,61 @@ export default function TeacherPage() {
     setStudents(data.students);
   }, []);
 
+  const loadClassLetters = useCallback(async (classId: string) => {
+    if (!classId) return;
+    setLettersLoading(true);
+    try {
+      const data = await api<{ letters: LetterRow[] }>(`/api/letters/class?classId=${classId}`);
+      setClassLetters(data.letters);
+      setLettersLoaded(true);
+    } finally {
+      setLettersLoading(false);
+    }
+  }, []);
+
+  const openLetterDetail = (letter: LetterRow) => {
+    setLetterDetail(letter);
+    setIsEditingLetter(false);
+    setEditLetterTitle(letter.title);
+    setEditLetterContent(letter.content);
+    setLetterError('');
+  };
+
+  const onSaveLetter = async () => {
+    if (!letterDetail) return;
+    setLetterSaving(true);
+    setLetterError('');
+    try {
+      const data = await api<{ letter: { id: string; title: string; content: string; updated_at: string } }>(
+        `/api/letters/${letterDetail.id}`,
+        { method: 'PATCH', body: JSON.stringify({ title: editLetterTitle, content: editLetterContent }) }
+      );
+      const updated = { ...letterDetail, title: data.letter.title, content: data.letter.content, updated_at: data.letter.updated_at };
+      setLetterDetail(updated);
+      setClassLetters((prev) => prev.map((l) => l.id === updated.id ? updated : l));
+      setIsEditingLetter(false);
+    } catch (err) {
+      setLetterError((err as Error).message);
+    } finally {
+      setLetterSaving(false);
+    }
+  };
+
+  const onDeleteLetter = async (letterId: string) => {
+    if (!window.confirm('이 편지를 삭제할까요? 발신자·수신자 편지함에서도 즉시 삭제되며 복구할 수 없습니다.')) return;
+    setDeletingLetterId(letterId);
+    try {
+      await api(`/api/letters/${letterId}`, { method: 'DELETE' });
+      setClassLetters((prev) => prev.filter((l) => l.id !== letterId));
+      if (letterDetail?.id === letterId) setLetterDetail(null);
+    } catch (err) {
+      setAuthError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setDeletingLetterId('');
+    }
+  };
+
   const loadFeeds = useCallback(async (classId: string, date: string) => {
     if (!classId) return;
     setFeedLoading(true);
@@ -135,6 +213,10 @@ export default function TeacherPage() {
     } else {
       setFeeds([]);
     }
+    // 학급 변경 시 편지 캐시 초기화
+    setClassLetters([]);
+    setLettersLoaded(false);
+    setLetterDetail(null);
   }, [selectedClassId, loadStudents]);
 
   useEffect(() => {
@@ -420,10 +502,16 @@ export default function TeacherPage() {
                 { key: 'student', label: '학생 관리' },
                 { key: 'feed', label: '마음피드' },
                 { key: 'eval', label: '평가피드백' },
-                { key: 'stats', label: '통계 대시보드' }
+                { key: 'letters', label: '관계회복의 날' },
+                { key: 'stats', label: '통계 대시보드' },
               ]}
               value={activeTab}
-              onChange={(key) => setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats')}
+              onChange={(key) => {
+                setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters');
+                if (key === 'letters' && selectedClassId && !lettersLoaded) {
+                  loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
+                }
+              }}
             />
           </section>
 
@@ -669,6 +757,162 @@ export default function TeacherPage() {
           )}
 
           {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} />}
+
+          {activeTab === 'letters' && (
+            <section className="card">
+              <div className="row space-between" style={{ marginBottom: 12 }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>관계회복의 날</h2>
+                  <p className="hint" style={{ marginTop: 4 }}>학급 내 학생들이 주고받은 편지를 확인하고 관리할 수 있습니다.</p>
+                </div>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ width: 'auto', flexShrink: 0 }}
+                  onClick={() => {
+                    setLettersLoaded(false);
+                    if (selectedClassId) loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
+                  }}
+                  disabled={lettersLoading}
+                >
+                  {lettersLoading ? '불러오는 중...' : '새로고침'}
+                </button>
+              </div>
+
+              {!selectedClassId ? (
+                <EmptyState title="학급을 먼저 선택하세요" description="상단에서 학급을 선택하면 편지 목록을 볼 수 있습니다." />
+              ) : lettersLoading ? (
+                <p className="hint">편지를 불러오는 중입니다...</p>
+              ) : classLetters.length === 0 ? (
+                <EmptyState title="주고받은 편지가 없습니다" description="학생들이 편지함에서 편지를 보내면 이곳에 표시됩니다." />
+              ) : (
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                  {/* 헤더 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 100px 80px', gap: 8, padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>제목</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>보낸 사람</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>받는 사람</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>작성일</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>관리</span>
+                  </div>
+                  {classLetters.map((letter, idx) => (
+                    <div
+                      key={letter.id}
+                      style={{
+                        display: 'grid', gridTemplateColumns: '1fr 120px 120px 100px 80px', gap: 8,
+                        alignItems: 'center', padding: '12px 16px',
+                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                        borderBottom: idx < classLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openLetterDetail(letter)}
+                        style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1e293b', fontSize: 14 }}
+                      >
+                        {letter.title}
+                      </button>
+                      <span style={{ fontSize: 13, color: '#374151' }}>{letter.sender?.name ?? '?'}</span>
+                      <span style={{ fontSize: 13, color: '#374151' }}>{letter.recipient?.name ?? '?'}</span>
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {new Date(letter.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                      </span>
+                      <button
+                        type="button"
+                        className="outline"
+                        style={{ width: 'auto', padding: '4px 10px', fontSize: 12, color: '#dc2626', borderColor: '#fca5a5' }}
+                        onClick={() => onDeleteLetter(letter.id)}
+                        disabled={deletingLetterId === letter.id}
+                      >
+                        {deletingLetterId === letter.id ? '삭제 중' : '삭제'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* 편지 상세/수정 모달 */}
+          {letterDetail && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => { if (e.target === e.currentTarget) { setLetterDetail(null); setIsEditingLetter(false); } }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
+            >
+              <div style={{ width: 'min(540px, 96vw)', maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+                {/* 헤더 */}
+                <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+                  <div className="row space-between" style={{ alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>
+                        {letterDetail.sender?.name} → {letterDetail.recipient?.name}
+                        {' · '}
+                        {new Date(letterDetail.created_at).toLocaleDateString('ko-KR')}
+                        {letterDetail.updated_at !== letterDetail.created_at && (
+                          <span style={{ marginLeft: 6, color: '#f59e0b' }}>수정됨</span>
+                        )}
+                      </p>
+                      {!isEditingLetter && (
+                        <h3 style={{ margin: 0, fontSize: 17, wordBreak: 'break-all' }}>{letterDetail.title}</h3>
+                      )}
+                    </div>
+                    <div className="row" style={{ gap: 8, flexShrink: 0 }}>
+                      {!isEditingLetter ? (
+                        <>
+                          <button type="button" className="outline" style={{ width: 'auto', padding: '6px 14px' }} onClick={() => setIsEditingLetter(true)}>수정</button>
+                          <button type="button" className="outline" style={{ width: 'auto', padding: '6px 14px', color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteLetter(letterDetail.id)} disabled={deletingLetterId === letterDetail.id}>
+                            {deletingLetterId === letterDetail.id ? '삭제 중' : '삭제'}
+                          </button>
+                          <button type="button" className="outline" style={{ width: 'auto', padding: '6px 14px' }} onClick={() => setLetterDetail(null)}>닫기</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="ghost" style={{ width: 'auto', padding: '6px 14px' }} onClick={onSaveLetter} disabled={letterSaving || !editLetterTitle.trim() || !editLetterContent.trim()}>
+                            {letterSaving ? '저장 중...' : '수정 저장'}
+                          </button>
+                          <button type="button" className="outline" style={{ width: 'auto', padding: '6px 14px' }} onClick={() => { setIsEditingLetter(false); setEditLetterTitle(letterDetail.title); setEditLetterContent(letterDetail.content); }}>취소</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {letterError && (
+                    <p style={{ margin: 0, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>{letterError}</p>
+                  )}
+
+                  {isEditingLetter ? (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>제목</label>
+                        <input
+                          value={editLetterTitle}
+                          maxLength={50}
+                          onChange={(e) => setEditLetterTitle(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>내용</label>
+                        <textarea
+                          value={editLetterContent}
+                          maxLength={1000}
+                          onChange={(e) => setEditLetterContent(e.target.value)}
+                          style={{ minHeight: 160, resize: 'vertical', width: '100%' }}
+                        />
+                        <p className="hint" style={{ margin: '4px 0 0', fontSize: 12, textAlign: 'right' }}>{editLetterContent.length}/1000</p>
+                      </div>
+                    </>
+                  ) : (
+                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.9, color: '#374151', fontSize: 15 }}>{letterDetail.content}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
         </>
