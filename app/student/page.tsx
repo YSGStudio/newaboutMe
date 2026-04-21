@@ -77,7 +77,7 @@ type EvalReportSummary = {
   title: string;
   created_at: string;
   eval_report_items: { id: string; grade: string; sort_order: number; rubric_title_snapshot: string }[];
-  eval_report_images: { id: string; sort_order: number }[];
+  eval_report_images: { id: string; storage_path: string; sort_order: number }[];
   eval_reflections: { id: string }[];
   eval_parent_comments: { id: string }[];
 };
@@ -99,7 +99,7 @@ type EvalReportDetail = {
     teacher_feedback: string | null;
     sort_order: number;
   }[];
-  eval_report_images: { id: string; sort_order: number }[];
+  eval_report_images: { id: string; storage_path: string; sort_order: number }[];
   eval_report_links: { id: string; url: string; label: string | null; sort_order: number }[];
   eval_reflections: { id: string; content: string; created_at: string }[];
   eval_parent_comments: { id: string; content: string; created_at: string }[];
@@ -470,21 +470,36 @@ export default function StudentPage() {
   };
 
   const loadReceived = async () => {
-    const d = await api<{ letters: ReceivedLetter[] }>('/api/letters/received');
-    setReceivedLetters(d.letters);
-    setReceivedLoaded(true);
+    try {
+      const d = await api<{ letters: ReceivedLetter[] }>('/api/letters/received');
+      setReceivedLetters(d.letters);
+    } catch {
+      // 테이블 미생성 등 일시적 오류 무시
+    } finally {
+      setReceivedLoaded(true);
+    }
   };
 
   const loadSent = async () => {
-    const d = await api<{ letters: SentLetter[] }>('/api/letters/sent');
-    setSentLetters(d.letters);
-    setSentLoaded(true);
+    try {
+      const d = await api<{ letters: SentLetter[] }>('/api/letters/sent');
+      setSentLetters(d.letters);
+    } catch {
+      // 일시적 오류 무시
+    } finally {
+      setSentLoaded(true);
+    }
   };
 
   const loadClassmates = async () => {
-    const d = await api<{ classmates: Classmate[] }>('/api/letters/classmates');
-    setClassmates(d.classmates);
-    setClassmatesLoaded(true);
+    try {
+      const d = await api<{ classmates: Classmate[] }>('/api/letters/classmates');
+      setClassmates(d.classmates);
+    } catch {
+      // 일시적 오류 무시
+    } finally {
+      setClassmatesLoaded(true);
+    }
   };
 
   const openLetterDetail = async (letterId: string) => {
@@ -554,11 +569,15 @@ export default function StudentPage() {
     finally { setEvalDetailLoading(false); setLoadingEvalId(''); }
   };
 
-  const openLightbox = async (reportId: string, imageId: string) => {
+  const openLightbox = async (reportId: string, imageId: string, storagePath: string) => {
     setLightboxLoadingId(imageId);
     try {
       const d = await api<{ url: string }>(`/api/eval/reports/${reportId}/images/${imageId}/view`);
-      setLightboxUrl(d.url);
+      if (storagePath.endsWith('.pdf')) {
+        window.open(d.url, '_blank');
+      } else {
+        setLightboxUrl(d.url);
+      }
     } catch { /* ignore */ }
     finally { setLightboxLoadingId(''); }
   };
@@ -1445,11 +1464,20 @@ export default function StudentPage() {
                       <button
                         key={img.id}
                         type="button"
-                        onClick={() => openLightbox(evalDetail.id, img.id)}
+                        onClick={() => openLightbox(evalDetail.id, img.id, img.storage_path)}
                         disabled={lightboxLoadingId === img.id}
-                        style={{ width: 72, height: 72, padding: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#f8fafc', flexShrink: 0, cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: 72, height: 72, padding: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#f8fafc', flexShrink: 0, cursor: 'zoom-in', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
                       >
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{lightboxLoadingId === img.id ? '...' : `자료 ${img.sort_order + 1}`}</span>
+                        {lightboxLoadingId === img.id ? (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>...</span>
+                        ) : img.storage_path.endsWith('.pdf') ? (
+                          <>
+                            <span style={{ fontSize: 24 }}>📄</span>
+                            <span style={{ fontSize: 9, color: '#64748b' }}>PDF</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{`자료 ${img.sort_order + 1}`}</span>
+                        )}
                       </button>
                     ))}
                   </div>

@@ -28,7 +28,7 @@ type ReportSummary = {
   title: string;
   created_at: string;
   eval_report_items: { id: string; grade: string; sort_order: number }[];
-  eval_report_images: { id: string; sort_order: number }[];
+  eval_report_images: { id: string; storage_path: string; sort_order: number }[];
   eval_report_links: { id: string }[];
   eval_reflections: { id: string }[];
   eval_parent_comments: { id: string }[];
@@ -424,7 +424,13 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 
   const openImage = (imageId: string) => {
     const url = thumbUrls[imageId];
-    if (url) setLightboxUrl(url);
+    if (!url) return;
+    const img = report.eval_report_images.find((i) => i.id === imageId);
+    if (img?.storage_path.endsWith('.pdf')) {
+      window.open(url, '_blank');
+    } else {
+      setLightboxUrl(url);
+    }
   };
 
   const startEdit = () => {
@@ -620,8 +626,15 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
                       style={{ width: 80, height: 80, padding: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#f8fafc', flexShrink: 0, cursor: thumbUrls[img.id] ? 'zoom-in' : 'default' }}
                     >
                       {thumbUrls[img.id] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                        img.storage_path.endsWith('.pdf') ? (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                            <span style={{ fontSize: 24 }}>📄</span>
+                            <span style={{ fontSize: 9, color: '#64748b' }}>PDF</span>
+                          </div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumbUrls[img.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                        )
                       ) : (
                         <span style={{ fontSize: 11, color: '#9ca3af' }}>로딩중</span>
                       )}
@@ -1087,12 +1100,19 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
                       {/* 이미지 첨부 */}
                       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
-                        <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 이미지 ({localFiles.length}/5)</p>
+                        <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 (이미지/PDF) ({localFiles.length}/5)</p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
                           {localFiles.map((lf, i) => (
                             <div key={i} style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={lf.previewUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} draggable={false} />
+                              {lf.file.type === 'application/pdf' ? (
+                                <div style={{ width: 72, height: 72, borderRadius: 8, border: '1px solid #e5e7eb', background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                  <span style={{ fontSize: 24 }}>📄</span>
+                                  <span style={{ fontSize: 9, color: '#64748b' }}>PDF</span>
+                                </div>
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={lf.previewUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} draggable={false} />
+                              )}
                               <button
                                 type="button"
                                 onClick={() => { URL.revokeObjectURL(lf.previewUrl); setLocalFiles((prev) => prev.filter((_, j) => j !== i)); }}
@@ -1102,7 +1122,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                           ))}
                           {localFiles.length < 5 && (
                             <>
-                              <input ref={localFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                              <input ref={localFileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style={{ display: 'none' }}
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (!file) return;
@@ -1176,7 +1196,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                                     {GRADE_LABEL[item.grade as 'high' | 'mid' | 'low']}
                                   </span>
                                 ))}
-                                {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b' }}>이미지 {r.eval_report_images.length}장</span>}
+                                {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b' }}>자료 {r.eval_report_images.length}개</span>}
                                 {r.eval_reflections?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 20, padding: '1px 7px' }}>학생확인</span>}
                                 {r.eval_parent_comments?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#9333ea', background: '#faf5ff', borderRadius: 20, padding: '1px 7px' }}>부모확인</span>}
                               </div>

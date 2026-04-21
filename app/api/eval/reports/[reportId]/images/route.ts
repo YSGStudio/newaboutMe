@@ -33,12 +33,12 @@ export async function POST(req: Request, { params }: Params) {
 
   if (!file) return NextResponse.json({ error: '파일이 없습니다.' }, { status: 400 });
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
   if (!allowedTypes.includes(file.type)) {
-    return NextResponse.json({ error: 'JPG, PNG, WEBP 파일만 업로드 가능합니다.' }, { status: 400 });
+    return NextResponse.json({ error: 'JPG, PNG, WEBP, PDF 파일만 업로드 가능합니다.' }, { status: 400 });
   }
-  if (file.size > 10 * 1024 * 1024) {
-    return NextResponse.json({ error: '파일 크기는 10MB를 초과할 수 없습니다.' }, { status: 400 });
+  if (file.size > 20 * 1024 * 1024) {
+    return NextResponse.json({ error: '파일 크기는 20MB를 초과할 수 없습니다.' }, { status: 400 });
   }
 
   const ext = file.name.split('.').pop() ?? 'jpg';

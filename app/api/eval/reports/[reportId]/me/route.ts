@@ -29,7 +29,7 @@ export async function GET(_: Request, { params }: Params) {
       .order('sort_order'),
     supabaseAdmin
       .from('eval_report_images')
-      .select('id, sort_order')
+      .select('id, storage_path, sort_order')
       .eq('report_id', params.reportId)
       .order('sort_order'),
     supabaseAdmin

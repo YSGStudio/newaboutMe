@@ -11,7 +11,7 @@ export async function GET() {
     .select(`
       id, title, created_at,
       eval_report_items(id, grade, sort_order, rubric_title_snapshot),
-      eval_report_images(id, sort_order),
+      eval_report_images(id, storage_path, sort_order),
       eval_reflections(id),
       eval_parent_comments(id)
     `)
