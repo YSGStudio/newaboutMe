@@ -214,12 +214,21 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
             ))}
           </div>
           <div style={{ display: 'grid', gap: 6 }}>
-            {reports.slice(0, 6).map((r) => (
-              <div key={r.id} className="row space-between" style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{r.title}</span>
-                <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>{new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</span>
-              </div>
-            ))}
+            {reports.slice(0, 6).map((r) => {
+              const gc = { high: 0, mid: 0, low: 0 };
+              r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
+              return (
+                <div key={r.id} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                  <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    {gc.high > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: GRADE_BG.high, color: GRADE_COLOR.high }}>잘함 {gc.high}</span>}
+                    {gc.mid  > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: GRADE_BG.mid,  color: GRADE_COLOR.mid  }}>보통 {gc.mid}</span>}
+                    {gc.low  > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: GRADE_BG.low,  color: GRADE_COLOR.low  }}>노력 {gc.low}</span>}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>{new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</span>
+                </div>
+              );
+            })}
             {reports.length > 6 && (
               <p className="hint" style={{ margin: '4px 0 0', textAlign: 'center', fontSize: 12 }}>외 {reports.length - 6}건 더 있음</p>
             )}
@@ -301,8 +310,13 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
     }));
     const evalRows = evalReports.length === 0
-      ? '<tr><td colspan="2">평가 기록이 없습니다.</td></tr>'
-      : evalReports.map((r) => `<tr><td>${escapeHtml(r.title)}</td><td>${new Date(r.created_at).toLocaleDateString('ko-KR')}</td></tr>`).join('');
+      ? '<tr><td colspan="3">평가 기록이 없습니다.</td></tr>'
+      : evalReports.map((r) => {
+          const gc = { high: 0, mid: 0, low: 0 };
+          r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
+          const grades = [gc.high > 0 ? `잘함 ${gc.high}` : '', gc.mid > 0 ? `보통 ${gc.mid}` : '', gc.low > 0 ? `노력 ${gc.low}` : ''].filter(Boolean).join(' / ');
+          return `<tr><td>${escapeHtml(r.title)}</td><td>${grades || '-'}</td><td>${new Date(r.created_at).toLocaleDateString('ko-KR')}</td></tr>`;
+        }).join('');
 
     const html = `<!doctype html>
 <html lang="ko">
@@ -354,7 +368,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       <span class="chip grade-low">노력 ${gradeCount.low}</span>
     </div>
     <table>
-      <thead><tr><th>보고서 제목</th><th>작성일</th></tr></thead>
+      <thead><tr><th>보고서 제목</th><th>등급</th><th>작성일</th></tr></thead>
       <tbody>${evalRows}</tbody>
     </table>
   </body>
