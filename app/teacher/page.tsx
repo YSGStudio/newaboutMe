@@ -89,7 +89,7 @@ export default function TeacherPage() {
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
 
-  // 관계회복의 날 — 편지 관련 상태
+  // 클래스메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
   const [lettersLoading, setLettersLoading] = useState(false);
   const [lettersLoaded, setLettersLoaded] = useState(false);
@@ -100,6 +100,7 @@ export default function TeacherPage() {
   const [letterSaving, setLetterSaving] = useState(false);
   const [letterError, setLetterError] = useState('');
   const [deletingLetterId, setDeletingLetterId] = useState('');
+  const [archivingAll, setArchivingAll] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
 
   const selectedClass = useMemo(
@@ -190,6 +191,24 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setDeletingLetterId('');
+    }
+  };
+
+  const onArchiveAll = async () => {
+    if (!selectedClassId || classLetters.length === 0) return;
+    setArchivingAll(true);
+    try {
+      await api('/api/letters/class/archive-all', {
+        method: 'PATCH',
+        body: JSON.stringify({ classId: selectedClassId }),
+      });
+      setClassLetters([]);
+      setLetterDetail(null);
+    } catch (err) {
+      setAuthError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setArchivingAll(false);
     }
   };
 
@@ -503,7 +522,7 @@ export default function TeacherPage() {
                 { key: 'student', label: '학생 관리' },
                 { key: 'feed', label: '마음피드' },
                 { key: 'eval', label: '평가피드백' },
-                { key: 'letters', label: '관계회복의 날' },
+                { key: 'letters', label: '클래스메일' },
                 { key: 'stats', label: '통계 대시보드' },
               ]}
               value={activeTab}
@@ -776,21 +795,34 @@ export default function TeacherPage() {
             <section className="card">
               <div className="row space-between" style={{ marginBottom: 12 }}>
                 <div>
-                  <h2 style={{ margin: 0 }}>관계회복의 날</h2>
+                  <h2 style={{ margin: 0 }}>클래스메일</h2>
                   <p className="hint" style={{ marginTop: 4 }}>학급 내 학생들이 주고받은 편지를 확인하고 관리할 수 있습니다.</p>
                 </div>
-                <button
-                  type="button"
-                  className="outline"
-                  style={{ width: 'auto', flexShrink: 0 }}
-                  onClick={() => {
-                    setLettersLoaded(false);
-                    if (selectedClassId) loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
-                  }}
-                  disabled={lettersLoading}
-                >
-                  {lettersLoading ? '불러오는 중...' : '새로고침'}
-                </button>
+                <div className="row" style={{ gap: 8, flexShrink: 0 }}>
+                  {classLetters.length > 0 && (
+                    <button
+                      type="button"
+                      className="outline"
+                      style={{ width: 'auto' }}
+                      onClick={onArchiveAll}
+                      disabled={archivingAll}
+                    >
+                      {archivingAll ? '처리 중...' : '모두 읽음 ✓'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="outline"
+                    style={{ width: 'auto' }}
+                    onClick={() => {
+                      setLettersLoaded(false);
+                      if (selectedClassId) loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
+                    }}
+                    disabled={lettersLoading}
+                  >
+                    {lettersLoading ? '불러오는 중...' : '새로고침'}
+                  </button>
+                </div>
               </div>
 
               {!selectedClassId ? (

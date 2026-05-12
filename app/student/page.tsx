@@ -170,7 +170,7 @@ export default function StudentPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxLoadingId, setLightboxLoadingId] = useState('');
 
-  // 편지함 상태
+  // 클래스메일 상태
   const [letterBox, setLetterBox] = useState<'received' | 'sent'>('received');
   const [receivedLetters, setReceivedLetters] = useState<ReceivedLetter[]>([]);
   const [sentLetters, setSentLetters] = useState<SentLetter[]>([]);
@@ -181,6 +181,8 @@ export default function StudentPage() {
   const [letterDetail, setLetterDetail] = useState<LetterDetail | null>(null);
   const [letterDetailLoading, setLetterDetailLoading] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [composeRecipientId, setComposeRecipientId] = useState('');
+  const [composeTitle, setComposeTitle] = useState('');
   const [composeContent, setComposeContent] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
   const [composeError, setComposeError] = useState('');
@@ -517,26 +519,29 @@ export default function StudentPage() {
     }
   };
 
+  const closeCompose = () => {
+    setComposeOpen(false);
+    setComposeRecipientId('');
+    setComposeTitle('');
+    setComposeContent('');
+    setComposeError('');
+  };
+
   const onSendLetter = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSendLoading(true);
     setComposeError('');
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
     try {
       await api('/api/letters', {
         method: 'POST',
         body: JSON.stringify({
-          recipientId: String(form.get('recipientId')),
-          title: String(form.get('title')),
+          recipientId: composeRecipientId,
+          title: composeTitle.trim(),
           content: composeContent.trim(),
         }),
       });
-      formEl.reset();
-      setComposeContent('');
-      setComposeOpen(false);
+      closeCompose();
       setLetterMsg('편지를 보냈습니다.');
-      // 보낸 편지함 캐시 초기화
       setSentLoaded(false);
       window.setTimeout(() => setLetterMsg(''), 2500);
     } catch (err) {
@@ -544,6 +549,19 @@ export default function StudentPage() {
     } finally {
       setSendLoading(false);
     }
+  };
+
+  const onReply = () => {
+    if (!letterDetail?.sender) return;
+    if (!classmatesLoaded) loadClassmates().catch(() => null);
+    setComposeRecipientId(letterDetail.sender.id);
+    const prefix = 'Re: ';
+    const maxBody = 50 - prefix.length;
+    setComposeTitle(prefix + letterDetail.title.slice(0, maxBody));
+    setComposeContent('');
+    setComposeError('');
+    setLetterDetail(null);
+    setComposeOpen(true);
   };
 
   const loadEvalReports = async () => {
@@ -647,6 +665,8 @@ export default function StudentPage() {
     setClassmatesLoaded(false);
     setLetterDetail(null);
     setComposeOpen(false);
+    setComposeRecipientId('');
+    setComposeTitle('');
     setComposeContent('');
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
@@ -733,7 +753,7 @@ export default function StudentPage() {
                 { key: 'eval', label: '평가기록' },
                 {
                   key: 'letters',
-                  label: `편지함${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
+                  label: `클래스메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
                 },
               ]}
               value={activeTab}
@@ -1103,7 +1123,7 @@ export default function StudentPage() {
           {activeTab === 'letters' && (
             <section className="card">
               <div className="row space-between" style={{ marginBottom: 12 }}>
-                <h2 style={{ margin: 0 }}>편지함</h2>
+                <h2 style={{ margin: 0 }}>클래스메일</h2>
                 <button
                   type="button"
                   className="ghost"
@@ -1111,7 +1131,6 @@ export default function StudentPage() {
                   onClick={() => {
                     if (!classmatesLoaded) loadClassmates().catch(() => null);
                     setComposeOpen(true);
-                    setComposeError('');
                   }}
                 >
                   ✉ 편지 쓰기
@@ -1593,7 +1612,14 @@ export default function StudentPage() {
                   </p>
                   <h3 style={{ margin: 0, fontSize: 17, wordBreak: 'break-all' }}>{letterDetail.title}</h3>
                 </div>
-                <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={() => setLetterDetail(null)}>닫기</button>
+                <div className="row" style={{ gap: 8, flexShrink: 0 }}>
+                  {letterBox === 'received' && letterDetail.sender && (
+                    <button type="button" className="ghost" style={{ width: 'auto', padding: '6px 14px', fontSize: 13 }} onClick={onReply}>
+                      ↩ 답장
+                    </button>
+                  )}
+                  <button type="button" className="outline" style={{ width: 'auto' }} onClick={() => setLetterDetail(null)}>닫기</button>
+                </div>
               </div>
             </div>
             <div style={{ padding: '20px 20px 24px' }}>
@@ -1608,18 +1634,22 @@ export default function StudentPage() {
         <div
           role="dialog"
           aria-modal="true"
-          onClick={(e) => { if (e.target === e.currentTarget) { setComposeOpen(false); setComposeError(''); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeCompose(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
           <div style={{ width: 'min(480px, 96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
             <div className="row space-between" style={{ marginBottom: 18 }}>
               <h3 style={{ margin: 0 }}>✉ 편지 쓰기</h3>
-              <button type="button" className="outline" style={{ width: 'auto' }} onClick={() => { setComposeOpen(false); setComposeError(''); }}>닫기</button>
+              <button type="button" className="outline" style={{ width: 'auto' }} onClick={closeCompose}>닫기</button>
             </div>
             <form className="grid" style={{ gap: 12 }} onSubmit={onSendLetter}>
               <div>
                 <label>받는 사람</label>
-                <select name="recipientId" required>
+                <select
+                  required
+                  value={composeRecipientId}
+                  onChange={(e) => setComposeRecipientId(e.target.value)}
+                >
                   <option value="">선택하세요</option>
                   {classmates.map((s) => (
                     <option key={s.id} value={s.id}>{s.student_number}번 {s.name}</option>
@@ -1629,12 +1659,16 @@ export default function StudentPage() {
               </div>
               <div>
                 <label>제목 (50자)</label>
-                <input name="title" maxLength={50} required />
+                <input
+                  maxLength={50}
+                  required
+                  value={composeTitle}
+                  onChange={(e) => setComposeTitle(e.target.value)}
+                />
               </div>
               <div>
                 <label>내용 (1000자)</label>
                 <textarea
-                  name="content"
                   maxLength={1000}
                   required
                   style={{ minHeight: 130, resize: 'vertical' }}

@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     .from('letters')
     .select('id, title, content, is_read, created_at, updated_at, sender_id, recipient_id')
     .eq('class_id', classId)
+    .is('teacher_archived_at', null)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
