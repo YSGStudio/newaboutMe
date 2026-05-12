@@ -100,6 +100,7 @@ export default function TeacherPage() {
   const [letterSaving, setLetterSaving] = useState(false);
   const [letterError, setLetterError] = useState('');
   const [deletingLetterId, setDeletingLetterId] = useState('');
+  const [showAddStudent, setShowAddStudent] = useState(false);
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -611,20 +612,33 @@ export default function TeacherPage() {
 
           {activeTab === 'student' && (
             <section className="card">
-              <h2>학생 관리</h2>
-              <form className="grid" onSubmit={onCreateStudent}>
-                <div>
-                  <label>학생 이름</label>
-                  <input name="name" placeholder="김마음" required />
-                </div>
-                <div>
-                  <label>출석번호</label>
-                  <input name="studentNumber" type="number" min={1} max={99} required />
-                </div>
-                <SubmitButton loading={studentLoading} idleText="학생 추가" disabled={!selectedClassId} />
-              </form>
+              <div className="row space-between" style={{ alignItems: 'center', marginBottom: 16 }}>
+                <h2 style={{ margin: 0 }}>학생 관리</h2>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ fontSize: 13, padding: '4px 12px' }}
+                  onClick={() => setShowAddStudent((v) => !v)}
+                >
+                  {showAddStudent ? '접기 ▲' : '학생 추가 ▼'}
+                </button>
+              </div>
 
-              <div style={{ marginTop: 16 }}>
+              {showAddStudent && (
+                <form className="grid" onSubmit={onCreateStudent} style={{ marginBottom: 16 }}>
+                  <div>
+                    <label>학생 이름</label>
+                    <input name="name" placeholder="김마음" required />
+                  </div>
+                  <div>
+                    <label>출석번호</label>
+                    <input name="studentNumber" type="number" min={1} max={99} required />
+                  </div>
+                  <SubmitButton loading={studentLoading} idleText="학생 추가" disabled={!selectedClassId} />
+                </form>
+              )}
+
+              <div>
                 <h3 style={{ margin: 0 }}>학생 목록</h3>
 
                 {students.length === 0 ? (
