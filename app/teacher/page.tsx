@@ -690,8 +690,14 @@ export default function TeacherPage() {
                 <h2 style={{ margin: 0 }}>학생 관리</h2>
                 <button
                   type="button"
-                  className="outline"
-                  style={{ fontSize: 13, padding: '4px 12px' }}
+                  style={{
+                    width: 'auto', fontSize: 13, fontWeight: 600,
+                    padding: '7px 14px',
+                    background: showAddStudent ? '#ede9fe' : '#6366f1',
+                    color: showAddStudent ? '#6366f1' : '#fff',
+                    border: '1.5px solid #6366f1',
+                    borderRadius: 10, cursor: 'pointer',
+                  }}
                   onClick={() => setShowAddStudent((v) => !v)}
                 >
                   {showAddStudent ? '접기 ▲' : '학생 추가 ▼'}
@@ -699,16 +705,18 @@ export default function TeacherPage() {
               </div>
 
               {showAddStudent && (
-                <form className="grid" onSubmit={onCreateStudent} style={{ marginBottom: 16 }}>
-                  <div>
+                <form onSubmit={onCreateStudent} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 160px' }}>
                     <label>학생 이름</label>
                     <input name="name" placeholder="김마음" required />
                   </div>
-                  <div>
+                  <div style={{ flex: '1 1 80px' }}>
                     <label>출석번호</label>
-                    <input name="studentNumber" type="number" min={1} max={99} required />
+                    <input name="studentNumber" type="number" min={1} max={99} placeholder="1" required />
                   </div>
-                  <SubmitButton loading={studentLoading} idleText="학생 추가" disabled={!selectedClassId} />
+                  <div style={{ flex: '0 0 auto', paddingBottom: 0 }}>
+                    <SubmitButton loading={studentLoading} idleText="+ 추가" disabled={!selectedClassId} style={{ width: 'auto', padding: '10px 20px', whiteSpace: 'nowrap' }} />
+                  </div>
                 </form>
               )}
 

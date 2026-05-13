@@ -1,9 +1,12 @@
+import { CSSProperties } from 'react';
+
 type Props = {
   loading: boolean;
   idleText: string;
   loadingText?: string;
   disabled?: boolean;
   className?: string;
+  style?: CSSProperties;
 };
 
 export default function SubmitButton({
@@ -11,10 +14,11 @@ export default function SubmitButton({
   idleText,
   loadingText = '처리 중...',
   disabled,
-  className
+  className,
+  style,
 }: Props) {
   return (
-    <button type="submit" disabled={loading || disabled} className={className}>
+    <button type="submit" disabled={loading || disabled} className={className} style={style}>
       {loading ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <span style={{
