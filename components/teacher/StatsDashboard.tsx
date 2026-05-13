@@ -275,7 +275,10 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     load();
   }, [activeStudentId, isDetailOpen, period]);
 
+  const isLoading = detailLoading || evalLoading;
+
   const openDetail = (studentId: string) => {
+    if (isLoading) return;
     setActiveStudentId(studentId);
     setIsDetailOpen(true);
   };
@@ -395,7 +398,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       <div className="grid two">
         <div>
           <label>조회 기간</label>
-          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
+          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
@@ -415,6 +418,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
               className="outline"
               style={{ textAlign: 'left', padding: 14, background: '#fff' }}
               onClick={() => openDetail(student.id)}
+              disabled={isLoading}
             >
               <div className="row space-between" style={{ marginBottom: 8 }}>
                 <strong style={{ fontSize: 16 }}>{student.name}</strong>
@@ -433,7 +437,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
           role="dialog"
           aria-modal="true"
           aria-label="AboutMe 보고서"
-          onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}
+          onClick={(e) => { if (e.target === e.currentTarget && !isLoading) closeDetail(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
           <div className="card" style={{ width: 'min(620px, 96vw)', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -449,11 +453,11 @@ export default function StatsDashboard({ classId, students }: { classId: string;
                 </p>
               </div>
               <div className="row" style={{ width: 'auto', flexShrink: 0 }}>
-                <button type="button" className="outline" style={{ width: 'auto' }} onClick={exportSnapshotPdf} disabled={!snapshot}>
+                <button type="button" className="outline" style={{ width: 'auto' }} onClick={exportSnapshotPdf} disabled={!snapshot || isLoading}>
                   PDF
                 </button>
-                <button type="button" className="outline" style={{ width: 'auto' }} onClick={closeDetail}>
-                  닫기
+                <button type="button" className="outline" style={{ width: 'auto' }} onClick={closeDetail} disabled={isLoading}>
+                  {isLoading ? '불러오는 중...' : '닫기'}
                 </button>
               </div>
             </div>
@@ -471,10 +475,17 @@ export default function StatsDashboard({ classId, students }: { classId: string;
             )}
 
             <Notice type="error" message={detailError} />
-            {detailLoading && <Notice type="info" message="데이터를 불러오는 중입니다..." />}
+
+            {isLoading && (
+              <div style={{ padding: '32px 0', textAlign: 'center', color: '#64748b' }}>
+                <div style={{ fontSize: 22, marginBottom: 10 }}>⏳</div>
+                <p style={{ margin: 0, fontSize: 14 }}>데이터를 불러오는 중입니다...</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>잠시만 기다려 주세요.</p>
+              </div>
+            )}
 
             {/* 3섹션 세로 배치 */}
-            {snapshot && (
+            {!isLoading && snapshot && (
               <>
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
