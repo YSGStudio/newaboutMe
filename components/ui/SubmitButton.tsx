@@ -15,7 +15,19 @@ export default function SubmitButton({
 }: Props) {
   return (
     <button type="submit" disabled={loading || disabled} className={className}>
-      {loading ? loadingText : idleText}
+      {loading ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{
+            width: 14, height: 14, borderRadius: '50%',
+            border: '2px solid rgba(255,255,255,0.35)',
+            borderTopColor: '#fff',
+            display: 'inline-block',
+            animation: 'spin 0.7s linear infinite',
+          }} />
+          {loadingText}
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </span>
+      ) : idleText}
     </button>
   );
 }

@@ -543,7 +543,7 @@ export default function TeacherPage() {
                 { key: 'feed', label: '마음피드' },
                 { key: 'eval', label: '평가피드백' },
                 { key: 'letters', label: '클래스메일' },
-                { key: 'stats', label: '통계 대시보드' },
+                { key: 'stats', label: '성장리포트' },
               ]}
               value={activeTab}
               onChange={(key) => {

@@ -9,8 +9,9 @@ type Props = {
 export default function EmptyState({ title, description, action }: Props) {
   return (
     <div className="empty-state">
-      <strong>{title}</strong>
-      <p className="hint">{description}</p>
+      <span style={{ fontSize: 28, display: 'block', marginBottom: 10 }}>✦</span>
+      <strong style={{ fontSize: 15 }}>{title}</strong>
+      <p className="hint" style={{ marginTop: 6, marginBottom: action ? 14 : 0 }}>{description}</p>
       {action}
     </div>
   );

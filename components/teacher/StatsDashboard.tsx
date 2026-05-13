@@ -390,7 +390,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 
   return (
     <section className="card">
-      <h2 style={{ marginTop: 0, marginBottom: 8 }}>통계 대시보드</h2>
+      <h2 style={{ marginTop: 0, marginBottom: 8 }}>성장리포트</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
       </p>
