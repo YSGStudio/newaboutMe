@@ -90,15 +90,15 @@ export default function HomePage() {
         </div>
 
         <h1 style={{
-          fontSize: 'clamp(36px, 7vw, 72px)', fontWeight: 900,
-          color: '#fff', margin: '0 0 8px', lineHeight: 1.15, letterSpacing: '-1px',
-        }}>별빛처럼 빛나는</h1>
-        <h1 style={{
-          fontSize: 'clamp(36px, 7vw, 72px)', fontWeight: 900,
-          background: 'linear-gradient(90deg, #a5b4fc, #fbbf24)',
+          fontSize: 'clamp(48px, 10vw, 96px)', fontWeight: 900,
+          background: 'linear-gradient(90deg, #a5b4fc, #fbbf24, #a5b4fc)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          margin: '0 0 24px', lineHeight: 1.15, letterSpacing: '-1px',
-        }}>나의 기록</h1>
+          margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-2px',
+        }}>별빛로그</h1>
+        <h2 style={{
+          fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 700,
+          color: 'rgba(255,255,255,0.85)', margin: '0 0 24px', lineHeight: 1.3, letterSpacing: '-0.5px',
+        }}>별빛처럼 빛나는 나의 기록</h2>
 
         <p style={{
           fontSize: 'clamp(15px, 2.5vw, 20px)', color: '#c7d2fe',
