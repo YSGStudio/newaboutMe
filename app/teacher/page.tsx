@@ -28,6 +28,7 @@ type ClassItem = {
   grade: number;
   section: number;
   class_code: string;
+  letters_enabled: boolean;
 };
 
 type StudentPlan = {
@@ -88,6 +89,7 @@ export default function TeacherPage() {
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
+  const [togglingLettersClassId, setTogglingLettersClassId] = useState('');
 
   // 클래스메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
@@ -209,6 +211,24 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setArchivingAll(false);
+    }
+  };
+
+  const onToggleLetters = async (classId: string, current: boolean) => {
+    setTogglingLettersClassId(classId);
+    try {
+      await api(`/api/classes/${classId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ letters_enabled: !current }),
+      });
+      setClasses((prev) =>
+        prev.map((c) => (c.id === classId ? { ...c, letters_enabled: !current } : c))
+      );
+    } catch (err) {
+      setAuthError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setTogglingLettersClassId('');
     }
   };
 
@@ -602,6 +622,41 @@ export default function TeacherPage() {
                               {c.grade}학년 {c.section}반
                             </p>
                             <p className="hint">학급코드: {c.class_code}</p>
+                            <div className="row" style={{ marginTop: 4, marginBottom: 4, alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 13, color: '#64748b' }}>클래스메일</span>
+                              <button
+                                type="button"
+                                onClick={() => onToggleLetters(c.id, c.letters_enabled)}
+                                disabled={togglingLettersClassId === c.id}
+                                style={{
+                                  width: 44,
+                                  height: 24,
+                                  borderRadius: 12,
+                                  border: 'none',
+                                  cursor: togglingLettersClassId === c.id ? 'not-allowed' : 'pointer',
+                                  background: c.letters_enabled ? '#16a34a' : '#cbd5e1',
+                                  position: 'relative',
+                                  transition: 'background 0.2s',
+                                  padding: 0,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span style={{
+                                  position: 'absolute',
+                                  top: 3,
+                                  left: c.letters_enabled ? 22 : 3,
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: '50%',
+                                  background: '#fff',
+                                  transition: 'left 0.2s',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                }} />
+                              </button>
+                              <span style={{ fontSize: 12, color: c.letters_enabled ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                                {togglingLettersClassId === c.id ? '변경 중...' : c.letters_enabled ? 'ON' : 'OFF'}
+                              </span>
+                            </div>
                             <div className="row" style={{ marginTop: 8 }}>
                               <button
                                 type="button"

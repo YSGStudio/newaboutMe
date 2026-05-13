@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   const { data: classRow } = await supabaseAdmin
     .from('classes')
-    .select('id,class_name,class_code')
+    .select('id,class_name,class_code,letters_enabled')
     .eq('class_code', classCode)
     .maybeSingle();
 
@@ -44,6 +44,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     student: { id: matchedStudent.id, name: matchedStudent.name, studentNumber: matchedStudent.student_number },
-    class: { id: classRow.id, className: classRow.class_name, classCode: classRow.class_code }
+    class: { id: classRow.id, className: classRow.class_name, classCode: classRow.class_code, lettersEnabled: classRow.letters_enabled }
   });
 }

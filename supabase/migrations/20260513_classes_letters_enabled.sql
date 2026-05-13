@@ -1,0 +1,2 @@
+ALTER TABLE public.classes
+  ADD COLUMN IF NOT EXISTS letters_enabled BOOLEAN NOT NULL DEFAULT true;

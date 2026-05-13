@@ -196,6 +196,7 @@ export default function StudentPage() {
   const [planHistoryMap, setPlanHistoryMap] = useState<Record<string, PlanTitleHistory[]>>({});
   const [openHistoryPlanId, setOpenHistoryPlanId] = useState('');
 
+  const [lettersEnabled, setLettersEnabled] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -298,7 +299,7 @@ export default function StudentPage() {
     try {
       const data = await api<{
         student: { id: string; name: string; studentNumber: number };
-        class: { id: string };
+        class: { id: string; lettersEnabled: boolean };
       }>('/api/auth/student/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -308,6 +309,7 @@ export default function StudentPage() {
       });
 
       setStudentName(data.student.name);
+      setLettersEnabled(data.class.lettersEnabled ?? true);
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
@@ -751,10 +753,10 @@ export default function StudentPage() {
                 { key: 'plan', label: '오늘의 계획' },
                 { key: 'stats', label: '나의 감정통계' },
                 { key: 'eval', label: '평가기록' },
-                {
+                ...(lettersEnabled ? [{
                   key: 'letters',
                   label: `클래스메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
-                },
+                }] : []),
               ]}
               value={activeTab}
               onChange={(key) => {

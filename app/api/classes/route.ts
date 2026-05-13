@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('classes')
-    .select('id,class_name,grade,section,class_code,created_at')
+    .select('id,class_name,grade,section,class_code,letters_enabled,created_at')
     .eq('teacher_id', auth.teacher.id)
     .order('created_at', { ascending: false });
 
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       section: parsed.data.section,
       class_code: classCode
     })
-    .select('id,class_name,grade,section,class_code,created_at')
+    .select('id,class_name,grade,section,class_code,letters_enabled,created_at')
     .single();
 
   if (error?.code === '23505') {
