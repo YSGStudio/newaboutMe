@@ -58,6 +58,15 @@ type ReportDetail = Omit<ReportSummary, 'eval_report_links'> & {
 
 type StudentItem = { id: string; name: string; student_number: number };
 
+type StudentEvalSummary = {
+  studentId: string;
+  name: string;
+  studentNumber: number;
+  reportCount: number;
+  gradeCounts: { high: number; mid: number; low: number };
+  latestReport: { title: string; createdAt: string } | null;
+};
+
 type DraftItem = {
   rubricId: string | null;
   rubricTitleSnapshot: string;
@@ -698,6 +707,9 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 // ── Main: EvalDashboard ───────────────────────────────────────────
 export default function EvalDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
+  const [viewMode, setViewMode] = useState<'overview' | 'detail'>('overview');
+  const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
+  const [summariesLoading, setSummariesLoading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [reports, setReports] = useState<ReportSummary[]>([]);
@@ -725,6 +737,21 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   useEffect(() => {
     api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
   }, []);
+
+  // 전체 현황 요약 로드
+  const loadSummaries = () => {
+    if (!classId) return;
+    setSummariesLoading(true);
+    api<{ summaries: StudentEvalSummary[] }>(`/api/eval/reports/class/summary?classId=${classId}`)
+      .then((d) => setSummaries(d.summaries))
+      .catch(() => {})
+      .finally(() => setSummariesLoading(false));
+  };
+
+  useEffect(() => {
+    if (subTab === 'reports' && viewMode === 'overview') loadSummaries();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, subTab, viewMode]);
 
   // 학생 선택 시 보고서 목록 로드
   useEffect(() => {
@@ -840,6 +867,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       setShowCreateForm(false);
       setShowRubricSelect(false);
       setMsg('평가보고서가 저장되었습니다.');
+      loadSummaries();
       clear();
     } catch (err) { setError((err as Error).message); clear(); }
     finally { setCreateLoading(false); }
@@ -851,6 +879,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     try {
       await api(`/api/eval/reports/${reportId}`, { method: 'DELETE' });
       setReports((prev) => prev.filter((r) => r.id !== reportId));
+      loadSummaries();
       setMsg('삭제되었습니다.'); clear();
     } catch (err) { setError((err as Error).message); clear(); }
     finally { setDeletingId(''); }
@@ -894,6 +923,115 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       {/* ── 평가 작성 탭 ── */}
       {subTab === 'reports' && (
         <>
+        {/* 뷰 모드 토글 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', background: '#f3f0ff', borderRadius: 10, padding: 3, gap: 2 }}>
+            {(['overview', 'detail'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                style={{
+                  width: 'auto', minHeight: 'unset', padding: '6px 16px', fontSize: 13, fontWeight: 600,
+                  borderRadius: 8, border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: viewMode === mode ? '#fff' : 'transparent',
+                  color: viewMode === mode ? '#6366f1' : '#9ca3af',
+                  boxShadow: viewMode === mode ? '0 2px 6px rgba(99,102,241,0.15)' : 'none',
+                }}
+              >
+                {mode === 'overview' ? '전체 현황' : '학생별 작성'}
+              </button>
+            ))}
+          </div>
+          {viewMode === 'overview' && (
+            <button type="button" className="outline" style={{ width: 'auto', padding: '5px 12px', fontSize: 12 }} onClick={loadSummaries}>
+              새로고침
+            </button>
+          )}
+        </div>
+
+        {/* ── 전체 현황 뷰 ── */}
+        {viewMode === 'overview' && (
+          summariesLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: 14 }}>불러오는 중...</p>
+            </div>
+          ) : summaries.length === 0 ? (
+            <EmptyState title="등록된 학생이 없습니다" description="학생을 먼저 등록하면 평가 현황이 표시됩니다." />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+              {summaries.map((s) => {
+                const total = s.gradeCounts.high + s.gradeCounts.mid + s.gradeCounts.low;
+                return (
+                  <article key={s.studentId} style={{
+                    background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 14,
+                    padding: '16px', display: 'flex', flexDirection: 'column', gap: 10,
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.07)',
+                  }}>
+                    {/* 학생명 */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>{s.name}</span>
+                      <span style={{ fontSize: 12, color: '#6366f1', background: '#ede9fe', borderRadius: 999, padding: '2px 9px', fontWeight: 700 }}>
+                        {s.studentNumber}번
+                      </span>
+                    </div>
+
+                    {/* 보고서 수 + 등급 */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', background: '#f1f5f9', borderRadius: 999, padding: '2px 9px' }}>
+                        보고서 {s.reportCount}건
+                      </span>
+                      {total > 0 && (
+                        <>
+                          {s.gradeCounts.high > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 999, padding: '2px 8px' }}>잘함 {s.gradeCounts.high}</span>}
+                          {s.gradeCounts.mid > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#d97706', background: '#fef9c3', borderRadius: 999, padding: '2px 8px' }}>보통 {s.gradeCounts.mid}</span>}
+                          {s.gradeCounts.low > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', borderRadius: 999, padding: '2px 8px' }}>노력 {s.gradeCounts.low}</span>}
+                        </>
+                      )}
+                    </div>
+
+                    {/* 최근 보고서 */}
+                    {s.latestReport ? (
+                      <p style={{ margin: 0, fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        최근: {s.latestReport.title}
+                      </p>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>아직 평가 없음</p>
+                    )}
+
+                    {/* 버튼 */}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                      <button
+                        type="button"
+                        className="ghost"
+                        style={{ flex: 1, padding: '6px 0', fontSize: 12, minHeight: 'unset' }}
+                        onClick={() => {
+                          setSelectedStudentId(s.studentId);
+                          setViewMode('detail');
+                          setLocalFiles([]); setLocalLinks([]); setLocalLinkUrl(''); setLocalLinkLabel('');
+                          if (pinnedRubric) { confirmRubricSelectionWith(pinnedRubric); } else { setShowCreateForm(false); setShowRubricSelect(false); }
+                        }}
+                      >목록 보기</button>
+                      <button
+                        type="button"
+                        style={{ flex: 1, padding: '6px 0', fontSize: 12, minHeight: 'unset' }}
+                        onClick={() => {
+                          setSelectedStudentId(s.studentId);
+                          setViewMode('detail');
+                          setLocalFiles([]); setLocalLinks([]); setLocalLinkUrl(''); setLocalLinkLabel('');
+                          if (pinnedRubric) { confirmRubricSelectionWith(pinnedRubric); } else { setShowRubricSelect(true); setShowCreateForm(false); }
+                        }}
+                      >+ 평가 작성</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )
+        )}
+
+        {/* ── 학생별 작성 뷰 ── */}
+        {viewMode === 'detail' && <>
         {/* 채점기준 고정 패널 */}
         <div style={{ background: pinnedRubric ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${pinnedRubric ? '#86efac' : '#e2e8f0'}`, borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
           {pinnedRubric ? (
@@ -930,25 +1068,32 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
               {rubrics.length === 0 ? (
                 <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {rubrics.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => {
-                        setPinnedRubric(r);
-                        setShowPinPanel(false);
-                        if (showCreateForm) confirmRubricSelectionWith(r);
-                      }}
-                      style={{
-                        background: pinnedRubric?.id === r.id ? '#dcfce7' : '#fff',
-                        border: `1.5px solid ${pinnedRubric?.id === r.id ? '#16a34a' : '#cbd5e1'}`,
-                        borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-                        fontWeight: pinnedRubric?.id === r.id ? 700 : 500,
-                        color: pinnedRubric?.id === r.id ? '#15803d' : '#374151',
-                      }}
-                    >{r.title}</button>
-                  ))}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                  {rubrics.map((r) => {
+                    const isSelected = pinnedRubric?.id === r.id;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          setPinnedRubric(r);
+                          setShowPinPanel(false);
+                          if (showCreateForm) confirmRubricSelectionWith(r);
+                        }}
+                        style={{
+                          background: isSelected ? '#f0fdf4' : '#fff',
+                          border: `1.5px solid ${isSelected ? '#16a34a' : '#e0e7ff'}`,
+                          borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+                          textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4,
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#15803d' : '#1e1b4b' }}>{r.title}</span>
+                        {r.criteria.length > 0 && (
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1022,18 +1167,22 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                     {rubrics.length === 0 ? (
                       <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
                     ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
                         {rubrics.map((r) => (
                           <button
                             key={r.id}
                             type="button"
                             onClick={() => confirmRubricSelectionWith(r)}
                             style={{
-                              background: '#fff', border: '1.5px solid #cbd5e1', borderRadius: 8,
-                              padding: '8px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151',
+                              background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 10,
+                              padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                              display: 'flex', flexDirection: 'column', gap: 4,
                             }}
                           >
-                            {r.title}
+                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1e1b4b' }}>{r.title}</span>
+                            {r.criteria.length > 0 && (
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>
+                            )}
                           </button>
                         ))}
                       </div>
@@ -1182,28 +1331,26 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                       <p style={{ margin: 0, fontSize: 14 }}>아직 작성된 평가가 없습니다</p>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
                       {reports.map((r) => {
                         const grades = [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
                         return (
-                          <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                              <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: 14 }}>{r.title}</p>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                                <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
-                                {grades.map((item, i) => (
-                                  <span key={i} style={{ fontSize: 11, fontWeight: 700, color: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'], background: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'] + '18', borderRadius: 20, padding: '1px 8px' }}>
-                                    {GRADE_LABEL[item.grade as 'high' | 'mid' | 'low']}
-                                  </span>
-                                ))}
-                                {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b' }}>자료 {r.eval_report_images.length}개</span>}
-                                {r.eval_reflections?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 20, padding: '1px 7px' }}>학생확인</span>}
-                                {r.eval_parent_comments?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#9333ea', background: '#faf5ff', borderRadius: 20, padding: '1px 7px' }}>부모확인</span>}
-                              </div>
+                          <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 12, padding: '14px', display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 2px 6px rgba(99,102,241,0.06)' }}>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#1e1b4b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {grades.map((item, i) => (
+                                <span key={i} style={{ fontSize: 11, fontWeight: 700, color: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'], background: GRADE_COLOR[item.grade as 'high' | 'mid' | 'low'] + '18', borderRadius: 20, padding: '2px 8px' }}>
+                                  {GRADE_LABEL[item.grade as 'high' | 'mid' | 'low']}
+                                </span>
+                              ))}
+                              {r.eval_report_images.length > 0 && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '2px 8px' }}>자료 {r.eval_report_images.length}개</span>}
+                              {r.eval_reflections?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 20, padding: '2px 7px' }}>학생확인</span>}
+                              {r.eval_parent_comments?.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#9333ea', background: '#faf5ff', borderRadius: 20, padding: '2px 7px' }}>부모확인</span>}
                             </div>
-                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <button type="button" className="ghost" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => openDetail(r.id)}>상세</button>
-                              <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={() => onDeleteReport(r.id)} disabled={deletingId === r.id}>삭제</button>
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 'auto' }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button type="button" className="ghost" style={{ flex: 1, padding: '5px 0', fontSize: 12, minHeight: 'unset' }} onClick={() => openDetail(r.id)}>상세</button>
+                              <button type="button" className="outline" style={{ flex: 1, padding: '5px 0', fontSize: 12, minHeight: 'unset' }} onClick={() => onDeleteReport(r.id)} disabled={deletingId === r.id}>삭제</button>
                             </div>
                           </article>
                         );
@@ -1215,6 +1362,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
             )}
           </div>
         </div>
+        </>}
         </>
       )}
 
