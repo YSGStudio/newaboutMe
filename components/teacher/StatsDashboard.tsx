@@ -248,6 +248,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
   const [snapshot, setSnapshot] = useState<StudentSnapshot | null>(null);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalLoading, setEvalLoading] = useState(false);
+  const [exportAllLoading, setExportAllLoading] = useState(false);
 
   useEffect(() => {
     if (!isDetailOpen || !activeStudentId) return;
@@ -288,6 +289,112 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     setDetailError('');
     setSnapshot(null);
     setEvalReports([]);
+  };
+
+  const exportAllReportsPdf = async () => {
+    if (students.length === 0 || exportAllLoading) return;
+    setExportAllLoading(true);
+    try {
+      const results = await Promise.all(
+        students.map(async (s) => {
+          const [snap, evalData] = await Promise.all([
+            api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
+            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}`),
+          ]);
+          return { snap, reports: evalData.reports };
+        })
+      );
+
+      const popup = window.open('', '_blank', 'width=860,height=900');
+      if (!popup) {
+        window.alert('팝업이 차단되어 내보내기를 실행할 수 없습니다. 팝업 차단을 해제해주세요.');
+        return;
+      }
+
+      const studentSections = results.map(({ snap, reports }) => {
+        const emotionChartItems = buildEmotionChartItems(snap.emotions.distribution);
+        const planRows = snap.plans.length === 0
+          ? '<tr><td colspan="3">계획 데이터가 없습니다.</td></tr>'
+          : snap.plans.map((p) => `<tr><td>${escapeHtml(p.title)}</td><td>${p.completed}/${p.totalPossible}</td><td>${p.achievementRate}%</td></tr>`).join('');
+        const emotionRows = emotionChartItems.length === 0
+          ? '<tr><td colspan="3">감정 데이터가 없습니다.</td></tr>'
+          : emotionChartItems.map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${item.ratio}%</td></tr>`).join('');
+        const gradeCount = { high: 0, mid: 0, low: 0 };
+        reports.forEach((r) => r.eval_report_items.forEach((item) => {
+          if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
+        }));
+        const evalRows = reports.length === 0
+          ? '<tr><td colspan="3">평가 기록이 없습니다.</td></tr>'
+          : reports.map((r) => {
+              const gc = { high: 0, mid: 0, low: 0 };
+              r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
+              const grades = [gc.high > 0 ? `잘함 ${gc.high}` : '', gc.mid > 0 ? `보통 ${gc.mid}` : '', gc.low > 0 ? `노력 ${gc.low}` : ''].filter(Boolean).join(' / ');
+              return `<tr><td>${escapeHtml(r.title)}</td><td>${grades || '-'}</td><td>${new Date(r.created_at).toLocaleDateString('ko-KR')}</td></tr>`;
+            }).join('');
+
+        return `
+          <div class="student-block">
+            <h1>${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
+            <p class="muted">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
+            <div class="summary">
+              <span class="chip">오늘 실천률 ${snap.today.achievementRate}%</span>
+              <span class="chip">감정 피드 ${snap.emotions.totalFeeds}건</span>
+              <span class="chip">평가 ${reports.length}건</span>
+            </div>
+            <h2>① 계획별 실천률</h2>
+            <table><thead><tr><th>계획</th><th>실천 횟수</th><th>실천률</th></tr></thead><tbody>${planRows}</tbody></table>
+            <h2>② 감정별 퍼센트</h2>
+            <table><thead><tr><th>감정</th><th>건수</th><th>비율</th></tr></thead><tbody>${emotionRows}</tbody></table>
+            <h2>③ 평가 현황</h2>
+            <div class="summary" style="margin-bottom:10px">
+              <span class="chip grade-high">잘함 ${gradeCount.high}</span>
+              <span class="chip grade-mid">보통 ${gradeCount.mid}</span>
+              <span class="chip grade-low">노력 ${gradeCount.low}</span>
+            </div>
+            <table><thead><tr><th>보고서 제목</th><th>등급</th><th>작성일</th></tr></thead><tbody>${evalRows}</tbody></table>
+          </div>`;
+      }).join('');
+
+      const html = `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>AboutMe 전체 리포트</title>
+    <style>
+      body { font-family: 'Pretendard', 'Noto Sans KR', sans-serif; padding: 28px; color: #1f2937; max-width: 700px; margin: 0 auto; }
+      .student-block { page-break-after: always; padding-bottom: 20px; }
+      .student-block:last-child { page-break-after: avoid; }
+      h1 { margin: 0 0 4px; font-size: 20px; }
+      h2 { margin: 20px 0 8px; font-size: 15px; color: #475569; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+      .muted { color: #64748b; margin: 0 0 16px; font-size: 13px; }
+      .summary { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+      .chip { background: #f1f5f9; border-radius: 20px; padding: 4px 14px; font-size: 13px; font-weight: 600; }
+      .grade-high { background: #dcfce7; color: #16a34a; }
+      .grade-mid  { background: #fef9c3; color: #d97706; }
+      .grade-low  { background: #fee2e2; color: #dc2626; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+      th, td { border-bottom: 1px solid #e5e7eb; padding: 7px 6px; text-align: left; font-size: 13px; }
+      th { color: #475569; font-weight: 600; }
+      @media print { body { padding: 0; } }
+    </style>
+  </head>
+  <body>
+    <div style="text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
+      <h1 style="font-size:22px">AboutMe 전체 리포트</h1>
+      <p style="color:#64748b;font-size:13px;margin:4px 0 0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
+    </div>
+    ${studentSections}
+  </body>
+</html>`;
+
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+      popup.focus();
+      setTimeout(() => popup.print(), 400);
+    } finally {
+      setExportAllLoading(false);
+    }
   };
 
   const exportSnapshotPdf = () => {
@@ -390,7 +497,18 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 
   return (
     <section className="card">
-      <h2 style={{ marginTop: 0, marginBottom: 8 }}>성장리포트</h2>
+      <div className="row space-between" style={{ marginBottom: 8, alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ marginTop: 0, marginBottom: 0 }}>성장리포트</h2>
+        <button
+          type="button"
+          className="outline"
+          style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
+          onClick={exportAllReportsPdf}
+          disabled={students.length === 0 || exportAllLoading || isLoading}
+        >
+          {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
+        </button>
+      </div>
       <p className="hint" style={{ marginTop: 0 }}>
         등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
       </p>
@@ -398,7 +516,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       <div className="grid two">
         <div>
           <label>조회 기간</label>
-          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading}>
+          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading || exportAllLoading}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
