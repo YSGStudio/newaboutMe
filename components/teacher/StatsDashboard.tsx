@@ -19,13 +19,6 @@ type EmotionDistributionItem = {
   ratio: number;
 };
 
-type EmotionChartItem = {
-  key: string;
-  label: string;
-  count: number;
-  ratio: number;
-  color: string;
-};
 
 type StudentSnapshot = {
   range: {
@@ -70,8 +63,6 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
   semester: { label: '학기', hint: '최근 120일' }
 };
 
-const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
-const otherEmotionColor = '#94a3b8';
 
 const CATEGORY_META: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
   joy_vitality:     { emoji: '✨', label: '기쁨/활력',   color: '#b45309', bg: '#fef9c3' },
@@ -97,33 +88,6 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
-const buildEmotionChartItems = (distribution: EmotionDistributionItem[]) => {
-  const visibleItems = distribution.filter((item) => item.count > 0);
-  const majorItems = visibleItems.filter((item) => item.ratio >= 5);
-  const minorItems = visibleItems.filter((item) => item.ratio < 5);
-  const minorCount = minorItems.reduce((sum, item) => sum + item.count, 0);
-  const minorRatio = minorItems.reduce((sum, item) => sum + item.ratio, 0);
-
-  const items: EmotionChartItem[] = majorItems.map((item, index) => ({
-    key: item.emotionType,
-    label: `${EMOTION_META[item.emotionType].categoryLabel} / ${EMOTION_META[item.emotionType].label}`,
-    count: item.count,
-    ratio: item.ratio,
-    color: donutColors[index % donutColors.length]
-  }));
-
-  if (minorCount > 0) {
-    items.push({
-      key: 'other',
-      label: '기타',
-      count: minorCount,
-      ratio: minorRatio,
-      color: otherEmotionColor
-    });
-  }
-
-  return items.sort((a, b) => b.ratio - a.ratio);
-};
 
 const PDF_STYLES = `
   * { box-sizing: border-box; }
