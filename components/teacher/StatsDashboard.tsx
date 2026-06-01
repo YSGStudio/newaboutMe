@@ -497,12 +497,12 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
-    <title>AboutMe 전체 리포트</title>
+    <title>별빛로그 전체 리포트</title>
     <style>${PDF_STYLES}</style>
   </head>
   <body>
     <div style="text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
-      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">AboutMe 전체 리포트</h1>
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">별빛로그 전체 리포트</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
     </div>
     ${studentSections}
@@ -532,12 +532,12 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
-    <title>AboutMe 보고서 — ${escapeHtml(snapshot.student.name)}</title>
+    <title>별빛로그 보고서 — ${escapeHtml(snapshot.student.name)}</title>
     <style>${PDF_STYLES}</style>
   </head>
   <body>
     <div style="margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #e5e7eb">
-      <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">AboutMe 보고서</h1>
+      <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">별빛로그 보고서</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${snapshot.student.studentNumber}번 ${escapeHtml(snapshot.student.name)} · ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})</p>
     </div>
     ${buildStudentHtmlBlock(snapshot, evalReports)}
@@ -614,7 +614,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="AboutMe 보고서"
+          aria-label="별빛로그 보고서"
           onClick={(e) => { if (e.target === e.currentTarget && !isLoading) closeDetail(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
@@ -623,7 +623,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
             {/* 헤더 */}
             <div className="row space-between" style={{ alignItems: 'flex-start', gap: 12 }}>
               <div>
-                <h3 style={{ marginTop: 0, marginBottom: 4 }}>AboutMe 보고서</h3>
+                <h3 style={{ marginTop: 0, marginBottom: 4 }}>별빛로그 보고서</h3>
                 <p className="hint" style={{ margin: 0 }}>
                   {snapshot
                     ? `${snapshot.student.studentNumber}번 ${snapshot.student.name} · ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})`
