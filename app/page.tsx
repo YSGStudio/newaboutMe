@@ -240,6 +240,26 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── 에듀집 배너 ── */}
+      <style>{`.edzip-banner:hover { transform: scale(1.02); }`}</style>
+      <section style={{
+        background: '#fff',
+        padding: 'clamp(40px, 6vw, 72px) clamp(16px, 5vw, 64px)',
+        display: 'flex', justifyContent: 'center',
+        borderTop: '1px solid #f1f5f9',
+      }}>
+        <a
+          href="https://edzip.kr/utilization/learning-sw/6a1e7ea65a2ee7c77240336c"
+          target="_blank"
+          rel="noreferrer"
+          className="edzip-banner"
+          style={{ display: 'inline-block', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', transition: 'transform 0.2s' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/edzip.png" alt="에듀집 소개" style={{ display: 'block', maxWidth: '100%', height: 'auto' }} />
+        </a>
+      </section>
+
       {/* ── 푸터 ── */}
       <footer style={{
         background: '#0f0c29', padding: '32px clamp(16px, 5vw, 64px)',
