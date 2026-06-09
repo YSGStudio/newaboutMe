@@ -9,6 +9,7 @@ import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionType } from '@/types/domain';
+import type { AwardedBadge } from '@/lib/badges';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
 type PlanAchievementRow = {
@@ -197,6 +198,10 @@ export default function StudentPage() {
   const [openHistoryPlanId, setOpenHistoryPlanId] = useState('');
 
   const [lettersEnabled, setLettersEnabled] = useState(true);
+  const [studentTitle, setStudentTitle] = useState('별빛 새싹');
+  const [studentBadgeCount, setStudentBadgeCount] = useState(0);
+  const [badgeStats, setBadgeStats] = useState({ emotionCount: 0, perfectPlanDays: 0, reflectionCount: 0, letterSentCount: 0 });
+  const [badgePopupQueue, setBadgePopupQueue] = useState<AwardedBadge[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -313,7 +318,7 @@ export default function StudentPage() {
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats()]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats(), loadBadgeProfile()]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -360,11 +365,12 @@ export default function StudentPage() {
     const before = plans;
     setPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, isCompleted: nextState } : plan)));
     try {
-      await api(`/api/plans/${planId}/check?date=${planDate}`, {
+      const checkData = await api<{ newBadges: AwardedBadge[] }>(`/api/plans/${planId}/check?date=${planDate}`, {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
       await loadPlanAchievements();
+      handleNewBadges(checkData.newBadges ?? []);
     } catch (err) {
       setPlans(before);
       setError((err as Error).message);
@@ -456,6 +462,7 @@ export default function StudentPage() {
           image_url: string | null;
           created_at: string;
         };
+        newBadges: AwardedBadge[];
       }>('/api/feeds', {
         method: 'POST',
         body: JSON.stringify({ emotionType, content })
@@ -463,6 +470,7 @@ export default function StudentPage() {
       formEl.reset();
       setMyFeed(data.feed);
       await loadEmotionStats();
+      handleNewBadges(data.newBadges ?? []);
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -534,7 +542,7 @@ export default function StudentPage() {
     setSendLoading(true);
     setComposeError('');
     try {
-      await api('/api/letters', {
+      const letterData = await api<{ newBadges: AwardedBadge[] }>('/api/letters', {
         method: 'POST',
         body: JSON.stringify({
           recipientId: composeRecipientId,
@@ -543,6 +551,7 @@ export default function StudentPage() {
         }),
       });
       closeCompose();
+      handleNewBadges(letterData.newBadges ?? []);
       setLetterMsg('편지를 보냈습니다.');
       setSentLoaded(false);
       window.setTimeout(() => setLetterMsg(''), 2500);
@@ -609,12 +618,13 @@ export default function StudentPage() {
     setReflectionLoading(true);
     setEvalModalError('');
     try {
-      const d = await api<{ reflection: { id: string; content: string; created_at: string } }>(
+      const d = await api<{ reflection: { id: string; content: string; created_at: string }; newBadges: AwardedBadge[] }>(
         `/api/eval/reports/${evalDetail.id}/reflection`,
         { method: 'POST', body: JSON.stringify({ content: reflectionText.trim() }) }
       );
       setEvalDetail((prev) => prev ? { ...prev, eval_reflections: [d.reflection] } : prev);
       setReflectionText('');
+      handleNewBadges(d.newBadges ?? []);
       setEvalModalMsg('성찰일기를 저장했습니다.');
       clearEvalModalNotice();
     } catch (err) {
@@ -670,8 +680,34 @@ export default function StudentPage() {
     setComposeRecipientId('');
     setComposeTitle('');
     setComposeContent('');
+    setStudentTitle('별빛 새싹');
+    setStudentBadgeCount(0);
+    setBadgePopupQueue([]);
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
+  };
+
+  const loadBadgeProfile = async () => {
+    try {
+      const d = await api<{
+        badgeCount: number;
+        title: string;
+        stats: { emotionCount: number; perfectPlanDays: number; reflectionCount: number; letterSentCount: number };
+      }>('/api/badges/me');
+      setStudentBadgeCount(d.badgeCount);
+      setStudentTitle(d.title);
+      if (d.stats) setBadgeStats(d.stats);
+    } catch {
+      // 무시
+    }
+  };
+
+  const handleNewBadges = (newBadges: AwardedBadge[]) => {
+    if (!newBadges || newBadges.length === 0) return;
+    setBadgePopupQueue((prev) => [...prev, ...newBadges]);
+    setStudentBadgeCount((prev) => prev + newBadges.length);
+    const last = newBadges[newBadges.length - 1];
+    if (last.newTitle) setStudentTitle(last.newTitle);
   };
 
   const onChangeEmotionDate = async (nextDate: string) => {
@@ -712,6 +748,85 @@ export default function StudentPage() {
 
       <Notice type="success" message={message} />
       <Notice type="error" message={error} />
+
+      {/* 뱃지 획득 팝업 */}
+      {badgePopupQueue.length > 0 && (
+        <div
+          onClick={() => setBadgePopupQueue((q) => q.slice(1))}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.45)', cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: 20, padding: '32px 36px',
+            textAlign: 'center', maxWidth: 320, width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            animation: 'badgePopIn 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+          }}>
+            <style>{`@keyframes badgePopIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
+            <div style={{ fontSize: 64, marginBottom: 12 }}>{badgePopupQueue[0].badge.icon}</div>
+            <p style={{ margin: '0 0 4px', fontSize: 13, color: '#6366f1', fontWeight: 700 }}>🎉 새 뱃지 획득!</p>
+            <p style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>{badgePopupQueue[0].badge.name}</p>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748b' }}>{badgePopupQueue[0].badge.condition}</p>
+            {badgePopupQueue[0].newTitle && (
+              <p style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, color: '#f59e0b' }}>
+                ✨ {badgePopupQueue[0].newTitle}가 되었어요!
+              </p>
+            )}
+            <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>탭하여 닫기</p>
+          </div>
+        </div>
+      )}
+
+      {/* 칭호 & 뱃지 프로필 배너 */}
+      {isLoggedIn && (
+        <section style={{
+          background: 'linear-gradient(135deg, #eef2ff, #ede9fe)',
+          borderRadius: 14, padding: '12px 16px',
+          border: '1px solid #e0e7ff',
+          display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto',
+        }}>
+          {/* 칭호 */}
+          <div style={{ flexShrink: 0 }}>
+            <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 칭호</p>
+            <p style={{ margin: '1px 0 0', fontSize: 15, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>{studentTitle}</p>
+          </div>
+
+          <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />
+
+          {/* 통계 칩 4개 */}
+          {[
+            { icon: '💜', label: '감정', value: badgeStats.emotionCount,    unit: '회' },
+            { icon: '✅', label: '계획100%', value: badgeStats.perfectPlanDays, unit: '일' },
+            { icon: '📝', label: '성찰', value: badgeStats.reflectionCount, unit: '회' },
+            { icon: '💌', label: '편지', value: badgeStats.letterSentCount,  unit: '통' },
+          ].map((stat) => (
+            <div key={stat.label} style={{ flexShrink: 0, textAlign: 'center', minWidth: 44 }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: '#6366f1' }}>
+                {stat.icon} {stat.value}<span style={{ fontSize: 10, fontWeight: 500, color: '#94a3b8' }}>{stat.unit}</span>
+              </p>
+              <p style={{ margin: 0, fontSize: 10, color: '#94a3b8' }}>{stat.label}</p>
+            </div>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {/* 뱃지 수 + 버튼 */}
+          <div style={{ flexShrink: 0, textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#6366f1' }}>
+              {studentBadgeCount}<span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>/18</span>
+            </p>
+            <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>뱃지</p>
+          </div>
+          <a href="/student/badges" style={{
+            background: '#6366f1', color: '#fff', borderRadius: 10,
+            padding: '7px 12px', fontSize: 12, fontWeight: 700,
+            textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+          }}>내 뱃지 →</a>
+        </section>
+      )}
 
       {!isLoggedIn && (
         <section className="card">

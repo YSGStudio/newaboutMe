@@ -3,6 +3,7 @@ import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
 import { feedCreateSchema } from '@/lib/validators';
+import { checkAndAwardBadge } from '@/lib/badges';
 
 export async function GET(req: Request) {
   const auth = await requireStudentSession();
@@ -64,5 +65,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ feed: data }, { status: 201 });
+
+  const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'emotion_save');
+  return NextResponse.json({ feed: data, newBadges }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
+import { checkAndAwardBadge } from '@/lib/badges';
 
 type Params = { params: { reportId: string } };
 
@@ -41,5 +42,7 @@ export async function POST(req: Request, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ reflection: data }, { status: 201 });
+
+  const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'reflection_save');
+  return NextResponse.json({ reflection: data, newBadges }, { status: 201 });
 }

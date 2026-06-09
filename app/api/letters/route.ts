@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireStudentSession } from '@/lib/student-session';
+import { checkAndAwardBadge } from '@/lib/badges';
 
 const letterCreateSchema = z.object({
   recipientId: z.string().uuid(),
@@ -48,5 +49,6 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ letter: data }, { status: 201 });
+  const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'mail_send');
+  return NextResponse.json({ letter: data, newBadges }, { status: 201 });
 }

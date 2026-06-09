@@ -3,6 +3,7 @@ import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { planCheckSchema } from '@/lib/validators';
 import { todayDate } from '@/lib/date';
+import { checkAndAwardBadge } from '@/lib/badges';
 
 type Params = { params: { id: string } };
 
@@ -51,5 +52,9 @@ export async function POST(req: Request, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ check: data });
+
+  const newBadges = parsed.data.isCompleted === true
+    ? await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'plan_complete')
+    : [];
+  return NextResponse.json({ check: data, newBadges });
 }
