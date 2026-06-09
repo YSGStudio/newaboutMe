@@ -816,7 +816,7 @@ export default function StudentPage() {
           {/* 뱃지 수 + 버튼 */}
           <div style={{ flexShrink: 0, textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#6366f1' }}>
-              {studentBadgeCount}<span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>/18</span>
+              {studentBadgeCount}<span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>/20</span>
             </p>
             <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>뱃지</p>
           </div>

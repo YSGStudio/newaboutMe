@@ -21,11 +21,13 @@ export const BADGES: BadgeDef[] = [
   { id: 'emotion_100',      name: '감정 박사',    icon: '🎓', category: 'emotion',     categoryColor: '#fbbf24', condition: '감정 기록 누적 100회' },
   { id: 'emotion_7days',    name: '7일의 기록',   icon: '🔥', category: 'emotion',     categoryColor: '#fbbf24', condition: '7일 연속 감정 기록' },
   { id: 'emotion_rainbow',  name: '감정 무지개',  icon: '🌈', category: 'emotion',     categoryColor: '#fbbf24', condition: '6가지 감정 카테고리 모두 기록' },
+  { id: 'emotion_10types',  name: '감정 만물상',  icon: '🎭', category: 'emotion',     categoryColor: '#fbbf24', condition: '10가지 감정 종류 기록' },
   // 계획 관리 (5개)
   { id: 'plan_first',       name: '첫 계획',      icon: '✅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 처음으로 완료' },
   { id: 'plan_perfect_1',   name: '오늘도 실천',  icon: '🌱', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 처음 달성' },
   { id: 'plan_perfect_5',   name: '작은 실천가',  icon: '🏅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 5회' },
-  { id: 'plan_perfect_30',  name: '큰 실천가',    icon: '🏆', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 30회' },
+  { id: 'plan_perfect_30',  name: '큰 실천가',    icon: '🏆', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 30일' },
+  { id: 'plan_check_100',   name: '백일의 기적',  icon: '💯', category: 'plan',        categoryColor: '#22c55e', condition: '모든 계획 체크 누적 100일' },
   { id: 'plan_perfect_day', name: '완벽한 하루',  icon: '🌙', category: 'plan',        categoryColor: '#22c55e', condition: '감정 기록 + 계획 달성률 100%를 같은 날 달성' },
   // 성찰일기 (4개)
   { id: 'reflection_first', name: '첫 성찰',      icon: '📖', category: 'reflection',  categoryColor: '#3b82f6', condition: '성찰일기 첫 작성' },
@@ -41,17 +43,17 @@ export const BADGES: BadgeDef[] = [
 export const BADGE_MAP = Object.fromEntries(BADGES.map((b) => [b.id, b]));
 
 const TRIGGER_BADGE_IDS: Record<BadgeTrigger, string[]> = {
-  emotion_save:    ['emotion_first', 'emotion_10', 'emotion_30', 'emotion_100', 'emotion_7days', 'emotion_rainbow', 'plan_perfect_day'],
-  plan_complete:   ['plan_first', 'plan_perfect_1', 'plan_perfect_5', 'plan_perfect_30', 'plan_perfect_day'],
+  emotion_save:    ['emotion_first', 'emotion_10', 'emotion_30', 'emotion_100', 'emotion_7days', 'emotion_rainbow', 'emotion_10types', 'plan_perfect_day'],
+  plan_complete:   ['plan_first', 'plan_perfect_1', 'plan_perfect_5', 'plan_perfect_30', 'plan_check_100', 'plan_perfect_day'],
   reflection_save: ['reflection_first', 'reflection_5', 'reflection_10', 'reflection_20'],
   mail_send:       ['letter_first', 'letter_10', 'letter_20'],
 };
 
 export function getTitleByBadgeCount(count: number): string {
-  if (count >= 18) return '별빛 전설';
-  if (count >= 12) return '별빛 마스터';
-  if (count >= 7)  return '별빛 기록자';
-  if (count >= 3)  return '별빛 탐험가';
+  if (count >= 20) return '별빛 전설';
+  if (count >= 15) return '별빛 마스터';
+  if (count >= 10) return '별빛 기록자';
+  if (count >= 5)  return '별빛 탐험가';
   return '별빛 새싹';
 }
 
@@ -204,6 +206,15 @@ async function checkCondition(
       const cats = new Set(data.map((r: { emotion_type: string }) => EMOTION_CATEGORY_MAP[r.emotion_type]).filter(Boolean));
       return cats.size >= 6;
     }
+    case 'emotion_10types': {
+      const { data } = await supabase
+        .from('emotion_feeds')
+        .select('emotion_type')
+        .eq('student_id', studentId);
+      if (!data) return false;
+      const types = new Set(data.map((r: { emotion_type: string }) => r.emotion_type));
+      return types.size >= 10;
+    }
 
     // ── 계획 관리 ──────────────────────────────────────────
     case 'plan_first': {
@@ -225,6 +236,10 @@ async function checkCondition(
       const threshold = badgeId === 'plan_perfect_1' ? 1 : badgeId === 'plan_perfect_5' ? 5 : 30;
       const perfectDays = await countPerfectPlanDays(supabase, studentId);
       return perfectDays >= threshold;
+    }
+    case 'plan_check_100': {
+      const checkedDays = await countAllCheckedDays(supabase, studentId);
+      return checkedDays >= 100;
     }
     case 'plan_perfect_day': {
       const today = todayDate();
@@ -317,6 +332,37 @@ export async function countPerfectPlanDays(supabase: SupabaseClient, studentId: 
     if (total > 0 && total === completed) perfectCount += 1;
   }
   return perfectCount;
+}
+
+export async function countAllCheckedDays(supabase: SupabaseClient, studentId: string): Promise<number> {
+  const { data: plans } = await supabase
+    .from('plans')
+    .select('id')
+    .eq('student_id', studentId)
+    .eq('is_active', true);
+
+  if (!plans || plans.length === 0) return 0;
+  const planIds = plans.map((p: { id: string }) => p.id);
+  const totalPlans = planIds.length;
+
+  const { data: checks } = await supabase
+    .from('plan_checks')
+    .select('check_date, plan_id')
+    .in('plan_id', planIds);
+
+  if (!checks || checks.length === 0) return 0;
+
+  const dateMap = new Map<string, Set<string>>();
+  for (const c of checks) {
+    if (!dateMap.has(c.check_date)) dateMap.set(c.check_date, new Set());
+    dateMap.get(c.check_date)!.add(c.plan_id);
+  }
+
+  let count = 0;
+  for (const planSet of dateMap.values()) {
+    if (planSet.size >= totalPlans) count++;
+  }
+  return count;
 }
 
 async function isTodayPerfect(supabase: SupabaseClient, studentId: string): Promise<boolean> {

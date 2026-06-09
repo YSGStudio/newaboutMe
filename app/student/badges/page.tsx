@@ -7,11 +7,11 @@ import { BADGES } from '@/lib/badges';
 type BadgeWithStatus = (typeof BADGES)[number] & { earned: boolean; earnedAt: string | null };
 
 const TITLE_META: Record<string, { color: string; next: string | null; nextThreshold: number }> = {
-  '별빛 새싹':   { color: '#22c55e', next: '별빛 탐험가', nextThreshold: 3 },
-  '별빛 탐험가': { color: '#3b82f6', next: '별빛 기록자', nextThreshold: 7 },
-  '별빛 기록자': { color: '#8b5cf6', next: '별빛 마스터', nextThreshold: 12 },
-  '별빛 마스터': { color: '#f59e0b', next: '별빛 전설',  nextThreshold: 18 },
-  '별빛 전설':   { color: '#ec4899', next: null,        nextThreshold: 18 },
+  '별빛 새싹':   { color: '#22c55e', next: '별빛 탐험가', nextThreshold: 5 },
+  '별빛 탐험가': { color: '#3b82f6', next: '별빛 기록자', nextThreshold: 10 },
+  '별빛 기록자': { color: '#8b5cf6', next: '별빛 마스터', nextThreshold: 15 },
+  '별빛 마스터': { color: '#f59e0b', next: '별빛 전설',  nextThreshold: 20 },
+  '별빛 전설':   { color: '#ec4899', next: null,        nextThreshold: 20 },
 };
 
 type Stats = { emotionCount: number; perfectPlanDays: number; reflectionCount: number; letterSentCount: number };
@@ -40,7 +40,7 @@ export default function BadgesPage() {
 
   const titleMeta = TITLE_META[title] ?? TITLE_META['별빛 새싹'];
   const nextThreshold = titleMeta.nextThreshold;
-  const progressRatio = Math.min(badgeCount / 18, 1);
+  const progressRatio = Math.min(badgeCount / 20, 1);
 
 
   return (
@@ -65,7 +65,7 @@ export default function BadgesPage() {
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 13, color: '#c7d2fe' }}>뱃지 수집 현황</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{badgeCount} / 18개</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{badgeCount} / 20개</span>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, height: 10, overflow: 'hidden' }}>
             <div style={{
