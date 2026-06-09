@@ -90,6 +90,10 @@ export default function TeacherPage() {
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
   const [togglingLettersClassId, setTogglingLettersClassId] = useState('');
+  const [deleteConfirmStudent, setDeleteConfirmStudent] = useState<StudentItem | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePasswordError, setDeletePasswordError] = useState('');
+  const [deletePasswordLoading, setDeletePasswordLoading] = useState(false);
 
   // 클래스메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
@@ -397,17 +401,34 @@ export default function TeacherPage() {
     }
   };
 
-  const onDeleteStudent = async (student: StudentItem) => {
-    const confirmed = window.confirm(
-      `${student.student_number}번 ${student.name} 학생을 삭제할까요?\n감정 피드, 반응, 계획, 체크 기록, 학생 세션도 함께 삭제됩니다.`
-    );
-    if (!confirmed) return;
+  const onDeleteStudent = (student: StudentItem) => {
+    setDeleteConfirmStudent(student);
+    setDeletePassword('');
+    setDeletePasswordError('');
+  };
 
-    setDeletingStudentId(student.id);
-    setAuthError('');
+  const onConfirmDeleteStudent = async () => {
+    if (!deleteConfirmStudent) return;
+    setDeletePasswordError('');
+    setDeletePasswordLoading(true);
 
     try {
-      await api(`/api/students/${student.id}`, { method: 'DELETE' });
+      await api('/api/auth/teacher/verify', {
+        method: 'POST',
+        body: JSON.stringify({ password: deletePassword }),
+      });
+    } catch {
+      setDeletePasswordError('비밀번호가 올바르지 않습니다.');
+      setDeletePasswordLoading(false);
+      return;
+    }
+
+    setDeletingStudentId(deleteConfirmStudent.id);
+    setDeleteConfirmStudent(null);
+    setDeletePassword('');
+
+    try {
+      await api(`/api/students/${deleteConfirmStudent.id}`, { method: 'DELETE' });
       await loadStudents(selectedClassId);
       setAuthMessage('학생이 삭제되었습니다.');
       clearNoticeLater();
@@ -416,6 +437,7 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setDeletingStudentId('');
+      setDeletePasswordLoading(false);
     }
   };
 
@@ -780,7 +802,11 @@ export default function TeacherPage() {
                           <button
                             type="button"
                             className="outline"
-                            style={{ marginTop: 10 }}
+                            style={{
+                              marginTop: 10, fontSize: 12, padding: '4px 10px',
+                              color: '#dc2626', borderColor: '#fca5a5',
+                              alignSelf: 'flex-start',
+                            }}
                             onClick={() => onDeleteStudent(student)}
                             disabled={deletingStudentId === student.id}
                           >
@@ -1025,6 +1051,78 @@ export default function TeacherPage() {
 
           {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
         </>
+      )}
+
+      {/* 학생 삭제 비밀번호 확인 모달 */}
+      {deleteConfirmStudent && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
+                학생 삭제 확인
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                <strong style={{ color: '#dc2626' }}>
+                  {deleteConfirmStudent.student_number}번 {deleteConfirmStudent.name}
+                </strong> 학생을 삭제합니다.<br />
+                감정 피드, 계획, 학생 세션도 함께 삭제되며 복구할 수 없습니다.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+                계속하려면 비밀번호를 입력하세요
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirmDeleteStudent(); }}
+                placeholder="비밀번호"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: deletePasswordError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {deletePasswordError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{deletePasswordError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setDeleteConfirmStudent(null); setDeletePassword(''); setDeletePasswordError(''); }}
+                disabled={deletePasswordLoading}
+                style={{ fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmDeleteStudent}
+                disabled={deletePasswordLoading || !deletePassword}
+                style={{
+                  background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14,
+                  fontWeight: 600, cursor: 'pointer', opacity: (!deletePassword || deletePasswordLoading) ? 0.5 : 1,
+                }}
+              >
+                {deletePasswordLoading ? '확인 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
