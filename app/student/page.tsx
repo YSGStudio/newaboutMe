@@ -789,9 +789,16 @@ export default function StudentPage() {
           display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto',
         }}>
           {/* 칭호 */}
-          <div style={{ flexShrink: 0 }}>
-            <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 칭호</p>
-            <p style={{ margin: '1px 0 0', fontSize: 15, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>{studentTitle}</p>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img
+              src={`/${studentTitle.replace(/ /g, '')}.png`}
+              alt={studentTitle}
+              style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+            />
+            <div>
+              <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 칭호</p>
+              <p style={{ margin: '1px 0 0', fontSize: 15, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>{studentTitle}</p>
+            </div>
           </div>
 
           <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />

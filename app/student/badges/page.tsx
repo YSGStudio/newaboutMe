@@ -6,12 +6,12 @@ import { BADGES } from '@/lib/badges';
 
 type BadgeWithStatus = (typeof BADGES)[number] & { earned: boolean; earnedAt: string | null };
 
-const TITLE_META: Record<string, { color: string; next: string | null; nextThreshold: number }> = {
-  '별빛 새싹':   { color: '#22c55e', next: '별빛 탐험가', nextThreshold: 5 },
-  '별빛 탐험가': { color: '#3b82f6', next: '별빛 기록자', nextThreshold: 10 },
-  '별빛 기록자': { color: '#8b5cf6', next: '별빛 마스터', nextThreshold: 15 },
-  '별빛 마스터': { color: '#f59e0b', next: '별빛 전설',  nextThreshold: 20 },
-  '별빛 전설':   { color: '#ec4899', next: null,        nextThreshold: 20 },
+const TITLE_META: Record<string, { color: string; next: string | null; nextThreshold: number; image: string }> = {
+  '별빛 새싹':   { color: '#22c55e', next: '별빛 탐험가', nextThreshold: 5,  image: '/별빛새싹.png' },
+  '별빛 탐험가': { color: '#3b82f6', next: '별빛 기록자', nextThreshold: 10, image: '/별빛탐험가.png' },
+  '별빛 기록자': { color: '#8b5cf6', next: '별빛 마스터', nextThreshold: 15, image: '/별빛기록자.png' },
+  '별빛 마스터': { color: '#f59e0b', next: '별빛 전설',  nextThreshold: 20, image: '/별빛마스터.png' },
+  '별빛 전설':   { color: '#ec4899', next: null,        nextThreshold: 20, image: '/별빛전설.png' },
 };
 
 type Stats = { emotionCount: number; perfectPlanDays: number; reflectionCount: number; letterSentCount: number };
@@ -58,8 +58,11 @@ export default function BadgesPage() {
         borderRadius: 20, padding: '28px 28px 24px',
         color: '#fff', marginBottom: 24,
       }}>
-        <p style={{ margin: '0 0 4px', fontSize: 13, color: '#a5b4fc' }}>현재 칭호</p>
-        <p style={{ margin: '0 0 20px', fontSize: 28, fontWeight: 900, color: titleMeta.color }}>{title}</p>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a5b4fc' }}>현재 칭호</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+          <img src={titleMeta.image} alt={title} style={{ width: 80, height: 80, borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} />
+          <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: titleMeta.color }}>{title}</p>
+        </div>
 
         {/* 전체 진행 바 */}
         <div style={{ marginBottom: 8 }}>
