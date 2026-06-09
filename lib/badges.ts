@@ -57,13 +57,20 @@ export function getTitleByBadgeCount(count: number): string {
 
 export type AwardedBadge = { badge: BadgeDef; newTitle: string | null };
 
-export async function checkAndAwardBadge(
+// 기존 데이터를 소급 적용: 모든 뱃지 조건을 한 번에 검사
+export async function backfillBadges(
   supabase: SupabaseClient,
   studentId: string,
-  trigger: BadgeTrigger
-): Promise<AwardedBadge[]> {
-  const badgeIds = TRIGGER_BADGE_IDS[trigger];
+): Promise<void> {
+  const allBadgeIds = BADGES.map((b) => b.id);
+  await awardBadgeList(supabase, studentId, allBadgeIds);
+}
 
+async function awardBadgeList(
+  supabase: SupabaseClient,
+  studentId: string,
+  badgeIds: string[],
+): Promise<AwardedBadge[]> {
   // 이미 획득한 뱃지 목록
   const { data: earned } = await supabase
     .from('student_badges')
@@ -88,12 +95,14 @@ export async function checkAndAwardBadge(
     const met = await checkCondition(supabase, studentId, badgeId);
     if (!met) continue;
 
-    // 뱃지 지급
     const { error: insertError } = await supabase
       .from('student_badges')
       .insert({ student_id: studentId, badge_id: badgeId });
 
-    if (insertError) continue;
+    if (insertError) {
+      console.error(`[badges] ${badgeId} insert 실패:`, insertError.message);
+      continue;
+    }
 
     currentCount += 1;
     const newTitle = getTitleByBadgeCount(currentCount);
@@ -111,6 +120,14 @@ export async function checkAndAwardBadge(
   }
 
   return newlyAwarded;
+}
+
+export async function checkAndAwardBadge(
+  supabase: SupabaseClient,
+  studentId: string,
+  trigger: BadgeTrigger
+): Promise<AwardedBadge[]> {
+  return awardBadgeList(supabase, studentId, TRIGGER_BADGE_IDS[trigger]);
 }
 
 async function checkCondition(

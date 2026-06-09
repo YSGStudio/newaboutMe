@@ -1,14 +1,27 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { BADGES } from '@/lib/badges';
-import { countPerfectPlanDays } from '@/lib/badges';
+import { BADGES, backfillBadges, countPerfectPlanDays } from '@/lib/badges';
 
 export async function GET() {
   const auth = await requireStudentSession();
   if ('error' in auth) return auth.error;
 
   const sid = auth.student.id;
+
+  // 기존 데이터 소급 적용: 18개 미만이면 항상 전체 조건 재검사 (이미 획득한 뱃지는 내부에서 skip)
+  const { count: earnedCount, error: countError } = await supabaseAdmin
+    .from('student_badges')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', sid);
+
+  if (countError) {
+    console.error('[badges/me] student_badges 조회 실패 (마이그레이션 미적용 가능성):', countError.message);
+  }
+
+  if ((earnedCount ?? 0) < BADGES.length) {
+    await backfillBadges(supabaseAdmin, sid);
+  }
 
   const [
     earnedRows,

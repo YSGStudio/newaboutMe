@@ -18,6 +18,8 @@ CREATE POLICY "student_badges_select_own" ON student_badges
   FOR SELECT USING (
     student_id IN (
       SELECT student_id FROM student_sessions
-      WHERE session_token = current_setting('request.cookies', true)::json->>'student_session'
+      WHERE token_hash = encode(sha256(
+        (current_setting('request.cookies', true)::json->>'student_session')::bytea
+      ), 'hex')
     )
   );
