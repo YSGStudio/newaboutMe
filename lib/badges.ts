@@ -49,7 +49,14 @@ const TRIGGER_BADGE_IDS: Record<BadgeTrigger, string[]> = {
   mail_send:       ['letter_first', 'letter_10', 'letter_20'],
 };
 
-export function getTitleByBadgeCount(count: number): string {
+export type ClassTitleSetting = { tier: number; name: string; threshold: number };
+
+export function getTitleByBadgeCount(count: number, classTitles?: ClassTitleSetting[]): string {
+  if (classTitles && classTitles.length > 0) {
+    const sorted = [...classTitles].sort((a, b) => b.threshold - a.threshold);
+    const match = sorted.find((s) => count >= s.threshold);
+    return match?.name ?? sorted[sorted.length - 1].name;
+  }
   if (count >= 20) return '별빛 전설';
   if (count >= 15) return '별빛 마스터';
   if (count >= 10) return '별빛 기록자';
@@ -63,15 +70,20 @@ export type AwardedBadge = { badge: BadgeDef; newTitle: string | null };
 export async function backfillBadges(
   supabase: SupabaseClient,
   studentId: string,
+  enabledBadgeIds?: Set<string>,
+  classTitles?: ClassTitleSetting[],
 ): Promise<void> {
-  const allBadgeIds = BADGES.map((b) => b.id);
-  await awardBadgeList(supabase, studentId, allBadgeIds);
+  const allBadgeIds = enabledBadgeIds
+    ? BADGES.filter((b) => enabledBadgeIds.has(b.id)).map((b) => b.id)
+    : BADGES.map((b) => b.id);
+  await awardBadgeList(supabase, studentId, allBadgeIds, classTitles);
 }
 
 async function awardBadgeList(
   supabase: SupabaseClient,
   studentId: string,
   badgeIds: string[],
+  classTitles?: ClassTitleSetting[],
 ): Promise<AwardedBadge[]> {
   // 이미 획득한 뱃지 목록
   const { data: earned } = await supabase
@@ -107,8 +119,8 @@ async function awardBadgeList(
     }
 
     currentCount += 1;
-    const newTitle = getTitleByBadgeCount(currentCount);
-    const prevTitle = getTitleByBadgeCount(currentCount - 1);
+    const newTitle = getTitleByBadgeCount(currentCount, classTitles);
+    const prevTitle = getTitleByBadgeCount(currentCount - 1, classTitles);
 
     await supabase
       .from('students')
@@ -127,9 +139,14 @@ async function awardBadgeList(
 export async function checkAndAwardBadge(
   supabase: SupabaseClient,
   studentId: string,
-  trigger: BadgeTrigger
+  trigger: BadgeTrigger,
+  enabledBadgeIds?: Set<string>,
+  classTitles?: ClassTitleSetting[],
 ): Promise<AwardedBadge[]> {
-  return awardBadgeList(supabase, studentId, TRIGGER_BADGE_IDS[trigger]);
+  const ids = enabledBadgeIds
+    ? TRIGGER_BADGE_IDS[trigger].filter((id) => enabledBadgeIds.has(id))
+    : TRIGGER_BADGE_IDS[trigger];
+  return awardBadgeList(supabase, studentId, ids, classTitles);
 }
 
 async function checkCondition(

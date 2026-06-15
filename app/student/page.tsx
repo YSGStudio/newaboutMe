@@ -77,7 +77,7 @@ type EvalReportSummary = {
   id: string;
   title: string;
   created_at: string;
-  eval_report_items: { id: string; grade: string; sort_order: number; rubric_title_snapshot: string }[];
+  eval_report_items: { id: string; grade: string; sort_order: number; rubric_title_snapshot: string; rubric_subject_snapshot: string | null }[];
   eval_report_images: { id: string; storage_path: string; sort_order: number }[];
   eval_reflections: { id: string }[];
   eval_parent_comments: { id: string }[];
@@ -1454,6 +1454,11 @@ export default function StudentPage() {
                         {/* 카드 하단 내용 */}
                         {!isLoading && (
                           <div style={{ flex: 1, padding: '9px 10px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            {sortedItems[0]?.rubric_subject_snapshot && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '1px 6px', alignSelf: 'flex-start', marginBottom: 4 }}>
+                                {sortedItems[0].rubric_subject_snapshot}
+                              </span>
+                            )}
                             <strong style={{ fontSize: 12, wordBreak: 'keep-all', color: '#0f172a', lineHeight: 1.4 }}>
                               {cardTitle}
                             </strong>

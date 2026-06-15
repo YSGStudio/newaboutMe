@@ -8,6 +8,7 @@ import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
 import EvalDashboard from '@/components/teacher/EvalDashboard';
+import ClassSettings from '@/components/teacher/ClassSettings';
 import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
@@ -73,7 +74,7 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings'>('class');
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -566,10 +567,11 @@ export default function TeacherPage() {
                 { key: 'eval', label: '평가피드백' },
                 { key: 'letters', label: '클래스메일' },
                 { key: 'stats', label: '성장리포트' },
+                { key: 'settings', label: '학급설정' },
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters');
+                setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings');
                 if (key === 'letters' && selectedClassId && !lettersLoaded) {
                   loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
                 }
@@ -1050,6 +1052,16 @@ export default function TeacherPage() {
           )}
 
           {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
+
+          {activeTab === 'settings' && (
+            <section className="card">
+              <div style={{ marginBottom: 20 }}>
+                <h2 style={{ margin: '0 0 4px' }}>학급설정</h2>
+                <p className="hint" style={{ margin: 0 }}>이 학급에서 사용할 뱃지와 칭호를 맞춤 설정합니다.</p>
+              </div>
+              <ClassSettings classId={selectedClassId} />
+            </section>
+          )}
         </>
       )}
 

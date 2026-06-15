@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BADGES } from '@/lib/badges';
 
-type BadgeWithStatus = (typeof BADGES)[number] & { earned: boolean; earnedAt: string | null };
+type BadgeWithStatus = (typeof BADGES)[number] & { earned: boolean; earnedAt: string | null; isEnabled: boolean };
 
 const TITLE_META: Record<string, { color: string; next: string | null; nextThreshold: number; image: string }> = {
   '별빛 새싹':   { color: '#22c55e', next: '별빛 탐험가', nextThreshold: 5,  image: '/별빛새싹.png' },
@@ -38,9 +38,10 @@ export default function BadgesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const titleMeta = TITLE_META[title] ?? TITLE_META['별빛 새싹'];
-  const nextThreshold = titleMeta.nextThreshold;
-  const progressRatio = Math.min(badgeCount / 20, 1);
+  const titleMeta = TITLE_META[title] ?? null;
+  const enabledBadges = badges.filter((b) => b.isEnabled);
+  const totalEnabled = enabledBadges.length || 20;
+  const progressRatio = Math.min(badgeCount / totalEnabled, 1);
 
 
   return (
@@ -60,15 +61,15 @@ export default function BadgesPage() {
       }}>
         <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a5b4fc' }}>현재 칭호</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-          <img src={titleMeta.image} alt={title} style={{ width: 80, height: 80, borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} />
-          <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: titleMeta.color }}>{title}</p>
+          {titleMeta && <img src={titleMeta.image} alt={title} style={{ width: 80, height: 80, borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} />}
+          <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: titleMeta?.color ?? '#a78bfa' }}>{title}</p>
         </div>
 
         {/* 전체 진행 바 */}
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 13, color: '#c7d2fe' }}>뱃지 수집 현황</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{badgeCount} / 20개</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{badgeCount} / {totalEnabled}개</span>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, height: 10, overflow: 'hidden' }}>
             <div style={{
@@ -80,13 +81,13 @@ export default function BadgesPage() {
           </div>
         </div>
 
-        {titleMeta.next && (
+        {titleMeta?.next && (
           <p style={{ margin: '10px 0 0', fontSize: 12, color: '#a5b4fc' }}>
             다음 칭호 <strong style={{ color: '#fbbf24' }}>{titleMeta.next}</strong>까지{' '}
-            {Math.max(0, nextThreshold - badgeCount)}개 더 필요해요
+            {Math.max(0, titleMeta.nextThreshold - badgeCount)}개 더 필요해요
           </p>
         )}
-        {!titleMeta.next && (
+        {titleMeta && !titleMeta.next && (
           <p style={{ margin: '10px 0 0', fontSize: 13, color: '#fbbf24', fontWeight: 700 }}>
             🌈 최고 칭호 달성! 모든 뱃지를 수집했어요!
           </p>
@@ -125,7 +126,7 @@ export default function BadgesPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
           gap: 14,
         }}>
-          {badges.map((badge) => (
+          {enabledBadges.map((badge) => (
             <div
               key={badge.id}
               style={{

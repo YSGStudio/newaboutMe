@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { BADGES, backfillBadges, countPerfectPlanDays } from '@/lib/badges';
+import { BADGES, backfillBadges, countPerfectPlanDays, ClassTitleSetting } from '@/lib/badges';
 
 export async function GET() {
   const auth = await requireStudentSession();
@@ -9,7 +9,35 @@ export async function GET() {
 
   const sid = auth.student.id;
 
-  // 기존 데이터 소급 적용: 18개 미만이면 항상 전체 조건 재검사 (이미 획득한 뱃지는 내부에서 skip)
+  // 학급 설정 조회 (class_badge_settings, class_title_settings)
+  const { data: studentRow0 } = await supabaseAdmin
+    .from('students')
+    .select('class_id')
+    .eq('id', sid)
+    .single();
+
+  const classId: string | null = studentRow0?.class_id ?? null;
+
+  let enabledBadgeIds: Set<string> | undefined;
+  let classTitles: ClassTitleSetting[] | undefined;
+
+  if (classId) {
+    const [{ data: badgeRows }, { data: titleRows }] = await Promise.all([
+      supabaseAdmin.from('class_badge_settings').select('badge_id,is_enabled').eq('class_id', classId),
+      supabaseAdmin.from('class_title_settings').select('tier,name,threshold').eq('class_id', classId).order('tier'),
+    ]);
+
+    if (badgeRows && badgeRows.length > 0) {
+      enabledBadgeIds = new Set(
+        badgeRows.filter((r: { badge_id: string; is_enabled: boolean }) => r.is_enabled).map((r: { badge_id: string }) => r.badge_id)
+      );
+    }
+    if (titleRows && titleRows.length === 5) {
+      classTitles = titleRows as ClassTitleSetting[];
+    }
+  }
+
+  // 소급 적용: 미획득 뱃지가 있으면 전체 조건 재검사
   const { count: earnedCount, error: countError } = await supabaseAdmin
     .from('student_badges')
     .select('id', { count: 'exact', head: true })
@@ -19,8 +47,9 @@ export async function GET() {
     console.error('[badges/me] student_badges 조회 실패 (마이그레이션 미적용 가능성):', countError.message);
   }
 
-  if ((earnedCount ?? 0) < BADGES.length) {
-    await backfillBadges(supabaseAdmin, sid);
+  const totalEnabled = enabledBadgeIds ? enabledBadgeIds.size : BADGES.length;
+  if ((earnedCount ?? 0) < totalEnabled) {
+    await backfillBadges(supabaseAdmin, sid, enabledBadgeIds, classTitles);
   }
 
   const [
@@ -47,6 +76,7 @@ export async function GET() {
     ...b,
     earned: earnedMap.has(b.id),
     earnedAt: earnedMap.get(b.id) ?? null,
+    isEnabled: enabledBadgeIds ? enabledBadgeIds.has(b.id) : true,
   }));
 
   return NextResponse.json({
