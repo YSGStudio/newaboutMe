@@ -736,7 +736,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 // ── Main: EvalDashboard ───────────────────────────────────────────
 export default function EvalDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
-  const [viewMode, setViewMode] = useState<'overview' | 'detail'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric'>('overview');
   const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -759,6 +759,15 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [pinnedRubric, setPinnedRubric] = useState<Rubric | null>(null);
   const [showPinPanel, setShowPinPanel] = useState(false);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+
+  // 성취기준별 작성 모드 상태
+  const [byRubricStep, setByRubricStep] = useState<1 | 2>(1);
+  const [byRubricRubric, setByRubricRubric] = useState<Rubric | null>(null);
+  const [byRubricSubjectFilter, setByRubricSubjectFilter] = useState<string | null>(null);
+  const [byRubricStudentId, setByRubricStudentId] = useState('');
+  const [byRubricDraftItems, setByRubricDraftItems] = useState<DraftItem[]>([]);
+  const [byRubricDone, setByRubricDone] = useState<Set<string>>(new Set());
+  const [byRubricSaving, setByRubricSaving] = useState(false);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
@@ -925,6 +934,96 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     } catch { /* ignore */ }
   };
 
+  // 성취기준별 작성: 루브릭 선택 → Step 2
+  const startByRubricEval = (r: Rubric) => {
+    setByRubricRubric(r);
+    setByRubricStep(2);
+    // 첫 번째 미완료 학생 자동 선택
+    const firstStudentId = students.find((s) => !byRubricDone.has(s.id))?.id ?? students[0]?.id ?? '';
+    setByRubricStudentId(firstStudentId);
+    buildByRubricDraft(r, firstStudentId);
+  };
+
+  const buildByRubricDraft = (r: Rubric, studentId: string) => {
+    if (!studentId) return;
+    const items: DraftItem[] = r.criteria.length > 0
+      ? r.criteria.map((c, i) => ({
+          rubricId: r.id,
+          rubricTitleSnapshot: r.title,
+          rubricSubjectSnapshot: r.subject,
+          rubricGoalSnapshot: r.goal,
+          rubricTaskSnapshot: r.task,
+          criterionTitleSnapshot: c.title,
+          rubricLevelHighSnapshot: c.level_high,
+          rubricLevelMidSnapshot: c.level_mid,
+          rubricLevelLowSnapshot: c.level_low,
+          grade: 'mid' as const,
+          teacherFeedback: '',
+          sortOrder: i,
+        }))
+      : [{
+          rubricId: r.id,
+          rubricTitleSnapshot: r.title,
+          rubricSubjectSnapshot: r.subject,
+          rubricGoalSnapshot: r.goal,
+          rubricTaskSnapshot: r.task,
+          criterionTitleSnapshot: null,
+          rubricLevelHighSnapshot: null,
+          rubricLevelMidSnapshot: null,
+          rubricLevelLowSnapshot: null,
+          grade: 'mid' as const,
+          teacherFeedback: '',
+          sortOrder: 0,
+        }];
+    setByRubricDraftItems(items);
+  };
+
+  const selectByRubricStudent = (studentId: string) => {
+    setByRubricStudentId(studentId);
+    if (byRubricRubric) buildByRubricDraft(byRubricRubric, studentId);
+  };
+
+  const saveByRubricReport = async (andNext: boolean) => {
+    if (!byRubricStudentId || !byRubricRubric) return;
+    setByRubricSaving(true);
+    setError('');
+    try {
+      const autoTitle = byRubricRubric.title;
+      await api<{ report: { id: string } }>('/api/eval/reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          studentId: byRubricStudentId,
+          title: autoTitle,
+          items: byRubricDraftItems.map((item) => ({
+            rubricId: item.rubricId,
+            rubricTitleSnapshot: item.rubricTitleSnapshot,
+            rubricSubjectSnapshot: item.rubricSubjectSnapshot,
+            rubricGoalSnapshot: item.rubricGoalSnapshot,
+            rubricTaskSnapshot: item.rubricTaskSnapshot,
+            rubricLevelHighSnapshot: item.rubricLevelHighSnapshot,
+            rubricLevelMidSnapshot: item.rubricLevelMidSnapshot,
+            rubricLevelLowSnapshot: item.rubricLevelLowSnapshot,
+            criterionTitleSnapshot: item.criterionTitleSnapshot,
+            grade: item.grade,
+            teacherFeedback: item.teacherFeedback || null,
+            sortOrder: item.sortOrder,
+          })),
+        }),
+      });
+      const newDone = new Set(byRubricDone).add(byRubricStudentId);
+      setByRubricDone(newDone);
+      setMsg('저장되었습니다.'); clear();
+      if (andNext) {
+        const nextStudent = students.find((s) => !newDone.has(s.id));
+        if (nextStudent) {
+          setByRubricStudentId(nextStudent.id);
+          buildByRubricDraft(byRubricRubric, nextStudent.id);
+        }
+      }
+    } catch (err) { setError((err as Error).message); clear(); }
+    finally { setByRubricSaving(false); }
+  };
+
   if (!classId) return <EmptyState title="학급을 선택하세요" description="평가피드백은 학급 선택 후 확인할 수 있습니다." />;
 
   return (
@@ -959,11 +1058,23 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
         {/* 뷰 모드 토글 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', background: '#f3f0ff', borderRadius: 10, padding: 3, gap: 2 }}>
-            {(['overview', 'detail'] as const).map((mode) => (
+            {([
+              ['overview', '전체 현황'],
+              ['detail', '학생별 작성'],
+              ['by-rubric', '성취기준별 작성'],
+            ] as const).map(([mode, label]) => (
               <button
                 key={mode}
                 type="button"
-                onClick={() => setViewMode(mode)}
+                onClick={() => {
+                  setViewMode(mode);
+                  if (mode === 'by-rubric') {
+                    setByRubricStep(1);
+                    setByRubricRubric(null);
+                    setByRubricDone(new Set());
+                    setByRubricStudentId('');
+                  }
+                }}
                 style={{
                   width: 'auto', minHeight: 'unset', padding: '6px 16px', fontSize: 13, fontWeight: 600,
                   borderRadius: 8, border: 'none', cursor: 'pointer', transition: 'all 0.15s',
@@ -971,9 +1082,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   color: viewMode === mode ? '#6366f1' : '#9ca3af',
                   boxShadow: viewMode === mode ? '0 2px 6px rgba(99,102,241,0.15)' : 'none',
                 }}
-              >
-                {mode === 'overview' ? '전체 현황' : '학생별 작성'}
-              </button>
+              >{label}</button>
             ))}
           </div>
           {viewMode === 'overview' && (
@@ -1416,6 +1525,184 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           </div>
         </div>
         </>}
+
+        {/* ── 성취기준별 작성 뷰 ── */}
+        {viewMode === 'by-rubric' && (() => {
+          const bySubjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
+          const byFiltered = byRubricSubjectFilter ? rubrics.filter((r) => r.subject === byRubricSubjectFilter) : rubrics;
+
+          if (byRubricStep === 1) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>Step 1 — 성취기준 선택</p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>평가할 채점기준을 선택하면 전체 학생을 순서대로 평가합니다.</p>
+                </div>
+
+                {rubrics.length === 0 ? (
+                  <EmptyState title="채점기준이 없습니다" description="채점기준 관리 탭에서 먼저 채점기준을 등록해주세요." />
+                ) : (
+                  <>
+                    {bySubjects.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {([null, ...bySubjects]).map((s) => (
+                          <button key={s ?? '전체'} type="button" onClick={() => setByRubricSubjectFilter(s)}
+                            style={{ padding: '4px 14px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
+                              background: byRubricSubjectFilter === s ? '#0369a1' : '#e0f2fe',
+                              color: byRubricSubjectFilter === s ? '#fff' : '#0369a1' }}>
+                            {s ?? '전체'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+                      {byFiltered.map((r) => (
+                        <button key={r.id} type="button" onClick={() => startByRubricEval(r)}
+                          style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 12, padding: '14px 16px',
+                            cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: '#1e1b4b' }}>{r.title}</span>
+                            {r.subject && <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px' }}>{r.subject}</span>}
+                          </div>
+                          {r.criteria.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {r.criteria.map((c, i) => (
+                                <span key={i} style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', borderRadius: 6, padding: '2px 8px' }}>{c.title}</span>
+                              ))}
+                            </div>
+                          )}
+                          {r.goal && <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>{r.goal}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          }
+
+          // Step 2: 학생별 순차 평가
+          const byRubricStudent = students.find((s) => s.id === byRubricStudentId);
+          const remainingCount = students.filter((s) => !byRubricDone.has(s.id)).length;
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 헤더 */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: '0 0 2px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+                    Step 2 — 학생별 순차 평가 · 완료 {byRubricDone.size}/{students.length}명
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{byRubricRubric?.title}</p>
+                    {byRubricRubric?.subject && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px' }}>{byRubricRubric.subject}</span>
+                    )}
+                  </div>
+                </div>
+                <button type="button" className="outline" style={{ width: 'auto', padding: '5px 12px', fontSize: 12, flexShrink: 0 }}
+                  onClick={() => { setByRubricStep(1); setByRubricRubric(null); setByRubricDone(new Set()); setByRubricStudentId(''); }}>
+                  ← 기준 재선택
+                </button>
+              </div>
+
+              {remainingCount === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', background: '#f0fdf4', borderRadius: 12, border: '1.5px solid #86efac' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#16a34a' }}>전체 학생 평가 완료!</p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#4ade80' }}>모든 학생의 평가가 저장되었습니다.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
+                  {/* 학생 목록 */}
+                  <div style={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: 2 }}>
+                    <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {students.map((s) => {
+                        const done = byRubricDone.has(s.id);
+                        const selected = byRubricStudentId === s.id;
+                        return (
+                          <button key={s.id} type="button" onClick={() => selectByRubricStudent(s.id)}
+                            style={{
+                              background: selected ? '#eff6ff' : done ? '#f0fdf4' : '#fff',
+                              border: `1.5px solid ${selected ? '#3b82f6' : done ? '#86efac' : '#e2e8f0'}`,
+                              borderRadius: 8, padding: '8px 10px', textAlign: 'left', cursor: 'pointer',
+                              color: selected ? '#1d4ed8' : done ? '#15803d' : '#374151',
+                              fontWeight: selected ? 700 : 400, fontSize: 13,
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
+                            }}>
+                            <span>{s.student_number}번 {s.name}</span>
+                            {done && <span style={{ fontSize: 14 }}>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 평가 폼 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                    {!byRubricStudentId ? (
+                      <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                        <p style={{ margin: 0, fontSize: 14 }}>왼쪽에서 학생을 선택하세요</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{byRubricStudent?.name} 학생</p>
+                          {byRubricDone.has(byRubricStudentId) && (
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: 999, padding: '3px 10px' }}>평가 완료</span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {byRubricDraftItems.map((item, idx) => (
+                            <div key={idx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                              {item.criterionTitleSnapshot && (
+                                <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14 }}>{item.criterionTitleSnapshot}</p>
+                              )}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                                {(['high', 'mid', 'low'] as const).map((g) => {
+                                  const desc = g === 'high' ? item.rubricLevelHighSnapshot : g === 'mid' ? item.rubricLevelMidSnapshot : item.rubricLevelLowSnapshot;
+                                  const selected = item.grade === g;
+                                  return (
+                                    <button key={g} type="button"
+                                      onClick={() => setByRubricDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, grade: g } : d))}
+                                      style={{ padding: '8px 6px', border: `2px solid ${GRADE_COLOR[g]}`,
+                                        borderRadius: 8, background: selected ? GRADE_COLOR[g] + '18' : '#fff',
+                                        cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 3,
+                                        outline: selected ? `2px solid ${GRADE_COLOR[g]}` : 'none' }}>
+                                      <span style={{ fontWeight: 700, fontSize: 13, color: GRADE_COLOR[g] }}>{GRADE_LABEL[g]}</span>
+                                      {desc && <span style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, wordBreak: 'keep-all' }}>{desc}</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <textarea
+                                placeholder="피드백 입력 (선택, 200자)"
+                                maxLength={200}
+                                value={item.teacherFeedback}
+                                onChange={(e) => setByRubricDraftItems((prev) => prev.map((d, i) => i === idx ? { ...d, teacherFeedback: e.target.value } : d))}
+                                style={{ minHeight: 48, resize: 'vertical' }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="button" className="outline" style={{ flex: 1 }} onClick={() => saveByRubricReport(false)} disabled={byRubricSaving}>
+                            {byRubricSaving ? '저장 중...' : '저장'}
+                          </button>
+                          <button type="button" className="ghost" style={{ flex: 2 }} onClick={() => saveByRubricReport(true)} disabled={byRubricSaving}>
+                            {byRubricSaving ? '저장 중...' : '저장 후 다음 학생 →'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         </>
       )}
 
