@@ -15,6 +15,7 @@ type RubricCriterion = {
 type Rubric = {
   id: string;
   title: string;
+  subject: string | null;
   goal: string | null;
   task: string | null;
   criteria: RubricCriterion[];
@@ -70,6 +71,7 @@ type StudentEvalSummary = {
 type DraftItem = {
   rubricId: string | null;
   rubricTitleSnapshot: string;
+  rubricSubjectSnapshot: string | null;
   rubricGoalSnapshot: string | null;
   rubricTaskSnapshot: string | null;
   criterionTitleSnapshot: string | null;
@@ -105,8 +107,8 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
   const [msg, setMsg] = useState('');
   const [editingId, setEditingId] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<{ title: string; goal: string; task: string; criteria: FormCriterion[] }>({
-    title: '', goal: '', task: '', criteria: []
+  const [form, setForm] = useState<{ title: string; subject: string; goal: string; task: string; criteria: FormCriterion[] }>({
+    title: '', subject: '', goal: '', task: '', criteria: []
   });
   const [savingId, setSavingId] = useState('');
 
@@ -116,7 +118,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
     api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
   }, []);
 
-  const resetForm = () => setForm({ title: '', goal: '', task: '', criteria: [] });
+  const resetForm = () => setForm({ title: '', subject: '', goal: '', task: '', criteria: [] });
 
   const addCriterion = () => setForm((prev) => ({
     ...prev,
@@ -141,6 +143,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
     try {
       const body = JSON.stringify({
         title: form.title,
+        subject: form.subject || null,
         goal: form.goal || null,
         task: form.task || null,
         criteria: form.criteria.map((c) => ({
@@ -174,6 +177,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
   const onEdit = (r: Rubric) => {
     setForm({
       title: r.title,
+      subject: r.subject ?? '',
       goal: r.goal ?? '',
       task: r.task ?? '',
       criteria: r.criteria.map((c) => ({
@@ -214,14 +218,32 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
           </div>
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>기준명 <span style={{ color: '#ef4444' }}>*</span></label>
-              <input
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                placeholder="예: 발표하기" required maxLength={100}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>기준명 <span style={{ color: '#ef4444' }}>*</span></label>
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                  placeholder="예: 발표하기" required maxLength={100}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>과목</label>
+                <input
+                  list="subject-list"
+                  value={form.subject}
+                  onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                  placeholder="예: 국어" maxLength={30}
+                  style={{ width: 100 }}
+                />
+                <datalist id="subject-list">
+                  {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
@@ -313,7 +335,14 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
             <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>{r.title}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>{r.title}</p>
+                    {r.subject && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px', flexShrink: 0 }}>
+                        {r.subject}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     {r.goal && <span style={{ fontSize: 12, color: '#64748b' }}><strong>목표</strong> {r.goal}</span>}
                     {r.task && <span style={{ fontSize: 12, color: '#64748b' }}><strong>과제</strong> {r.task}</span>}
@@ -729,6 +758,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [deletingId, setDeletingId] = useState('');
   const [pinnedRubric, setPinnedRubric] = useState<Rubric | null>(null);
   const [showPinPanel, setShowPinPanel] = useState(false);
+  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
@@ -787,6 +817,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       ? r.criteria.map((c, i) => ({
           rubricId: r.id,
           rubricTitleSnapshot: r.title,
+          rubricSubjectSnapshot: r.subject,
           rubricGoalSnapshot: r.goal,
           rubricTaskSnapshot: r.task,
           criterionTitleSnapshot: c.title,
@@ -800,6 +831,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
       : [{
           rubricId: r.id,
           rubricTitleSnapshot: r.title,
+          rubricSubjectSnapshot: r.subject,
           rubricGoalSnapshot: r.goal,
           rubricTaskSnapshot: r.task,
           criterionTitleSnapshot: null,
@@ -830,6 +862,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           items: draftItems.map((item) => ({
             rubricId: item.rubricId,
             rubricTitleSnapshot: item.rubricTitleSnapshot,
+            rubricSubjectSnapshot: item.rubricSubjectSnapshot,
             rubricGoalSnapshot: item.rubricGoalSnapshot,
             rubricTaskSnapshot: item.rubricTaskSnapshot,
             rubricLevelHighSnapshot: item.rubricLevelHighSnapshot,
@@ -1063,41 +1096,49 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
               </div>
             </div>
           )}
-          {showPinPanel && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
-              {rubrics.length === 0 ? (
-                <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-                  {rubrics.map((r) => {
-                    const isSelected = pinnedRubric?.id === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => {
-                          setPinnedRubric(r);
-                          setShowPinPanel(false);
-                          if (showCreateForm) confirmRubricSelectionWith(r);
-                        }}
-                        style={{
-                          background: isSelected ? '#f0fdf4' : '#fff',
-                          border: `1.5px solid ${isSelected ? '#16a34a' : '#e0e7ff'}`,
-                          borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
-                          textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4,
-                        }}
-                      >
-                        <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#15803d' : '#1e1b4b' }}>{r.title}</span>
-                        {r.criteria.length > 0 && (
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {showPinPanel && (() => {
+            const subjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
+            const pinFiltered = subjectFilter ? rubrics.filter((r) => r.subject === subjectFilter) : rubrics;
+            return (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+                {rubrics.length === 0 ? (
+                  <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
+                ) : (
+                  <>
+                    {subjects.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {[null, ...subjects].map((s) => (
+                          <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
+                            style={{ padding: '3px 12px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
+                              background: subjectFilter === s ? '#0369a1' : '#e0f2fe',
+                              color: subjectFilter === s ? '#fff' : '#0369a1' }}>
+                            {s ?? '전체'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                      {pinFiltered.map((r) => {
+                        const isSelected = pinnedRubric?.id === r.id;
+                        return (
+                          <button key={r.id} type="button"
+                            onClick={() => { setPinnedRubric(r); setShowPinPanel(false); if (showCreateForm) confirmRubricSelectionWith(r); }}
+                            style={{ background: isSelected ? '#f0fdf4' : '#fff', border: `1.5px solid ${isSelected ? '#16a34a' : '#e0e7ff'}`,
+                              borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#15803d' : '#1e1b4b' }}>{r.title}</span>
+                              {r.subject && <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '1px 6px' }}>{r.subject}</span>}
+                            </div>
+                            {r.criteria.length > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
@@ -1158,37 +1199,49 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                 </div>
 
                 {/* STEP 1: 채점기준 선택 */}
-                {showRubricSelect && (
-                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>채점기준을 선택하세요</p>
-                      <button type="button" onClick={() => setShowRubricSelect(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 18 }}>×</button>
-                    </div>
-                    {rubrics.length === 0 ? (
-                      <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-                        {rubrics.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => confirmRubricSelectionWith(r)}
-                            style={{
-                              background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 10,
-                              padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
-                              display: 'flex', flexDirection: 'column', gap: 4,
-                            }}
-                          >
-                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1e1b4b' }}>{r.title}</span>
-                            {r.criteria.length > 0 && (
-                              <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>
-                            )}
-                          </button>
-                        ))}
+                {showRubricSelect && (() => {
+                  const subjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
+                  const stepFiltered = subjectFilter ? rubrics.filter((r) => r.subject === subjectFilter) : rubrics;
+                  return (
+                    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>채점기준을 선택하세요</p>
+                        <button type="button" onClick={() => setShowRubricSelect(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 18 }}>×</button>
                       </div>
-                    )}
-                  </div>
-                )}
+                      {rubrics.length === 0 ? (
+                        <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
+                      ) : (
+                        <>
+                          {subjects.length > 0 && (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                              {[null, ...subjects].map((s) => (
+                                <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
+                                  style={{ padding: '3px 12px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
+                                    background: subjectFilter === s ? '#0369a1' : '#e0f2fe',
+                                    color: subjectFilter === s ? '#fff' : '#0369a1' }}>
+                                  {s ?? '전체'}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                            {stepFiltered.map((r) => (
+                              <button key={r.id} type="button" onClick={() => confirmRubricSelectionWith(r)}
+                                style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 10,
+                                  padding: '10px 12px', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: '#1e1b4b' }}>{r.title}</span>
+                                  {r.subject && <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '1px 6px' }}>{r.subject}</span>}
+                                </div>
+                                {r.criteria.length > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* STEP 2: 평가 입력 폼 */}
                 {showCreateForm && (

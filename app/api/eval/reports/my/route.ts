@@ -10,7 +10,7 @@ export async function GET() {
     .from('eval_reports')
     .select(`
       id, title, created_at,
-      eval_report_items(id, grade, sort_order, rubric_title_snapshot),
+      eval_report_items(id, grade, sort_order, rubric_title_snapshot, rubric_subject_snapshot),
       eval_report_images(id, storage_path, sort_order),
       eval_reflections(id),
       eval_parent_comments(id)

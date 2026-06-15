@@ -7,6 +7,7 @@ type Params = { params: { id: string } };
 
 const rubricUpdateSchema = z.object({
   title: z.string().min(1).max(100).optional(),
+  subject: z.string().max(30).nullable().optional(),
   goal: z.string().max(200).nullable().optional(),
   task: z.string().max(200).nullable().optional(),
   criteria: z.array(z.object({
@@ -27,6 +28,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const update: Record<string, unknown> = {};
   if (parsed.data.title !== undefined) update.title = parsed.data.title;
+  if (parsed.data.subject !== undefined) update.subject = parsed.data.subject;
   if (parsed.data.goal !== undefined) update.goal = parsed.data.goal;
   if (parsed.data.task !== undefined) update.task = parsed.data.task;
   if (parsed.data.criteria !== undefined) {
@@ -43,7 +45,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .update(update)
     .eq('id', params.id)
     .eq('teacher_id', auth.teacher.id)
-    .select('id,title,goal,task,criteria,sort_order')
+    .select('id,title,subject,goal,task,criteria,sort_order')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -12,6 +12,7 @@ const criterionSchema = z.object({
 
 const rubricSchema = z.object({
   title: z.string().min(1).max(100),
+  subject: z.string().max(30).optional().nullable(),
   goal: z.string().max(200).optional().nullable(),
   task: z.string().max(200).optional().nullable(),
   criteria: z.array(criterionSchema).default([]),
@@ -23,7 +24,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('eval_rubrics')
-    .select('id,title,goal,task,criteria,sort_order,created_at')
+    .select('id,title,subject,goal,task,criteria,sort_order,created_at')
     .eq('teacher_id', auth.teacher.id)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
@@ -59,12 +60,13 @@ export async function POST(req: Request) {
     .insert({
       teacher_id: auth.teacher.id,
       title: parsed.data.title,
+      subject: parsed.data.subject ?? null,
       goal: parsed.data.goal ?? null,
       task: parsed.data.task ?? null,
       criteria,
       sort_order: (count ?? 0),
     })
-    .select('id,title,goal,task,criteria,sort_order,created_at')
+    .select('id,title,subject,goal,task,criteria,sort_order,created_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
