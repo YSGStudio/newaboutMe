@@ -16,29 +16,6 @@ CREATE TABLE IF NOT EXISTS class_title_settings (
   UNIQUE(class_id, tier)
 );
 
--- RLS 활성화
+-- RLS 활성화 (API는 supabaseAdmin으로 호출하므로 정책 불필요)
 ALTER TABLE class_badge_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_title_settings ENABLE ROW LEVEL SECURITY;
-
--- 교사만 자기 학급 설정 읽기/쓰기
-CREATE POLICY "teacher_class_badge_settings" ON class_badge_settings
-  USING (
-    class_id IN (
-      SELECT id FROM classes WHERE teacher_id = (
-        SELECT id FROM teachers WHERE id = (
-          SELECT teacher_id FROM teacher_sessions WHERE token_hash = current_setting('request.jwt.claims', true)::json->>'token_hash' LIMIT 1
-        )
-      )
-    )
-  );
-
-CREATE POLICY "teacher_class_title_settings" ON class_title_settings
-  USING (
-    class_id IN (
-      SELECT id FROM classes WHERE teacher_id = (
-        SELECT id FROM teachers WHERE id = (
-          SELECT teacher_id FROM teacher_sessions WHERE token_hash = current_setting('request.jwt.claims', true)::json->>'token_hash' LIMIT 1
-        )
-      )
-    )
-  );
