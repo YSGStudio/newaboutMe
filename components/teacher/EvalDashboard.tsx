@@ -756,8 +756,6 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
-  const [pinnedRubric, setPinnedRubric] = useState<Rubric | null>(null);
-  const [showPinPanel, setShowPinPanel] = useState(false);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
 
   // 성취기준별 작성 모드 상태
@@ -808,16 +806,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     setLocalLinks([]);
     setLocalLinkUrl('');
     setLocalLinkLabel('');
-    if (pinnedRubric) {
-      confirmRubricSelectionWith(pinnedRubric);
-    } else {
-      if (!rubrics.length) {
-        const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
-        setRubrics(d.rubrics);
-      }
-      setShowCreateForm(false);
-      setShowRubricSelect(true);
+    if (!rubrics.length) {
+      const d = await api<{ rubrics: Rubric[] }>('/api/eval/rubrics');
+      setRubrics(d.rubrics);
     }
+    setShowCreateForm(false);
+    setShowRubricSelect(true);
   };
 
   // 채점기준 선택 완료 → 평가 입력 폼으로
@@ -1151,7 +1145,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                           setSelectedStudentId(s.studentId);
                           setViewMode('detail');
                           setLocalFiles([]); setLocalLinks([]); setLocalLinkUrl(''); setLocalLinkLabel('');
-                          if (pinnedRubric) { confirmRubricSelectionWith(pinnedRubric); } else { setShowCreateForm(false); setShowRubricSelect(false); }
+                          setShowCreateForm(false); setShowRubricSelect(false);
                         }}
                       >목록 보기</button>
                       <button
@@ -1161,7 +1155,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                           setSelectedStudentId(s.studentId);
                           setViewMode('detail');
                           setLocalFiles([]); setLocalLinks([]); setLocalLinkUrl(''); setLocalLinkLabel('');
-                          if (pinnedRubric) { confirmRubricSelectionWith(pinnedRubric); } else { setShowRubricSelect(true); setShowCreateForm(false); }
+                          setShowRubricSelect(true); setShowCreateForm(false);
                         }}
                       >+ 평가 작성</button>
                     </div>
@@ -1174,82 +1168,6 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
 
         {/* ── 학생별 작성 뷰 ── */}
         {viewMode === 'detail' && <>
-        {/* 채점기준 고정 패널 */}
-        <div style={{ background: pinnedRubric ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${pinnedRubric ? '#86efac' : '#e2e8f0'}`, borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
-          {pinnedRubric ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div>
-                <p style={{ margin: '0 0 1px', fontSize: 12, color: '#16a34a', fontWeight: 600 }}>채점기준 고정됨 — 학생 클릭 시 바로 평가 폼이 열립니다</p>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>{pinnedRubric.title}</p>
-                {pinnedRubric.criteria.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                    {pinnedRubric.criteria.map((c, i) => (
-                      <span key={i} style={{ fontSize: 11, background: '#dcfce7', color: '#166534', borderRadius: 20, padding: '1px 8px' }}>{c.title}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}
-                  onClick={() => setShowPinPanel((v) => !v)}>변경</button>
-                <button type="button" className="outline" style={{ width: 'auto', padding: '4px 10px', fontSize: 12, color: '#94a3b8' }}
-                  onClick={() => { setPinnedRubric(null); setShowPinPanel(false); }}>해제</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>채점기준을 고정하면 학생 클릭 시 바로 평가할 수 있습니다.</p>
-                <button type="button" className="ghost" style={{ width: 'auto', padding: '4px 14px', fontSize: 13 }}
-                  onClick={() => setShowPinPanel((v) => !v)}>채점기준 선택</button>
-              </div>
-            </div>
-          )}
-          {showPinPanel && (() => {
-            const subjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
-            const pinFiltered = subjectFilter ? rubrics.filter((r) => r.subject === subjectFilter) : rubrics;
-            return (
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
-                {rubrics.length === 0 ? (
-                  <p className="hint" style={{ margin: 0, fontSize: 13 }}>채점기준 탭에서 먼저 기준을 등록해주세요.</p>
-                ) : (
-                  <>
-                    {subjects.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                        {[null, ...subjects].map((s) => (
-                          <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
-                            style={{ padding: '3px 12px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
-                              background: subjectFilter === s ? '#0369a1' : '#e0f2fe',
-                              color: subjectFilter === s ? '#fff' : '#0369a1' }}>
-                            {s ?? '전체'}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-                      {pinFiltered.map((r) => {
-                        const isSelected = pinnedRubric?.id === r.id;
-                        return (
-                          <button key={r.id} type="button"
-                            onClick={() => { setPinnedRubric(r); setShowPinPanel(false); if (showCreateForm) confirmRubricSelectionWith(r); }}
-                            style={{ background: isSelected ? '#f0fdf4' : '#fff', border: `1.5px solid ${isSelected ? '#16a34a' : '#e0e7ff'}`,
-                              borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#15803d' : '#1e1b4b' }}>{r.title}</span>
-                              {r.subject && <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '1px 6px' }}>{r.subject}</span>}
-                            </div>
-                            {r.criteria.length > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>항목 {r.criteria.length}개</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
 
           {/* 학생 목록 */}
@@ -1269,12 +1187,8 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                       setLocalLinks([]);
                       setLocalLinkUrl('');
                       setLocalLinkLabel('');
-                      if (pinnedRubric) {
-                        confirmRubricSelectionWith(pinnedRubric);
-                      } else {
-                        setShowCreateForm(false);
-                        setShowRubricSelect(false);
-                      }
+                      setShowCreateForm(false);
+                      setShowRubricSelect(false);
                     }}
                     style={{
                       background: selectedStudentId === s.id ? '#eff6ff' : '#fff',
