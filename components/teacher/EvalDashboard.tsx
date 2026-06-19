@@ -68,6 +68,23 @@ type StudentEvalSummary = {
   latestReport: { title: string; createdAt: string } | null;
 };
 
+type LookupItem = {
+  grade: 'high' | 'mid' | 'low';
+  teacherFeedback: string | null;
+  criterionTitleSnapshot: string | null;
+  sortOrder: number;
+};
+
+type LookupRecord = {
+  studentId: string;
+  name: string;
+  studentNumber: number;
+  reportId: string | null;
+  reportTitle: string | null;
+  createdAt: string | null;
+  items: LookupItem[];
+};
+
 type DraftItem = {
   rubricId: string | null;
   rubricTitleSnapshot: string;
@@ -736,7 +753,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 // ── Main: EvalDashboard ───────────────────────────────────────────
 export default function EvalDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
-  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric' | 'lookup'>('overview');
   const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -757,6 +774,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+
+  // 평가 조회 모드 상태
+  const [lookupRubric, setLookupRubric] = useState<Rubric | null>(null);
+  const [lookupSubjectFilter, setLookupSubjectFilter] = useState<string | null>(null);
+  const [lookupRecords, setLookupRecords] = useState<LookupRecord[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   // 성취기준별 작성 모드 상태
   const [byRubricStep, setByRubricStep] = useState<1 | 2>(1);
@@ -1018,6 +1041,18 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     finally { setByRubricSaving(false); }
   };
 
+  // 평가 조회: 채점기준 선택 → 학생별 성적/피드백 로드
+  const openLookup = async (r: Rubric) => {
+    setLookupRubric(r);
+    setLookupLoading(true);
+    setError('');
+    try {
+      const d = await api<{ records: LookupRecord[] }>(`/api/eval/reports/by-rubric/${r.id}?classId=${classId}`);
+      setLookupRecords(d.records);
+    } catch (err) { setError((err as Error).message); clear(); }
+    finally { setLookupLoading(false); }
+  };
+
   if (!classId) return <EmptyState title="학급을 선택하세요" description="평가피드백은 학급 선택 후 확인할 수 있습니다." />;
 
   return (
@@ -1056,6 +1091,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
               ['overview', '전체 현황'],
               ['detail', '학생별 작성'],
               ['by-rubric', '성취기준별 작성'],
+              ['lookup', '평가 조회'],
             ] as const).map(([mode, label]) => (
               <button
                 key={mode}
@@ -1067,6 +1103,10 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                     setByRubricRubric(null);
                     setByRubricDone(new Set());
                     setByRubricStudentId('');
+                  }
+                  if (mode === 'lookup') {
+                    setLookupRubric(null);
+                    setLookupRecords([]);
                   }
                 }}
                 style={{
@@ -1612,6 +1652,122 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                       </>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── 평가 조회 뷰 ── */}
+        {viewMode === 'lookup' && (() => {
+          const lookupSubjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
+          const lookupFiltered = lookupSubjectFilter ? rubrics.filter((r) => r.subject === lookupSubjectFilter) : rubrics;
+
+          if (!lookupRubric) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>채점기준을 선택하세요</p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>선택한 채점기준으로 평가받은 전체 학생의 성적과 피드백을 한 번에 볼 수 있습니다.</p>
+                </div>
+
+                {rubrics.length === 0 ? (
+                  <EmptyState title="채점기준이 없습니다" description="채점기준 관리 탭에서 먼저 채점기준을 등록해주세요." />
+                ) : (
+                  <>
+                    {lookupSubjects.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {([null, ...lookupSubjects]).map((s) => (
+                          <button key={s ?? '전체'} type="button" onClick={() => setLookupSubjectFilter(s)}
+                            style={{ padding: '4px 14px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
+                              background: lookupSubjectFilter === s ? '#0369a1' : '#e0f2fe',
+                              color: lookupSubjectFilter === s ? '#fff' : '#0369a1' }}>
+                            {s ?? '전체'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+                      {lookupFiltered.map((r) => (
+                        <button key={r.id} type="button" onClick={() => openLookup(r)}
+                          style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 12, padding: '14px 16px',
+                            cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: '#1e1b4b' }}>{r.title}</span>
+                            {r.subject && <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px' }}>{r.subject}</span>}
+                          </div>
+                          {r.criteria.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {r.criteria.map((c, i) => (
+                                <span key={i} style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', borderRadius: 6, padding: '2px 8px' }}>{c.title}</span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: '0 0 2px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>평가 조회 · 총 {lookupRecords.length}명</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{lookupRubric.title}</p>
+                    {lookupRubric.subject && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px' }}>{lookupRubric.subject}</span>
+                    )}
+                  </div>
+                </div>
+                <button type="button" className="outline" style={{ width: 'auto', padding: '5px 12px', fontSize: 12, flexShrink: 0 }}
+                  onClick={() => { setLookupRubric(null); setLookupRecords([]); }}>
+                  ← 기준 재선택
+                </button>
+              </div>
+
+              {lookupLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                  <p style={{ margin: 0, fontSize: 14 }}>불러오는 중...</p>
+                </div>
+              ) : lookupRecords.length === 0 ? (
+                <EmptyState title="등록된 학생이 없습니다" description="학생을 먼저 등록해주세요." />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {lookupRecords.map((rec) => (
+                    <article key={rec.studentId} style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 12, padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: rec.items.length > 0 ? 10 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: '#1e1b4b' }}>{rec.studentNumber}번 {rec.name}</span>
+                          {rec.createdAt && <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(rec.createdAt).toLocaleDateString('ko-KR')}</span>}
+                        </div>
+                        {rec.items.length === 0 && (
+                          <span style={{ fontSize: 12, color: '#cbd5e1' }}>미평가</span>
+                        )}
+                      </div>
+                      {rec.items.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {rec.items.map((item, i) => (
+                            <div key={i} style={{ background: '#f8fafc', border: `1px solid ${GRADE_COLOR[item.grade]}33`, borderRadius: 10, padding: '10px 12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: item.teacherFeedback ? 6 : 0 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{item.criterionTitleSnapshot ?? '전체 평가'}</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: GRADE_COLOR[item.grade], background: GRADE_COLOR[item.grade] + '18', borderRadius: 20, padding: '2px 10px', flexShrink: 0 }}>
+                                  {GRADE_LABEL[item.grade]}
+                                </span>
+                              </div>
+                              {item.teacherFeedback && (
+                                <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{item.teacherFeedback}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  ))}
                 </div>
               )}
             </div>
