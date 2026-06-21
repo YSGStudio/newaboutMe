@@ -20,6 +20,7 @@ type Rubric = {
   task: string | null;
   criteria: RubricCriterion[];
   sort_order: number;
+  link_url: string | null;
 };
 
 type ReportLink = { id: string; url: string; label: string | null; sort_order: number };
@@ -124,8 +125,8 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
   const [msg, setMsg] = useState('');
   const [editingId, setEditingId] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<{ title: string; subject: string; goal: string; task: string; criteria: FormCriterion[] }>({
-    title: '', subject: '', goal: '', task: '', criteria: []
+  const [form, setForm] = useState<{ title: string; subject: string; goal: string; task: string; linkUrl: string; criteria: FormCriterion[] }>({
+    title: '', subject: '', goal: '', task: '', linkUrl: '', criteria: []
   });
   const [savingId, setSavingId] = useState('');
 
@@ -135,7 +136,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
     api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
   }, []);
 
-  const resetForm = () => setForm({ title: '', subject: '', goal: '', task: '', criteria: [] });
+  const resetForm = () => setForm({ title: '', subject: '', goal: '', task: '', linkUrl: '', criteria: [] });
 
   const addCriterion = () => setForm((prev) => ({
     ...prev,
@@ -163,6 +164,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
         subject: form.subject || null,
         goal: form.goal || null,
         task: form.task || null,
+        linkUrl: form.linkUrl || null,
         criteria: form.criteria.map((c) => ({
           title: c.title,
           levelHigh: c.levelHigh || null,
@@ -197,6 +199,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
       subject: r.subject ?? '',
       goal: r.goal ?? '',
       task: r.task ?? '',
+      linkUrl: r.link_url ?? '',
       criteria: r.criteria.map((c) => ({
         title: c.title,
         levelHigh: c.level_high ?? '',
@@ -271,6 +274,16 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
                 <label style={{ fontSize: 13, fontWeight: 600 }}>수행과제</label>
                 <textarea value={form.task} onChange={(e) => setForm((prev) => ({ ...prev, task: e.target.value }))} placeholder="구체적인 평가 과제" maxLength={200} style={{ minHeight: 60, resize: 'vertical' }} />
               </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>참고 링크 (선택)</label>
+              <input
+                value={form.linkUrl}
+                onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                placeholder="예: https://padlet.com/... — 입력하면 학생 평가 작성 시 자동으로 첨부됩니다"
+                maxLength={2000}
+              />
             </div>
           </div>
 
@@ -358,6 +371,11 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px', flexShrink: 0 }}>
                         {r.subject}
                       </span>
+                    )}
+                    {r.link_url && (
+                      <a href={r.link_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f3e8ff', borderRadius: 6, padding: '2px 8px', flexShrink: 0, textDecoration: 'none' }}>
+                        🔗 링크
+                      </a>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -869,6 +887,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           sortOrder: 0,
         }];
     setDraftItems(items);
+    if (r.link_url) setLocalLinks([{ url: r.link_url, label: r.title }]);
     setShowRubricSelect(false);
     setShowCreateForm(true);
   };
@@ -1006,7 +1025,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     setError('');
     try {
       const autoTitle = byRubricRubric.title;
-      await api<{ report: { id: string } }>('/api/eval/reports', {
+      const d = await api<{ report: { id: string } }>('/api/eval/reports', {
         method: 'POST',
         body: JSON.stringify({
           studentId: byRubricStudentId,
@@ -1027,6 +1046,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           })),
         }),
       });
+      if (byRubricRubric.link_url) {
+        await api(`/api/eval/reports/${d.report.id}/links`, {
+          method: 'POST',
+          body: JSON.stringify({ url: byRubricRubric.link_url, label: byRubricRubric.title }),
+        }).catch(() => {});
+      }
       const newDone = new Set(byRubricDone).add(byRubricStudentId);
       setByRubricDone(newDone);
       setMsg('저장되었습니다.'); clear();

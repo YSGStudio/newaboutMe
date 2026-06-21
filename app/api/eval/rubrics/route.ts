@@ -10,12 +10,22 @@ const criterionSchema = z.object({
   levelLow: z.string().max(200).optional().nullable(),
 });
 
+const linkUrlSchema = z.string().max(2000).transform((v) => {
+  const s = v.trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}).refine((v) => {
+  if (!v) return true;
+  try { new URL(v); return true; } catch { return false; }
+}, { message: '올바른 URL을 입력하세요.' });
+
 const rubricSchema = z.object({
   title: z.string().min(1).max(100),
   subject: z.string().max(30).optional().nullable(),
   goal: z.string().max(200).optional().nullable(),
   task: z.string().max(200).optional().nullable(),
   criteria: z.array(criterionSchema).default([]),
+  linkUrl: linkUrlSchema.optional().nullable(),
 });
 
 export async function GET() {
@@ -24,7 +34,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('eval_rubrics')
-    .select('id,title,subject,goal,task,criteria,sort_order,created_at')
+    .select('id,title,subject,goal,task,criteria,sort_order,created_at,link_url')
     .eq('teacher_id', auth.teacher.id)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
@@ -65,8 +75,9 @@ export async function POST(req: Request) {
       task: parsed.data.task ?? null,
       criteria,
       sort_order: (count ?? 0),
+      link_url: parsed.data.linkUrl || null,
     })
-    .select('id,title,subject,goal,task,criteria,sort_order,created_at')
+    .select('id,title,subject,goal,task,criteria,sort_order,created_at,link_url')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -5,6 +5,15 @@ import { z } from 'zod';
 
 type Params = { params: { id: string } };
 
+const linkUrlSchema = z.string().max(2000).transform((v) => {
+  const s = v.trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}).refine((v) => {
+  if (!v) return true;
+  try { new URL(v); return true; } catch { return false; }
+}, { message: '올바른 URL을 입력하세요.' });
+
 const rubricUpdateSchema = z.object({
   title: z.string().min(1).max(100).optional(),
   subject: z.string().max(30).nullable().optional(),
@@ -16,6 +25,7 @@ const rubricUpdateSchema = z.object({
     levelMid: z.string().max(200).nullable().optional(),
     levelLow: z.string().max(200).nullable().optional(),
   })).optional(),
+  linkUrl: linkUrlSchema.nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -39,13 +49,14 @@ export async function PATCH(req: Request, { params }: Params) {
       level_low: c.levelLow ?? null,
     }));
   }
+  if (parsed.data.linkUrl !== undefined) update.link_url = parsed.data.linkUrl || null;
 
   const { data, error } = await supabaseAdmin
     .from('eval_rubrics')
     .update(update)
     .eq('id', params.id)
     .eq('teacher_id', auth.teacher.id)
-    .select('id,title,subject,goal,task,criteria,sort_order')
+    .select('id,title,subject,goal,task,criteria,sort_order,link_url')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
