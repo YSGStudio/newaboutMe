@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getPeriodRange, isPeriod } from '@/lib/stats';
 
 type Params = { params: { studentId: string } };
 
-export async function GET(_: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
@@ -18,12 +19,23 @@ export async function GET(_: Request, { params }: Params) {
     return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
   }
 
-  const { data: reports, error } = await supabaseAdmin
+  // period가 명시된 경우(성장보고서 등)에만 기간 필터를 적용한다.
+  // period가 없으면(예: 평가 작성 탭의 학생별 보고서 목록) 전체 기록을 그대로 반환해 기존 동작을 유지한다.
+  const url = new URL(req.url);
+  const periodParam = url.searchParams.get('period');
+
+  let query = supabaseAdmin
     .from('eval_reports')
     .select('id, title, created_at, eval_report_items(id, grade, sort_order), eval_report_images(id, storage_path, sort_order), eval_report_links(id)')
     .eq('student_id', params.studentId)
-    .eq('teacher_id', auth.teacher.id)
-    .order('created_at', { ascending: false });
+    .eq('teacher_id', auth.teacher.id);
+
+  if (isPeriod(periodParam)) {
+    const range = getPeriodRange(periodParam);
+    query = query.gte('created_at', range.startIso).lte('created_at', range.endIso);
+  }
+
+  const { data: reports, error } = await query.order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!reports || reports.length === 0) return NextResponse.json({ reports: [] });

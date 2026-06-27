@@ -433,7 +433,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       try {
         const [snapshotData, evalData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
-          api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}`),
+          api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`),
         ]);
         setSnapshot(snapshotData);
         setEvalReports(evalData.reports);
@@ -472,7 +472,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
         students.map(async (s) => {
           const [snap, evalData] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}`),
+            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`),
           ]);
           return { snap, reports: evalData.reports };
         })
