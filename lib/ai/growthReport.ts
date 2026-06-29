@@ -9,7 +9,7 @@ import { getOpenAIClient, GROWTH_REPORT_MODEL } from './openaiClient';
 
 export class InsufficientDataError extends Error {
   constructor() {
-    super('분석할 데이터가 충분하지 않습니다. (계획·감정기록·평가보고서가 모두 없음)');
+    super('분석할 데이터가 충분하지 않습니다. (계획·감정기록이 모두 없음)');
     this.name = 'InsufficientDataError';
   }
 }
@@ -18,11 +18,10 @@ export type GrowthReportApiResult = GrowthReportResult & {
   generatedAt: string;
   cached: boolean;
   // 캐시된 응답은 원본 데이터를 다시 조회하지 않으므로 비어있을 수 있음
-  dataSummary?: { planCount: number; emotionCount: number; evalReportCount: number };
+  dataSummary?: { planCount: number; emotionCount: number };
 };
 
 type CachedRow = {
-  subject_reports: GrowthReportResult['subjectReports'];
   plan_analysis: string;
   emotion_insight: string;
   growth_suggestion: string;
@@ -42,7 +41,7 @@ export async function getOrGenerateGrowthReport(
   if (!forceRefresh) {
     const { data: cached } = await supabaseAdmin
       .from('ai_growth_reports')
-      .select('subject_reports, plan_analysis, emotion_insight, growth_suggestion, created_at')
+      .select('plan_analysis, emotion_insight, growth_suggestion, created_at')
       .eq('student_id', studentId)
       .eq('period', period)
       .eq('generated_date', generatedDate)
@@ -53,15 +52,14 @@ export async function getOrGenerateGrowthReport(
     }
   }
 
-  const data = await gatherGrowthReportData(studentId, teacherId, period);
+  const data = await gatherGrowthReportData(studentId, period);
 
   const dataSummary = {
     planCount: data.plans.length,
     emotionCount: data.emotions.length,
-    evalReportCount: data.evalReports.length,
   };
 
-  if (dataSummary.planCount === 0 && dataSummary.emotionCount === 0 && dataSummary.evalReportCount === 0) {
+  if (dataSummary.planCount === 0 && dataSummary.emotionCount === 0) {
     throw new InsufficientDataError();
   }
 
@@ -104,7 +102,6 @@ export async function getOrGenerateGrowthReport(
       teacher_id: teacherId,
       period,
       generated_date: generatedDate,
-      subject_reports: result.subjectReports,
       plan_analysis: result.planAnalysis,
       emotion_insight: result.emotionInsight,
       growth_suggestion: result.growthSuggestion,
@@ -120,7 +117,6 @@ export async function getOrGenerateGrowthReport(
 
 function buildApiResultFromCache(cached: CachedRow): GrowthReportApiResult {
   return {
-    subjectReports: cached.subject_reports,
     planAnalysis: cached.plan_analysis,
     emotionInsight: cached.emotion_insight,
     growthSuggestion: cached.growth_suggestion,

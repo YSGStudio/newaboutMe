@@ -57,10 +57,7 @@ type EvalReportSummary = {
   eval_report_items: { id: string; grade: string }[];
 };
 
-type SubjectReport = { subject: string; content: string };
-
 type GrowthAiResult = {
-  subjectReports: SubjectReport[];
   planAnalysis: string;
   emotionInsight: string;
   growthSuggestion: string;
@@ -265,19 +262,12 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
     return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">AI 분석을 불러올 수 없습니다.</p>`;
   }
 
-  const subjectsHtml = ai.subjectReports.map((sr) => `
-    <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
-      <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#86198f">${escapeHtml(sr.subject)}</p>
-      <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(sr.content)}</p>
-    </div>`).join('');
-
   return `
     <div style="background:#fdf4ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #f0abfc">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
         <span style="font-size:20px">✨</span>
         <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 분석</span>
       </div>
-      ${subjectsHtml}
       <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
         <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#15803d">일일계획 실천 분석</p>
         <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.planAnalysis)}</p>
@@ -498,16 +488,6 @@ function AiGrowthSection({
 
       {result && !loading && (
         <>
-          {result.subjectReports.length > 0 && (
-            <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
-              {result.subjectReports.map((sr, i) => (
-                <div key={i} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px' }}>
-                  <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#86198f' }}>{sr.subject}</p>
-                  <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{sr.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
           <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
             <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#15803d' }}>일일계획 실천 분석</p>
             <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.planAnalysis}</p>
