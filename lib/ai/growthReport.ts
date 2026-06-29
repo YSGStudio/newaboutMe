@@ -23,6 +23,7 @@ export type GrowthReportApiResult = GrowthReportResult & {
 
 type CachedRow = {
   subject_reports: GrowthReportResult['subjectReports'];
+  plan_analysis: string;
   emotion_insight: string;
   growth_suggestion: string;
   created_at: string;
@@ -41,7 +42,7 @@ export async function getOrGenerateGrowthReport(
   if (!forceRefresh) {
     const { data: cached } = await supabaseAdmin
       .from('ai_growth_reports')
-      .select('subject_reports, emotion_insight, growth_suggestion, created_at')
+      .select('subject_reports, plan_analysis, emotion_insight, growth_suggestion, created_at')
       .eq('student_id', studentId)
       .eq('period', period)
       .eq('generated_date', generatedDate)
@@ -104,6 +105,7 @@ export async function getOrGenerateGrowthReport(
       period,
       generated_date: generatedDate,
       subject_reports: result.subjectReports,
+      plan_analysis: result.planAnalysis,
       emotion_insight: result.emotionInsight,
       growth_suggestion: result.growthSuggestion,
     }, { onConflict: 'student_id,period,generated_date' });
@@ -119,6 +121,7 @@ export async function getOrGenerateGrowthReport(
 function buildApiResultFromCache(cached: CachedRow): GrowthReportApiResult {
   return {
     subjectReports: cached.subject_reports,
+    planAnalysis: cached.plan_analysis,
     emotionInsight: cached.emotion_insight,
     growthSuggestion: cached.growth_suggestion,
     generatedAt: cached.created_at,

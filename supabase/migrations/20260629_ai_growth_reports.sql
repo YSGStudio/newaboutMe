@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS ai_growth_reports (
   teacher_id      UUID NOT NULL REFERENCES teacher_profiles(id) ON DELETE CASCADE,
   period          TEXT NOT NULL CHECK (period IN ('week', 'month', 'semester')),
   generated_date  DATE NOT NULL,                  -- 생성 날짜 (캐시 기준, Asia/Seoul)
-  subject_reports JSONB NOT NULL,                 -- [{ subject, content }]
+  subject_reports JSONB NOT NULL,                 -- [{ subject(과목명), content }] — 과목 단위로 통합
+  plan_analysis   TEXT NOT NULL,                  -- 일일계획 실천 패턴 분석
   emotion_insight TEXT NOT NULL,
   growth_suggestion TEXT NOT NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -61,6 +61,7 @@ type SubjectReport = { subject: string; content: string };
 
 type GrowthAiResult = {
   subjectReports: SubjectReport[];
+  planAnalysis: string;
   emotionInsight: string;
   growthSuggestion: string;
   generatedAt: string;
@@ -277,6 +278,10 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
         <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 분석</span>
       </div>
       ${subjectsHtml}
+      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#15803d">일일계획 실천 분석</p>
+        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.planAnalysis)}</p>
+      </div>
       <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
         <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#7c3aed">감정 패턴 인사이트</p>
         <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.emotionInsight)}</p>
@@ -503,6 +508,10 @@ function AiGrowthSection({
               ))}
             </div>
           )}
+          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#15803d' }}>일일계획 실천 분석</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.planAnalysis}</p>
+          </div>
           <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
             <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>감정 패턴 인사이트</p>
             <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.emotionInsight}</p>
