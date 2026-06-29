@@ -10,6 +10,7 @@ const schema = z.object({
     id: z.string().uuid(),
     grade: z.enum(['high', 'mid', 'low']),
     teacherFeedback: z.string().max(200).nullable().optional(),
+    rubricSubjectSnapshot: z.string().max(30).nullable().optional(),
   })).min(1),
 });
 
@@ -31,13 +32,15 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const results = await Promise.all(
-    parsed.data.items.map((item) =>
-      supabaseAdmin
+    parsed.data.items.map((item) => {
+      const update: Record<string, unknown> = { grade: item.grade, teacher_feedback: item.teacherFeedback ?? null };
+      if (item.rubricSubjectSnapshot !== undefined) update.rubric_subject_snapshot = item.rubricSubjectSnapshot;
+      return supabaseAdmin
         .from('eval_report_items')
-        .update({ grade: item.grade, teacher_feedback: item.teacherFeedback ?? null })
+        .update(update)
         .eq('id', item.id)
-        .eq('report_id', params.reportId)
-    )
+        .eq('report_id', params.reportId);
+    })
   );
 
   const failed = results.find((r) => r.error);

@@ -39,6 +39,7 @@ type ReportSummary = {
 type ReportDetailItem = {
   id: string;
   rubric_title_snapshot: string;
+  rubric_subject_snapshot: string | null;
   rubric_goal_snapshot: string | null;
   rubric_task_snapshot: string | null;
   rubric_level_high_snapshot: string | null;
@@ -523,6 +524,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
             id: item.id,
             grade: item.grade,
             teacherFeedback: item.teacher_feedback ?? null,
+            rubricSubjectSnapshot: item.rubric_subject_snapshot ?? null,
           })),
         }),
       });
@@ -556,7 +558,14 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
               <p style={{ margin: '0 0 2px', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
                 {report.students?.name} · {new Date(report.created_at).toLocaleDateString('ko-KR')}
               </p>
-              <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
+                {report.eval_report_items[0]?.rubric_subject_snapshot && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px', flexShrink: 0 }}>
+                    {report.eval_report_items[0].rubric_subject_snapshot}
+                  </span>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {!isEditing ? (
@@ -582,6 +591,24 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
               <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: isEditing ? '#2563eb' : '#374151', letterSpacing: '0.02em' }}>
                 {isEditing ? '평가 수정 중' : '평가 결과'}
               </p>
+              {isEditing && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>과목</label>
+                  <select
+                    value={editItems[0]?.rubric_subject_snapshot ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setEditItems((prev) => prev.map((d) => ({ ...d, rubric_subject_snapshot: value })));
+                    }}
+                    style={{ width: 140 }}
+                  >
+                    <option value="">선택 안 함</option>
+                    {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {sortedItems.map((item, idx) => {
                   if (isEditing) {
