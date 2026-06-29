@@ -253,19 +253,16 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600 }}>과목</label>
-                <input
-                  list="subject-list"
+                <select
                   value={form.subject}
                   onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                  placeholder="예: 국어" maxLength={30}
-                  style={{ width: 100 }}
-                />
-                <datalist id="subject-list">
+                  style={{ width: 110 }}
+                >
+                  <option value="">선택 안 함</option>
                   {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
-                    <option key={s} value={s} />
+                    <option key={s} value={s}>{s}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -1564,12 +1561,20 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                 ) : (
                   <>
                     {bySubjects.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{
+                        display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
+                        overflowX: 'auto', scrollbarWidth: 'thin',
+                      }}>
                         {([null, ...bySubjects]).map((s) => (
                           <button key={s ?? '전체'} type="button" onClick={() => setByRubricSubjectFilter(s)}
-                            style={{ padding: '4px 14px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
-                              background: byRubricSubjectFilter === s ? '#0369a1' : '#e0f2fe',
-                              color: byRubricSubjectFilter === s ? '#fff' : '#0369a1' }}>
+                            style={{
+                              width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
+                              padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              background: byRubricSubjectFilter === s ? '#fff' : 'transparent',
+                              color: byRubricSubjectFilter === s ? '#0369a1' : '#64748b',
+                              boxShadow: byRubricSubjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
+                            }}>
                             {s ?? '전체'}
                           </button>
                         ))}
