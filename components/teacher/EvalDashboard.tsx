@@ -841,6 +841,11 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [byRubricDraftItems, setByRubricDraftItems] = useState<DraftItem[]>([]);
   const [byRubricDone, setByRubricDone] = useState<Set<string>>(new Set());
   const [byRubricSaving, setByRubricSaving] = useState(false);
+  const [byRubricLocalFiles, setByRubricLocalFiles] = useState<{ file: File; previewUrl: string }[]>([]);
+  const [byRubricLocalLinks, setByRubricLocalLinks] = useState<{ url: string; label: string }[]>([]);
+  const [byRubricLocalLinkUrl, setByRubricLocalLinkUrl] = useState('');
+  const [byRubricLocalLinkLabel, setByRubricLocalLinkLabel] = useState('');
+  const byRubricFileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId);
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
@@ -1046,6 +1051,12 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           sortOrder: 0,
         }];
     setByRubricDraftItems(items);
+    // 학생이 바뀌면 이전 학생의 첨부 파일·링크 초기화
+    byRubricLocalFiles.forEach((lf) => URL.revokeObjectURL(lf.previewUrl));
+    setByRubricLocalFiles([]);
+    setByRubricLocalLinks([]);
+    setByRubricLocalLinkUrl('');
+    setByRubricLocalLinkLabel('');
   };
 
   const selectByRubricStudent = (studentId: string) => {
@@ -1080,12 +1091,33 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
           })),
         }),
       });
-      if (byRubricRubric.link_url) {
-        await api(`/api/eval/reports/${d.report.id}/links`, {
-          method: 'POST',
-          body: JSON.stringify({ url: byRubricRubric.link_url, label: byRubricRubric.title }),
-        }).catch(() => {});
-      }
+      // 이미지·링크·채점기준 링크 병렬 저장
+      const reportId = d.report.id;
+      await Promise.all([
+        ...byRubricLocalFiles.map((lf) => {
+          const fd = new FormData();
+          fd.append('file', lf.file);
+          return fetch(`/api/eval/reports/${reportId}/images`, { method: 'POST', body: fd });
+        }),
+        ...byRubricLocalLinks.map((lk) =>
+          fetch(`/api/eval/reports/${reportId}/links`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: lk.url, label: lk.label || null }),
+          })
+        ),
+        ...(byRubricRubric.link_url
+          ? [api(`/api/eval/reports/${reportId}/links`, {
+              method: 'POST',
+              body: JSON.stringify({ url: byRubricRubric.link_url, label: byRubricRubric.title }),
+            }).catch(() => {})]
+          : []),
+      ]);
+      byRubricLocalFiles.forEach((lf) => URL.revokeObjectURL(lf.previewUrl));
+      setByRubricLocalFiles([]);
+      setByRubricLocalLinks([]);
+      setByRubricLocalLinkUrl('');
+      setByRubricLocalLinkLabel('');
       const newDone = new Set(byRubricDone).add(byRubricStudentId);
       setByRubricDone(newDone);
       setMsg('저장되었습니다.'); clear();
@@ -1661,7 +1693,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   </div>
                 </div>
                 <button type="button" className="outline" style={{ width: 'auto', padding: '5px 12px', fontSize: 12, flexShrink: 0 }}
-                  onClick={() => { setByRubricStep(1); setByRubricRubric(null); setByRubricDone(new Set()); setByRubricStudentId(''); }}>
+                  onClick={() => { setByRubricStep(1); setByRubricRubric(null); setByRubricDone(new Set()); setByRubricStudentId(''); byRubricLocalFiles.forEach((lf) => URL.revokeObjectURL(lf.previewUrl)); setByRubricLocalFiles([]); setByRubricLocalLinks([]); setByRubricLocalLinkUrl(''); setByRubricLocalLinkLabel(''); }}>
                   ← 기준 재선택
                 </button>
               </div>
@@ -1745,6 +1777,71 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                               />
                             </div>
                           ))}
+                        </div>
+
+                        {/* 이미지/PDF 첨부 */}
+                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                          <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>평가 자료 (이미지/PDF) ({byRubricLocalFiles.length}/5)</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
+                            {byRubricLocalFiles.map((lf, i) => (
+                              <div key={i} style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
+                                {lf.file.type === 'application/pdf' ? (
+                                  <div style={{ width: 72, height: 72, borderRadius: 8, border: '1px solid #e5e7eb', background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                    <span style={{ fontSize: 24 }}>📄</span>
+                                    <span style={{ fontSize: 9, color: '#64748b' }}>PDF</span>
+                                  </div>
+                                ) : (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={lf.previewUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} draggable={false} />
+                                )}
+                                <button type="button" onClick={() => { URL.revokeObjectURL(lf.previewUrl); setByRubricLocalFiles((prev) => prev.filter((_, j) => j !== i)); }}
+                                  style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 }}>×</button>
+                              </div>
+                            ))}
+                            {byRubricLocalFiles.length < 5 && (
+                              <>
+                                <input ref={byRubricFileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setByRubricLocalFiles((prev) => [...prev, { file, previewUrl: URL.createObjectURL(file) }]);
+                                    if (byRubricFileInputRef.current) byRubricFileInputRef.current.value = '';
+                                  }}
+                                />
+                                <button type="button" className="outline" style={{ width: 72, height: 72, fontSize: 22, color: '#9ca3af', flexShrink: 0 }} onClick={() => byRubricFileInputRef.current?.click()}>+</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 링크 첨부 */}
+                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+                          <p className="hint" style={{ margin: '0 0 8px', fontWeight: 600 }}>웹 링크 ({byRubricLocalLinks.length}/10)</p>
+                          {byRubricLocalLinks.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                              {byRubricLocalLinks.map((lk, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f9ff', borderRadius: 6, padding: '5px 10px' }}>
+                                  <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {lk.label ? <><strong>{lk.label}</strong> — </> : ''}{lk.url}
+                                  </span>
+                                  <button type="button" className="outline" style={{ width: 'auto', padding: '2px 8px', fontSize: 11, flexShrink: 0 }} onClick={() => setByRubricLocalLinks((prev) => prev.filter((_, j) => j !== i))}>삭제</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {byRubricLocalLinks.length < 10 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <input value={byRubricLocalLinkLabel} onChange={(e) => setByRubricLocalLinkLabel(e.target.value)} placeholder="링크 이름 (선택)" maxLength={100} style={{ fontSize: 13 }} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }} />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <input value={byRubricLocalLinkUrl} onChange={(e) => setByRubricLocalLinkUrl(e.target.value)} placeholder="주소 입력 (예: youtube.com/...)" maxLength={2000} style={{ fontSize: 13, flex: 1 }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const u = byRubricLocalLinkUrl.trim(); if (u) { const norm = /^https?:\/\//i.test(u) ? u : `https://${u}`; setByRubricLocalLinks((prev) => [...prev, { url: norm, label: byRubricLocalLinkLabel.trim() }]); setByRubricLocalLinkUrl(''); setByRubricLocalLinkLabel(''); } } }}
+                                />
+                                <button type="button" className="ghost" style={{ width: 'auto', padding: '0 14px', fontSize: 13, flexShrink: 0 }}
+                                  onClick={() => { const u = byRubricLocalLinkUrl.trim(); if (!u) return; const norm = /^https?:\/\//i.test(u) ? u : `https://${u}`; setByRubricLocalLinks((prev) => [...prev, { url: norm, label: byRubricLocalLinkLabel.trim() }]); setByRubricLocalLinkUrl(''); setByRubricLocalLinkLabel(''); }}
+                                  disabled={!byRubricLocalLinkUrl.trim()}>추가</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', gap: 8 }}>
