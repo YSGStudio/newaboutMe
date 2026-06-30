@@ -57,6 +57,8 @@ type EvalReportSummary = {
   eval_report_items: { id: string; grade: string }[];
 };
 
+type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; ai: GrowthAiResult | null };
+
 type GrowthAiResult = {
   planAnalysis: string;
   emotionInsight: string;
@@ -531,6 +533,8 @@ export default function StatsDashboard({ classId, students, className }: { class
   // AI 성장 분석 (학급 전체)
   const [classAiRunning, setClassAiRunning] = useState(false);
   const [classAiProgress, setClassAiProgress] = useState({ done: 0, total: 0 });
+  // 분석 완료 후 PDF 다운로드를 위해 결과를 state에 보관 (popup은 사용자 클릭 시 열어야 차단 안 됨)
+  const [classAiResults, setClassAiResults] = useState<ClassAiResultItem[] | null>(null);
 
   useEffect(() => {
     if (!isDetailOpen || !activeStudentId) return;
@@ -714,26 +718,38 @@ export default function StatsDashboard({ classId, students, className }: { class
           return { snap, reports: evalData.reports, ai: aiByStudent.get(s.id) ?? null };
         })
       );
+      // popup은 비동기 함수 내부에서 열면 브라우저가 차단함.
+      // 결과를 state에 저장하고 사용자가 직접 버튼을 클릭할 때 열도록 분리.
+      setClassAiResults(results);
+    } finally {
+      setClassAiRunning(false);
+      setClassAiProgress({ done: 0, total: 0 });
+    }
+  };
 
-      const popup = window.open('', '_blank', 'width=860,height=900');
-      if (!popup) {
-        window.alert('팝업이 차단되어 내보내기를 실행할 수 없습니다. 팝업 차단을 해제해주세요.');
-        return;
-      }
+  // 사용자 클릭(직접 제스처)으로 호출 — 이래야 popup 차단이 일어나지 않음
+  const downloadClassAiPdf = () => {
+    if (!classAiResults) return;
 
-      const classTitle = className?.trim() || '우리반';
+    const popup = window.open('', '_blank', 'width=860,height=900');
+    if (!popup) {
+      window.alert('팝업이 차단되어 PDF를 열 수 없습니다. 팝업 차단을 해제한 뒤 다시 눌러주세요.');
+      return;
+    }
 
-      const studentSections = results.map(({ snap, reports, ai }) => `
-        <div class="student-block">
-          <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
-            <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
-            <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
-          </div>
-          ${buildStudentHtmlBlock(snap, reports)}
-          ${buildAiSectionHtml(ai)}
-        </div>`).join('');
+    const classTitle = className?.trim() || '우리반';
 
-      const html = `<!doctype html>
+    const studentSections = classAiResults.map(({ snap, reports, ai }) => `
+      <div class="student-block">
+        <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
+          <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
+          <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
+        </div>
+        ${buildStudentHtmlBlock(snap, reports)}
+        ${buildAiSectionHtml(ai)}
+      </div>`).join('');
+
+    const html = `<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
@@ -749,15 +765,12 @@ export default function StatsDashboard({ classId, students, className }: { class
   </body>
 </html>`;
 
-      popup.document.open();
-      popup.document.write(html);
-      popup.document.close();
-      popup.focus();
-      setTimeout(() => popup.print(), 400);
-    } finally {
-      setClassAiRunning(false);
-      setClassAiProgress({ done: 0, total: 0 });
-    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    // 인쇄 창에서 PDF로 저장하면 학생별 페이지 분리(page-break-after:always)가 적용됨
+    setTimeout(() => popup.print(), 400);
   };
 
   if (!classId) {
@@ -787,6 +800,16 @@ export default function StatsDashboard({ classId, students, className }: { class
           >
             {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
           </button>
+          {classAiResults && !classAiRunning && (
+            <button
+              type="button"
+              className="outline"
+              style={{ width: 'auto', fontSize: 13, padding: '6px 14px', color: '#2563eb', borderColor: '#2563eb' }}
+              onClick={downloadClassAiPdf}
+            >
+              📥 PDF 다운로드
+            </button>
+          )}
         </div>
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
@@ -796,7 +819,7 @@ export default function StatsDashboard({ classId, students, className }: { class
       <div className="grid two">
         <div>
           <label>조회 기간</label>
-          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading || exportAllLoading || classAiRunning}>
+          <select value={period} onChange={(e) => { setPeriod(e.target.value as Period); setClassAiResults(null); }} disabled={isLoading || exportAllLoading || classAiRunning}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
