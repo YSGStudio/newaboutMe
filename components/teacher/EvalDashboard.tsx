@@ -1366,12 +1366,20 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                       ) : (
                         <>
                           {subjects.length > 0 && (
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                            <div style={{
+                              display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
+                              overflowX: 'auto', scrollbarWidth: 'thin', marginBottom: 10,
+                            }}>
                               {[null, ...subjects].map((s) => (
                                 <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
-                                  style={{ padding: '3px 12px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
-                                    background: subjectFilter === s ? '#0369a1' : '#e0f2fe',
-                                    color: subjectFilter === s ? '#fff' : '#0369a1' }}>
+                                  style={{
+                                    width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
+                                    padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                    background: subjectFilter === s ? '#fff' : 'transparent',
+                                    color: subjectFilter === s ? '#0369a1' : '#64748b',
+                                    boxShadow: subjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
+                                  }}>
                                   {s ?? '전체'}
                                 </button>
                               ))}
