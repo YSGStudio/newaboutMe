@@ -57,6 +57,14 @@ type EvalReportSummary = {
   eval_report_items: { id: string; grade: string }[];
 };
 
+type GrowthAiResult = {
+  planAnalysis: string;
+  emotionInsight: string;
+  growthSuggestion: string;
+  generatedAt: string;
+  cached: boolean;
+};
+
 const periodMeta: Record<Period, { label: string; hint: string }> = {
   week: { label: '주간', hint: '최근 7일' },
   month: { label: '월간', hint: '최근 30일' },
@@ -75,6 +83,13 @@ const CATEGORY_META: Record<string, { emoji: string; label: string; color: strin
 
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
+  return json;
+};
+
+const apiPost = async <T,>(url: string, body: unknown): Promise<T> => {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
   return json;
@@ -239,6 +254,33 @@ const buildStudentHtmlBlock = (
         ${gradeCardsHtml}
       </div>
       ${reportsHtml}
+    </div>`;
+};
+
+const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
+  if (!ai) {
+    return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">AI 분석을 불러올 수 없습니다.</p>`;
+  }
+
+  return `
+    <div style="background:#fdf4ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #f0abfc">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:20px">✨</span>
+        <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 분석</span>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#15803d">일일계획 실천 분석</p>
+        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.planAnalysis)}</p>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#7c3aed">감정 패턴 인사이트</p>
+        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.emotionInsight)}</p>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#0369a1">맞춤 성장 제언</p>
+        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.growthSuggestion)}</p>
+      </div>
+      <p style="margin:0;font-size:11px;color:#9333ea;text-align:center">⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.</p>
     </div>`;
 };
 
@@ -412,7 +454,65 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
   );
 }
 
-export default function StatsDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
+function AiGrowthSection({
+  result, loading, error, onAnalyze,
+}: {
+  result: GrowthAiResult | null;
+  loading: boolean;
+  error: string;
+  onAnalyze: (forceRefresh: boolean) => void;
+}) {
+  return (
+    <div style={{ background: '#fdf4ff', borderRadius: 18, padding: '18px 18px 14px', border: '1px solid #f0abfc' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 20 }}>✨</span>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#86198f' }}>AI 성장 분석</h3>
+        {result?.cached && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a21caf', background: '#fae8ff', borderRadius: 20, padding: '2px 8px' }}>캐시됨</span>
+        )}
+      </div>
+
+      {!result && !loading && (
+        <button type="button" className="ghost" style={{ width: '100%' }} onClick={() => onAnalyze(false)}>
+          ✨ 분석하기
+        </button>
+      )}
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: '#86198f' }}>
+          <p style={{ margin: 0, fontSize: 13 }}>AI가 분석하고 있습니다... (3~5초 소요)</p>
+        </div>
+      )}
+
+      <Notice type="error" message={error} />
+
+      {result && !loading && (
+        <>
+          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#15803d' }}>일일계획 실천 분석</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.planAnalysis}</p>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>감정 패턴 인사이트</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.emotionInsight}</p>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#0369a1' }}>맞춤 성장 제언</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.growthSuggestion}</p>
+          </div>
+          <button type="button" className="outline" style={{ width: '100%', fontSize: 12 }} onClick={() => onAnalyze(true)} disabled={loading}>
+            🔄 재분석
+          </button>
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: '#9333ea', textAlign: 'center' }}>
+            ⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function StatsDashboard({ classId, students, className }: { classId: string; students: StudentItem[]; className?: string }) {
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState('');
@@ -423,8 +523,20 @@ export default function StatsDashboard({ classId, students }: { classId: string;
   const [evalLoading, setEvalLoading] = useState(false);
   const [exportAllLoading, setExportAllLoading] = useState(false);
 
+  // AI 성장 분석 (개별 학생, 모달)
+  const [aiResult, setAiResult] = useState<GrowthAiResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  // AI 성장 분석 (학급 전체)
+  const [classAiRunning, setClassAiRunning] = useState(false);
+  const [classAiProgress, setClassAiProgress] = useState({ done: 0, total: 0 });
+
   useEffect(() => {
     if (!isDetailOpen || !activeStudentId) return;
+
+    setAiResult(null);
+    setAiError('');
 
     const load = async () => {
       setDetailLoading(true);
@@ -451,6 +563,20 @@ export default function StatsDashboard({ classId, students }: { classId: string;
 
   const isLoading = detailLoading || evalLoading;
 
+  const analyzeStudent = async (forceRefresh: boolean) => {
+    if (!activeStudentId || aiLoading) return;
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const result = await apiPost<GrowthAiResult>(`/api/ai/growth-report/${activeStudentId}`, { period, forceRefresh });
+      setAiResult(result);
+    } catch (err) {
+      setAiError((err as Error).message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const openDetail = (studentId: string) => {
     if (isLoading) return;
     setActiveStudentId(studentId);
@@ -462,6 +588,8 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     setDetailError('');
     setSnapshot(null);
     setEvalReports([]);
+    setAiResult(null);
+    setAiError('');
   };
 
   const exportAllReportsPdf = async () => {
@@ -541,6 +669,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       <p style="color:#64748b;font-size:13px;margin:0">${snapshot.student.studentNumber}번 ${escapeHtml(snapshot.student.name)} · ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})</p>
     </div>
     ${buildStudentHtmlBlock(snapshot, evalReports)}
+    ${aiResult ? buildAiSectionHtml(aiResult) : ''}
   </body>
 </html>`;
 
@@ -551,6 +680,86 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     setTimeout(() => popup.print(), 300);
   };
 
+  const analyzeAllStudents = async () => {
+    if (students.length === 0 || classAiRunning) return;
+    const estMinutes = Math.max(1, Math.ceil(students.length / 5) * 0.5);
+    const confirmed = window.confirm(
+      `${students.length}명 학생의 AI 분석을 생성합니다. 약 ${estMinutes}분 소요됩니다.\n계속할까요?`
+    );
+    if (!confirmed) return;
+
+    setClassAiRunning(true);
+    setClassAiProgress({ done: 0, total: students.length });
+
+    const aiByStudent = new Map<string, GrowthAiResult | null>();
+    const CHUNK = 5;
+    for (let i = 0; i < students.length; i += CHUNK) {
+      const chunk = students.slice(i, i + CHUNK);
+      const settled = await Promise.allSettled(
+        chunk.map((s) => apiPost<GrowthAiResult>(`/api/ai/growth-report/${s.id}`, { period }))
+      );
+      settled.forEach((r, idx) => {
+        aiByStudent.set(chunk[idx].id, r.status === 'fulfilled' ? r.value : null);
+      });
+      setClassAiProgress((prev) => ({ ...prev, done: Math.min(prev.total, i + chunk.length) }));
+    }
+
+    try {
+      const results = await Promise.all(
+        students.map(async (s) => {
+          const [snap, evalData] = await Promise.all([
+            api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
+            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`),
+          ]);
+          return { snap, reports: evalData.reports, ai: aiByStudent.get(s.id) ?? null };
+        })
+      );
+
+      const popup = window.open('', '_blank', 'width=860,height=900');
+      if (!popup) {
+        window.alert('팝업이 차단되어 내보내기를 실행할 수 없습니다. 팝업 차단을 해제해주세요.');
+        return;
+      }
+
+      const classTitle = className?.trim() || '우리반';
+
+      const studentSections = results.map(({ snap, reports, ai }) => `
+        <div class="student-block">
+          <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
+            <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
+            <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
+          </div>
+          ${buildStudentHtmlBlock(snap, reports)}
+          ${buildAiSectionHtml(ai)}
+        </div>`).join('');
+
+      const html = `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(classTitle)} AI 성장 리포트</title>
+    <style>${PDF_STYLES}</style>
+  </head>
+  <body>
+    <div style="text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">${escapeHtml(classTitle)} AI 성장 리포트</h1>
+      <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
+    </div>
+    ${studentSections}
+  </body>
+</html>`;
+
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+      popup.focus();
+      setTimeout(() => popup.print(), 400);
+    } finally {
+      setClassAiRunning(false);
+      setClassAiProgress({ done: 0, total: 0 });
+    }
+  };
+
   if (!classId) {
     return <EmptyState title="학급을 선택하세요" description="통계는 학급 선택 후 확인할 수 있습니다." />;
   }
@@ -559,15 +768,26 @@ export default function StatsDashboard({ classId, students }: { classId: string;
     <section className="card">
       <div className="row space-between" style={{ marginBottom: 8, alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ marginTop: 0, marginBottom: 0 }}>성장리포트</h2>
-        <button
-          type="button"
-          className="outline"
-          style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
-          onClick={exportAllReportsPdf}
-          disabled={students.length === 0 || exportAllLoading || isLoading}
-        >
-          {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
-        </button>
+        <div className="row" style={{ width: 'auto', gap: 8 }}>
+          <button
+            type="button"
+            className="outline"
+            style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
+            onClick={exportAllReportsPdf}
+            disabled={students.length === 0 || exportAllLoading || isLoading || classAiRunning}
+          >
+            {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
+            onClick={analyzeAllStudents}
+            disabled={students.length === 0 || classAiRunning || exportAllLoading || isLoading}
+          >
+            {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
+          </button>
+        </div>
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
         등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
@@ -576,7 +796,7 @@ export default function StatsDashboard({ classId, students }: { classId: string;
       <div className="grid two">
         <div>
           <label>조회 기간</label>
-          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading || exportAllLoading}>
+          <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} disabled={isLoading || exportAllLoading || classAiRunning}>
             <option value="week">주간</option>
             <option value="month">월간</option>
             <option value="semester">학기</option>
@@ -668,12 +888,13 @@ export default function StatsDashboard({ classId, students }: { classId: string;
               </div>
             )}
 
-            {/* 3섹션 세로 배치 */}
+            {/* 4섹션 세로 배치 */}
             {!isLoading && snapshot && (
               <div style={{ display: 'grid', gap: 12 }}>
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <EvalSection reports={evalReports} loading={evalLoading} />
+                <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
               </div>
             )}
           </div>

@@ -1051,7 +1051,7 @@ export default function TeacherPage() {
             </div>
           )}
 
-          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} />}
+          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} />}
 
           {activeTab === 'settings' && (
             <section className="card">

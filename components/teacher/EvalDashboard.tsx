@@ -39,6 +39,7 @@ type ReportSummary = {
 type ReportDetailItem = {
   id: string;
   rubric_title_snapshot: string;
+  rubric_subject_snapshot: string | null;
   rubric_goal_snapshot: string | null;
   rubric_task_snapshot: string | null;
   rubric_level_high_snapshot: string | null;
@@ -85,6 +86,9 @@ type LookupRecord = {
   createdAt: string | null;
   items: LookupItem[];
 };
+
+type SubjectReportItem = { subject: string; content: string };
+type ComprehensiveResult = { subjectReports: SubjectReportItem[]; generatedAt: string };
 
 type DraftItem = {
   rubricId: string | null;
@@ -250,19 +254,16 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600 }}>과목</label>
-                <input
-                  list="subject-list"
+                <select
                   value={form.subject}
                   onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                  placeholder="예: 국어" maxLength={30}
-                  style={{ width: 100 }}
-                />
-                <datalist id="subject-list">
+                  style={{ width: 110 }}
+                >
+                  <option value="">선택 안 함</option>
                   {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
-                    <option key={s} value={s} />
+                    <option key={s} value={s}>{s}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -523,6 +524,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
             id: item.id,
             grade: item.grade,
             teacherFeedback: item.teacher_feedback ?? null,
+            rubricSubjectSnapshot: item.rubric_subject_snapshot ?? null,
           })),
         }),
       });
@@ -556,7 +558,14 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
               <p style={{ margin: '0 0 2px', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
                 {report.students?.name} · {new Date(report.created_at).toLocaleDateString('ko-KR')}
               </p>
-              <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 17 }}>{report.title}</h3>
+                {report.eval_report_items[0]?.rubric_subject_snapshot && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 6, padding: '2px 8px', flexShrink: 0 }}>
+                    {report.eval_report_items[0].rubric_subject_snapshot}
+                  </span>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {!isEditing ? (
@@ -582,6 +591,24 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
               <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: isEditing ? '#2563eb' : '#374151', letterSpacing: '0.02em' }}>
                 {isEditing ? '평가 수정 중' : '평가 결과'}
               </p>
+              {isEditing && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>과목</label>
+                  <select
+                    value={editItems[0]?.rubric_subject_snapshot ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setEditItems((prev) => prev.map((d) => ({ ...d, rubric_subject_snapshot: value })));
+                    }}
+                    style={{ width: 140 }}
+                  >
+                    <option value="">선택 안 함</option>
+                    {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {sortedItems.map((item, idx) => {
                   if (isEditing) {
@@ -771,7 +798,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 // ── Main: EvalDashboard ───────────────────────────────────────────
 export default function EvalDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
-  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric' | 'lookup'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric' | 'lookup' | 'comprehensive'>('overview');
   const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -798,6 +825,13 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
   const [lookupSubjectFilter, setLookupSubjectFilter] = useState<string | null>(null);
   const [lookupRecords, setLookupRecords] = useState<LookupRecord[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
+
+  // 종합평가 모드 상태
+  const [comprehensiveStudentId, setComprehensiveStudentId] = useState('');
+  const [comprehensiveResult, setComprehensiveResult] = useState<ComprehensiveResult | null>(null);
+  const [comprehensiveLoading, setComprehensiveLoading] = useState(false); // 저장된 결과 불러오기
+  const [comprehensiveAnalyzing, setComprehensiveAnalyzing] = useState(false); // AI 분석 실행 중
+  const [comprehensiveError, setComprehensiveError] = useState('');
 
   // 성취기준별 작성 모드 상태
   const [byRubricStep, setByRubricStep] = useState<1 | 2>(1);
@@ -1078,6 +1112,31 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     finally { setLookupLoading(false); }
   };
 
+  // 종합평가: 학생 선택 → 저장된 분석 결과 자동 불러오기 (없으면 null)
+  const selectComprehensiveStudent = async (studentId: string) => {
+    setComprehensiveStudentId(studentId);
+    setComprehensiveResult(null);
+    setComprehensiveError('');
+    setComprehensiveLoading(true);
+    try {
+      const d = await api<{ report: ComprehensiveResult | null }>(`/api/ai/subject-report/${studentId}`);
+      setComprehensiveResult(d.report);
+    } catch (err) { setComprehensiveError((err as Error).message); }
+    finally { setComprehensiveLoading(false); }
+  };
+
+  // 종합평가: AI 분석 버튼 — 항상 새로 분석하고 기존 저장 결과를 덮어씀
+  const analyzeComprehensive = async () => {
+    if (!comprehensiveStudentId || comprehensiveAnalyzing) return;
+    setComprehensiveAnalyzing(true);
+    setComprehensiveError('');
+    try {
+      const result = await api<ComprehensiveResult>(`/api/ai/subject-report/${comprehensiveStudentId}`, { method: 'POST' });
+      setComprehensiveResult(result);
+    } catch (err) { setComprehensiveError((err as Error).message); }
+    finally { setComprehensiveAnalyzing(false); }
+  };
+
   if (!classId) return <EmptyState title="학급을 선택하세요" description="평가피드백은 학급 선택 후 확인할 수 있습니다." />;
 
   return (
@@ -1117,6 +1176,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
               ['detail', '학생별 작성'],
               ['by-rubric', '성취기준별 작성'],
               ['lookup', '평가 조회'],
+              ['comprehensive', '종합평가'],
             ] as const).map(([mode, label]) => (
               <button
                 key={mode}
@@ -1132,6 +1192,11 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                   if (mode === 'lookup') {
                     setLookupRubric(null);
                     setLookupRecords([]);
+                  }
+                  if (mode === 'comprehensive') {
+                    setComprehensiveStudentId('');
+                    setComprehensiveResult(null);
+                    setComprehensiveError('');
                   }
                 }}
                 style={{
@@ -1523,12 +1588,20 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
                 ) : (
                   <>
                     {bySubjects.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{
+                        display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
+                        overflowX: 'auto', scrollbarWidth: 'thin',
+                      }}>
                         {([null, ...bySubjects]).map((s) => (
                           <button key={s ?? '전체'} type="button" onClick={() => setByRubricSubjectFilter(s)}
-                            style={{ padding: '4px 14px', fontSize: 12, fontWeight: 600, borderRadius: 20, border: 'none', cursor: 'pointer',
-                              background: byRubricSubjectFilter === s ? '#0369a1' : '#e0f2fe',
-                              color: byRubricSubjectFilter === s ? '#fff' : '#0369a1' }}>
+                            style={{
+                              width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
+                              padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              background: byRubricSubjectFilter === s ? '#fff' : 'transparent',
+                              color: byRubricSubjectFilter === s ? '#0369a1' : '#64748b',
+                              boxShadow: byRubricSubjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
+                            }}>
                             {s ?? '전체'}
                           </button>
                         ))}
@@ -1806,6 +1879,95 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
             </div>
           );
         })()}
+
+        {/* ── 종합평가 뷰 ── */}
+        {viewMode === 'comprehensive' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
+            {/* 학생 목록 */}
+            <div style={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: 2 }}>
+              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
+              {students.length === 0 ? (
+                <p className="hint" style={{ fontSize: 12 }}>등록된 학생이 없습니다.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {students.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => selectComprehensiveStudent(s.id)}
+                      style={{
+                        background: comprehensiveStudentId === s.id ? '#fdf4ff' : '#fff',
+                        border: `1.5px solid ${comprehensiveStudentId === s.id ? '#d946ef' : '#e2e8f0'}`,
+                        borderRadius: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
+                        color: comprehensiveStudentId === s.id ? '#a21caf' : '#374151',
+                        fontWeight: comprehensiveStudentId === s.id ? 700 : 400, fontSize: 13,
+                      }}
+                    >
+                      {s.student_number}번 {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 종합평가 결과 영역 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {!comprehensiveStudentId ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                  <p style={{ margin: 0, fontSize: 14 }}>왼쪽에서 학생을 선택하세요</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
+                      {students.find((s) => s.id === comprehensiveStudentId)?.name} 학생 종합평가
+                    </p>
+                    <button
+                      type="button"
+                      className="ghost"
+                      style={{ width: 'auto', padding: '6px 16px', fontSize: 13 }}
+                      onClick={analyzeComprehensive}
+                      disabled={comprehensiveAnalyzing || comprehensiveLoading}
+                    >
+                      {comprehensiveAnalyzing ? '분석 중...' : comprehensiveResult ? '🔄 재분석' : '✨ AI 분석'}
+                    </button>
+                  </div>
+
+                  <Notice type="error" message={comprehensiveError} />
+
+                  {comprehensiveLoading ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
+                      <p style={{ margin: 0, fontSize: 14 }}>저장된 분석을 불러오는 중...</p>
+                    </div>
+                  ) : comprehensiveAnalyzing ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: '#a21caf' }}>
+                      <p style={{ margin: 0, fontSize: 13 }}>AI가 전체 평가기록을 과목별로 분석하고 있습니다... (몇 초 소요)</p>
+                    </div>
+                  ) : comprehensiveResult ? (
+                    <>
+                      <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+                        마지막 분석: {new Date(comprehensiveResult.generatedAt).toLocaleString('ko-KR')}
+                      </p>
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {comprehensiveResult.subjectReports.map((sr, i) => (
+                          <div key={i} style={{ background: '#fdf4ff', border: '1px solid #f0abfc', borderRadius: 12, padding: '14px 16px' }}>
+                            <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 14, color: '#86198f' }}>{sr.subject}</p>
+                            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{sr.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p style={{ margin: '4px 0 0', fontSize: 11, color: '#9333ea', textAlign: 'center' }}>
+                        ⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.
+                      </p>
+                    </>
+                  ) : (
+                    <EmptyState title="아직 분석한 기록이 없습니다" description="AI 분석 버튼을 눌러 이 학생의 전체 평가기록을 과목별로 분석해보세요." />
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
         </>
       )}
 
