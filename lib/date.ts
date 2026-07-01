@@ -9,7 +9,7 @@ export const formatDateInSeoul = (date: Date) => DATE_FORMATTER.format(date);
 
 export const todayDate = () => formatDateInSeoul(new Date());
 
-const SEOUL_UTC_OFFSET_HOURS = 9;
+export const SEOUL_UTC_OFFSET_HOURS = 9;
 
 const parseDateString = (date: string) => {
   const [year, month, day] = date.split('-').map(Number);

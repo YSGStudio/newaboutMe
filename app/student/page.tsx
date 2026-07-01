@@ -207,6 +207,12 @@ export default function StudentPage() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [myFeedLoading, setMyFeedLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
+
+  // 월별 감정 모아보기
+  type MonthlyFeedRow = { id: string; emotion_type: EmotionType; content: string; created_at: string };
+  const [monthlyViewMonth, setMonthlyViewMonth] = useState('');
+  const [monthlyFeeds, setMonthlyFeeds] = useState<MonthlyFeedRow[]>([]);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
   const today = getTodayInSeoul();
   const isPlanEditable = planDate === today;
   const isEmotionEditable = emotionDate === today;
@@ -281,6 +287,18 @@ export default function StudentPage() {
       setMyFeed(data.feed);
     } finally {
       setMyFeedLoading(false);
+    }
+  };
+
+  const loadMonthlyFeeds = async (yearMonth: string) => {
+    if (!yearMonth) { setMonthlyFeeds([]); return; }
+    const [year, month] = yearMonth.split('-');
+    setMonthlyLoading(true);
+    try {
+      const data = await api<{ feeds: MonthlyFeedRow[] }>(`/api/feeds/monthly?year=${year}&month=${parseInt(month, 10)}`);
+      setMonthlyFeeds(data.feeds);
+    } finally {
+      setMonthlyLoading(false);
     }
   };
 
@@ -895,54 +913,106 @@ export default function StudentPage() {
 
           {activeTab === 'emotion' && (
             <section className="card">
-              <div className="row space-between" style={{ marginBottom: 8 }}>
+              <div className="row space-between" style={{ marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                 <h2 style={{ margin: 0 }}>오늘의 감정</h2>
-                <div style={{ width: 180 }}>
-                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
-                  <input
-                    type="date"
-                    value={emotionDate}
-                    max={today}
-                    onChange={(event) => onChangeEmotionDate(event.target.value)}
-                  />
+                <div className="row" style={{ width: 'auto', gap: 10, alignItems: 'flex-end' }}>
+                  <div style={{ minWidth: 150 }}>
+                    <label style={{ marginBottom: 4 }}>날짜 선택</label>
+                    <input
+                      type="date"
+                      value={emotionDate}
+                      max={today}
+                      onChange={(event) => { setMonthlyViewMonth(''); onChangeEmotionDate(event.target.value); }}
+                    />
+                  </div>
+                  <div style={{ minWidth: 150 }}>
+                    <label style={{ marginBottom: 4 }}>월별 감정 모아보기</label>
+                    <select
+                      value={monthlyViewMonth}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setMonthlyViewMonth(val);
+                        loadMonthlyFeeds(val);
+                      }}
+                    >
+                      <option value="">— 날짜별 보기 —</option>
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const m = String(i + 1).padStart(2, '0');
+                        const ym = `${today.slice(0, 4)}-${m}`;
+                        return <option key={ym} value={ym}>{i + 1}월</option>;
+                      })}
+                    </select>
+                  </div>
                 </div>
               </div>
               <p className="hint" style={{ marginTop: 0 }}>
-                {isEmotionEditable
+                {monthlyViewMonth
+                  ? `${today.slice(0, 4)}년 ${parseInt(monthlyViewMonth.slice(5), 10)}월에 기록한 감정을 모아봅니다.`
+                  : isEmotionEditable
                   ? '오늘 선택한 감정과 기록은 저장되며, 달력에서 날짜를 골라 다시 볼 수 있습니다.'
                   : '선택한 날짜의 감정 기록은 읽기 전용으로 확인할 수 있습니다.'}
               </p>
 
-              {myFeedLoading ? (
-                <div className="card" style={{ padding: 12 }}>
-                  <p className="hint">감정 기록을 불러오는 중입니다...</p>
-                </div>
-              ) : myFeed ? (
-                <div className="card" style={{ padding: 14, background: '#f8fbff' }}>
-                  <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div className="grid" style={{ gap: 6 }}>
-                      {emotionDate !== today ? <strong>{`${emotionDate} 감정 기록`}</strong> : null}
-                      <div className="row" style={{ flexWrap: 'wrap' }}>
-                        <span className="badge">{EMOTION_META[myFeed.emotion_type].categoryLabel}</span>
-                        <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
-                      </div>
-                    </div>
-                    <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
+              {/* 월별 모아보기 뷰 */}
+              {monthlyViewMonth ? (
+                monthlyLoading ? (
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="hint">감정 기록을 불러오는 중입니다...</p>
                   </div>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
-                </div>
+                ) : monthlyFeeds.length === 0 ? (
+                  <EmptyState title="이 달의 감정 기록이 없습니다" description="날짜별 보기에서 감정을 작성해보세요." />
+                ) : (
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {monthlyFeeds.map((feed) => {
+                      const dateStr = new Date(feed.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+                      return (
+                        <div key={feed.id} className="card" style={{ padding: 14, background: '#f8fbff' }}>
+                          <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
+                              <span className="badge">{EMOTION_META[feed.emotion_type].categoryLabel}</span>
+                              <span className="badge">{EMOTION_META[feed.emotion_type].label}</span>
+                            </div>
+                            <span className="hint" style={{ fontSize: 12, flexShrink: 0 }}>{dateStr}</span>
+                          </div>
+                          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{feed.content}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
-                <EmptyState
-                  title="저장된 감정 기록이 없습니다"
-                  description={
-                    isEmotionEditable
-                      ? '아래에서 오늘의 감정과 한 줄 기록을 작성해보세요.'
-                      : '선택한 날짜에는 저장된 감정 기록이 없습니다.'
-                  }
-                />
+                /* 날짜별 단일 뷰 */
+                myFeedLoading ? (
+                  <div className="card" style={{ padding: 12 }}>
+                    <p className="hint">감정 기록을 불러오는 중입니다...</p>
+                  </div>
+                ) : myFeed ? (
+                  <div className="card" style={{ padding: 14, background: '#f8fbff' }}>
+                    <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div className="grid" style={{ gap: 6 }}>
+                        {emotionDate !== today ? <strong>{`${emotionDate} 감정 기록`}</strong> : null}
+                        <div className="row" style={{ flexWrap: 'wrap' }}>
+                          <span className="badge">{EMOTION_META[myFeed.emotion_type].categoryLabel}</span>
+                          <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
+                        </div>
+                      </div>
+                      <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
+                    </div>
+                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="저장된 감정 기록이 없습니다"
+                    description={
+                      isEmotionEditable
+                        ? '아래에서 오늘의 감정과 한 줄 기록을 작성해보세요.'
+                        : '선택한 날짜에는 저장된 감정 기록이 없습니다.'
+                    }
+                  />
+                )
               )}
 
-              {isEmotionEditable && !myFeed && (
+              {isEmotionEditable && !myFeed && !monthlyViewMonth && (
                 <form className="grid" onSubmit={onCreateFeed} style={{ marginTop: 16 }}>
                   <div>
                     <label>감정 범주</label>
