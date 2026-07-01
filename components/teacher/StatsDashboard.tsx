@@ -67,6 +67,26 @@ type GrowthAiResult = {
   cached: boolean;
 };
 
+type HollandAiResult = {
+  primaryType: string;
+  primaryLabel: string;
+  primaryReason: string;
+  secondaryType?: string | null;
+  secondaryLabel?: string | null;
+  secondaryReason?: string | null;
+  careerSuggestions: string[];
+  generatedAt: string;
+};
+
+const HOLLAND_TYPE_COLOR: Record<string, { bg: string; color: string }> = {
+  R: { bg: '#fef3c7', color: '#92400e' },
+  I: { bg: '#ede9fe', color: '#4c1d95' },
+  A: { bg: '#fce7f3', color: '#831843' },
+  S: { bg: '#d1fae5', color: '#065f46' },
+  E: { bg: '#fee2e2', color: '#991b1b' },
+  C: { bg: '#dbeafe', color: '#1e3a5f' },
+};
+
 const periodMeta: Record<Period, { label: string; hint: string }> = {
   week: { label: '주간', hint: '최근 7일' },
   month: { label: '월간', hint: '최근 30일' },
@@ -418,6 +438,98 @@ function AiGrowthSection({
   );
 }
 
+function HollandSection({
+  result, loading, error, onGenerate,
+}: {
+  result: HollandAiResult | null;
+  loading: boolean;
+  error: string;
+  onGenerate: () => void;
+}) {
+  const primaryColor = result ? (HOLLAND_TYPE_COLOR[result.primaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+  const secondaryColor = result?.secondaryType ? (HOLLAND_TYPE_COLOR[result.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+
+  return (
+    <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '12px 14px 12px', border: '1px solid #bae6fd' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>🔍</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0c4a6e' }}>홀란드 기반 성향 분석</h3>
+        {result && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0369a1', background: '#e0f2fe', borderRadius: 20, padding: '2px 8px' }}>
+            {new Date(result.generatedAt).toLocaleDateString('ko-KR')}
+          </span>
+        )}
+      </div>
+
+      {!result && !loading && (
+        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
+            계획·감정·평가 데이터를 바탕으로 홀란드 RIASEC 성향을 분석합니다.
+          </p>
+          <button type="button" className="ghost" style={{ width: '100%', fontSize: 13 }} onClick={onGenerate}>
+            🔍 AI 생성
+          </button>
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: '#0c4a6e' }}>
+          <p style={{ margin: 0, fontSize: 13 }}>AI가 성향을 분석하고 있습니다... (5~10초 소요)</p>
+        </div>
+      )}
+
+      {error && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#ef4444' }}>{error}</p>}
+
+      {result && !loading && (
+        <>
+          {/* 주된 성향 */}
+          <div style={{ background: primaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: primaryColor?.color, color: '#fff' }}>
+                주된 성향 · {result.primaryType}형
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: primaryColor?.color }}>{result.primaryLabel}</span>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{result.primaryReason}</p>
+          </div>
+
+          {/* 보조 성향 */}
+          {result.secondaryType && result.secondaryLabel && result.secondaryReason && (
+            <div style={{ background: secondaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: secondaryColor?.color, color: '#fff' }}>
+                  보조 성향 · {result.secondaryType}형
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: secondaryColor?.color }}>{result.secondaryLabel}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{result.secondaryReason}</p>
+            </div>
+          )}
+
+          {/* 추천 직업 */}
+          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#0369a1' }}>💼 추천 직업군</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {result.careerSuggestions.map((career) => (
+                <span key={career} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: '#e0f2fe', color: '#0c4a6e' }}>
+                  {career}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <button type="button" className="outline" style={{ width: '100%', fontSize: 12 }} onClick={onGenerate} disabled={loading}>
+            🔄 재분석
+          </button>
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: '#0369a1', textAlign: 'center' }}>
+            ⚠ AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function StatsDashboard({ classId, students, className }: { classId: string; students: StudentItem[]; className?: string }) {
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -434,6 +546,11 @@ export default function StatsDashboard({ classId, students, className }: { class
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
+  // 홀란드 기반 성향 분석
+  const [hollandResult, setHollandResult] = useState<HollandAiResult | null>(null);
+  const [hollandLoading, setHollandLoading] = useState(false);
+  const [hollandError, setHollandError] = useState('');
+
   // AI 성장 분석 (학급 전체)
   const [classAiRunning, setClassAiRunning] = useState(false);
   const [classAiProgress, setClassAiProgress] = useState({ done: 0, total: 0 });
@@ -445,18 +562,22 @@ export default function StatsDashboard({ classId, students, className }: { class
 
     setAiResult(null);
     setAiError('');
+    setHollandResult(null);
+    setHollandError('');
 
     const load = async () => {
       setDetailLoading(true);
       setEvalLoading(true);
       setDetailError('');
       try {
-        const [snapshotData, evalData] = await Promise.all([
+        const [snapshotData, evalData, hollandData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
           api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`),
+          api<{ report: HollandAiResult | null }>(`/api/ai/holland-report/${activeStudentId}`),
         ]);
         setSnapshot(snapshotData);
         setEvalReports(evalData.reports);
+        if (hollandData.report) setHollandResult(hollandData.report);
       } catch (err) {
         setSnapshot(null);
         setDetailError((err as Error).message);
@@ -485,6 +606,20 @@ export default function StatsDashboard({ classId, students, className }: { class
     }
   };
 
+  const analyzeHolland = async () => {
+    if (!activeStudentId || hollandLoading) return;
+    setHollandLoading(true);
+    setHollandError('');
+    try {
+      const result = await apiPost<HollandAiResult>(`/api/ai/holland-report/${activeStudentId}`, {});
+      setHollandResult(result);
+    } catch (err) {
+      setHollandError((err as Error).message);
+    } finally {
+      setHollandLoading(false);
+    }
+  };
+
   const openDetail = (studentId: string) => {
     if (isLoading) return;
     setActiveStudentId(studentId);
@@ -498,6 +633,8 @@ export default function StatsDashboard({ classId, students, className }: { class
     setEvalReports([]);
     setAiResult(null);
     setAiError('');
+    setHollandResult(null);
+    setHollandError('');
   };
 
   const exportAllReportsPdf = async () => {
@@ -805,13 +942,13 @@ export default function StatsDashboard({ classId, students, className }: { class
               </div>
             )}
 
-            {/* 4섹션 세로 배치 */}
             {!isLoading && snapshot && (
               <div style={{ display: 'grid', gap: 12 }}>
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <EvalSection reports={evalReports} loading={evalLoading} />
                 <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
+                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} />
               </div>
             )}
           </div>
