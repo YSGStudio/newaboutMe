@@ -74,15 +74,6 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
 };
 
 
-const CATEGORY_META: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
-  joy_vitality:     { emoji: '✨', label: '기쁨/활력',   color: '#b45309', bg: '#fef9c3' },
-  affection_bond:   { emoji: '💛', label: '애정/유대',   color: '#be185d', bg: '#fce7f3' },
-  anxiety_tension:  { emoji: '😰', label: '불안/긴장',   color: '#6d28d9', bg: '#ede9fe' },
-  sadness_lethargy: { emoji: '😢', label: '슬픔/무기력', color: '#1d4ed8', bg: '#dbeafe' },
-  anger_rejection:  { emoji: '😤', label: '분노/거부',   color: '#b91c1c', bg: '#fee2e2' },
-  social_emotions:  { emoji: '🤝', label: '사회적 감정', color: '#047857', bg: '#d1fae5' },
-};
-
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
   const json = await res.json();
@@ -122,59 +113,33 @@ const buildStudentHtmlBlock = (
   snap: StudentSnapshot,
   reports: EvalReportSummary[],
 ): string => {
-  const getStars = (pct: number) => '⭐'.repeat(Math.round(pct / 20)) + '☆'.repeat(5 - Math.round(pct / 20));
   const getBarColor = (pct: number) =>
     pct >= 80 ? 'linear-gradient(90deg,#22c55e,#16a34a)'
     : pct >= 50 ? 'linear-gradient(90deg,#facc15,#f59e0b)'
     : 'linear-gradient(90deg,#fb923c,#ef4444)';
   const getPctColor = (pct: number) => pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#ef4444';
 
-  const catMeta: Record<string, { emoji: string; label: string; color: string; bg: string }> = {
-    joy_vitality:     { emoji: '✨', label: '기쁨/활력',   color: '#b45309', bg: '#fef9c3' },
-    affection_bond:   { emoji: '💛', label: '애정/유대',   color: '#be185d', bg: '#fce7f3' },
-    anxiety_tension:  { emoji: '😰', label: '불안/긴장',   color: '#6d28d9', bg: '#ede9fe' },
-    sadness_lethargy: { emoji: '😢', label: '슬픔/무기력', color: '#1d4ed8', bg: '#dbeafe' },
-    anger_rejection:  { emoji: '😤', label: '분노/거부',   color: '#b91c1c', bg: '#fee2e2' },
-    social_emotions:  { emoji: '🤝', label: '사회적 감정', color: '#047857', bg: '#d1fae5' },
-  };
   const gradeBg:    Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low: '#fee2e2' };
   const gradeColor: Record<string, string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
   const gradeLabel: Record<string, string> = { high: '잘함',    mid: '보통',    low: '노력'  };
-  const gradeEmoji: Record<string, string> = { high: '🌟',      mid: '👍',      low: '💪'   };
 
   // ── 계획 ──
   const planHtml = snap.plans.length === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">등록된 계획이 없어요.</p>'
     : snap.plans.map((p) => `
-      <div style="background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:14px;font-weight:600;color:#1e293b">${escapeHtml(p.title)}</span>
-          <span style="font-size:18px;font-weight:800;color:${getPctColor(p.achievementRate)}">${p.achievementRate}%</span>
+      <div style="background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:13px;font-weight:600;color:#1e293b">${escapeHtml(p.title)}</span>
+          <span style="font-size:13px;font-weight:800;color:${getPctColor(p.achievementRate)}">${p.achievementRate}%</span>
         </div>
-        <div style="background:#e2e8f0;border-radius:99px;height:10px;overflow:hidden;margin-bottom:6px">
+        <div style="background:#e2e8f0;border-radius:99px;height:7px;overflow:hidden;margin-bottom:4px">
           <div style="width:${p.achievementRate}%;height:100%;border-radius:99px;background:${getBarColor(p.achievementRate)}"></div>
         </div>
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-size:12px;color:#94a3b8">${p.completed}/${p.totalPossible}번 실천</span>
-          <span style="font-size:13px;letter-spacing:2px">${getStars(p.achievementRate)}</span>
-        </div>
+        <span style="font-size:11px;color:#94a3b8">${p.completed}/${p.totalPossible}번 실천</span>
       </div>`).join('');
 
   // ── 감정 ──
-  const categoryTotals: Record<string, { count: number; ratio: number }> = {};
-  snap.emotions.distribution.filter((d) => d.count > 0).forEach((item) => {
-    const cat = EMOTION_META[item.emotionType].category;
-    if (!categoryTotals[cat]) categoryTotals[cat] = { count: 0, ratio: 0 };
-    categoryTotals[cat].count += item.count;
-    categoryTotals[cat].ratio += item.ratio;
-  });
-  const sortedCats = Object.entries(categoryTotals).sort((a, b) => b[1].ratio - a[1].ratio);
   const topEmotions = [...snap.emotions.distribution].filter((d) => d.count > 0).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
-
-  const pillsHtml = sortedCats.map(([cat, data]) => {
-    const m = catMeta[cat] ?? { emoji: '❓', label: cat, color: '#64748b', bg: '#f1f5f9' };
-    return `<span style="display:inline-flex;align-items:center;gap:5px;background:${m.bg};border-radius:99px;padding:5px 12px;margin:0 4px 5px 0;font-size:12px;font-weight:700;color:${m.color}">${m.emoji} ${m.label} ${Math.round(data.ratio)}%</span>`;
-  }).join('');
 
   const barsHtml = topEmotions.map((item) => `
     <div style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
@@ -187,19 +152,13 @@ const buildStudentHtmlBlock = (
 
   const emotionInner = snap.emotions.totalFeeds === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">기록된 감정이 없어요.</p>'
-    : `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${pillsHtml}</div>${barsHtml}`;
+    : barsHtml;
 
   // ── 평가 ──
   const gradeCount = { high: 0, mid: 0, low: 0 };
   reports.forEach((r) => r.eval_report_items.forEach((item) => {
     if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
   }));
-  const gradeCardsHtml = (['high', 'mid', 'low'] as const).map((g) => `
-    <div style="background:${gradeBg[g]};border-radius:12px;padding:14px 10px;text-align:center">
-      <div style="font-size:18px;margin-bottom:2px">${gradeEmoji[g]}</div>
-      <div style="font-size:22px;font-weight:800;color:${gradeColor[g]};line-height:1.1">${gradeCount[g]}</div>
-      <div style="font-size:12px;font-weight:600;color:${gradeColor[g]};margin-top:2px">${gradeLabel[g]}</div>
-    </div>`).join('');
   const reportsHtml = reports.length === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">작성된 평가가 없어요.</p>'
     : reports.slice(0, 10).map((r) => {
@@ -217,43 +176,31 @@ const buildStudentHtmlBlock = (
       }).join('');
 
   return `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-      <div style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:14px;padding:14px 10px;text-align:center">
-        <div style="font-size:11px;color:#065f46;font-weight:600;margin-bottom:4px">🎯 오늘 실천률</div>
-        <div style="font-size:24px;font-weight:800;color:#064e3b;line-height:1.1">${snap.today.achievementRate}%</div>
-      </div>
-      <div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:14px;padding:14px 10px;text-align:center">
-        <div style="font-size:11px;color:#4c1d95;font-weight:600;margin-bottom:4px">💭 감정 피드</div>
-        <div style="font-size:24px;font-weight:800;color:#3b0764;line-height:1.1">${snap.emotions.totalFeeds}건</div>
-      </div>
-      <div style="background:linear-gradient(135deg,#fef9c3,#fde68a);border-radius:14px;padding:14px 10px;text-align:center">
-        <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px">⭐ 평가</div>
-        <div style="font-size:24px;font-weight:800;color:#78350f;line-height:1.1">${reports.length}건</div>
-      </div>
+    <div style="display:flex;gap:16px;padding:7px 12px;background:#f8fafc;border-radius:8px;font-size:13px;color:#475569;margin-bottom:10px">
+      <span>🎯 실천률 <strong style="color:#064e3b">${snap.today.achievementRate}%</strong></span>
+      <span>💭 감정 <strong style="color:#3b0764">${snap.emotions.totalFeeds}건</strong></span>
+      <span>⭐ 평가 <strong style="color:#78350f">${reports.length}건</strong></span>
     </div>
-    <div style="background:#f0fdf4;border-radius:16px;padding:18px 18px 14px;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:20px">📋</span>
-        <span style="font-size:15px;font-weight:700;color:#166534">계획별 실천률</span>
+    <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:14px">📋</span>
+        <span style="font-size:14px;font-weight:700;color:#166534">계획별 실천률</span>
       </div>
       ${planHtml}
     </div>
-    <div style="background:#f5f3ff;border-radius:16px;padding:18px 18px 14px;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:20px">💭</span>
-        <span style="font-size:15px;font-weight:700;color:#5b21b6">감정 기록</span>
-        <span style="margin-left:auto;font-size:13px;color:#7c3aed;font-weight:700">총 ${snap.emotions.totalFeeds}건</span>
+    <div style="background:#f5f3ff;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:14px">💭</span>
+        <span style="font-size:14px;font-weight:700;color:#5b21b6">감정 기록</span>
+        <span style="margin-left:auto;font-size:12px;color:#7c3aed;font-weight:700">총 ${snap.emotions.totalFeeds}건</span>
       </div>
       ${emotionInner}
     </div>
-    <div style="background:#fff7ed;border-radius:16px;padding:18px 18px 14px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:20px">⭐</span>
-        <span style="font-size:15px;font-weight:700;color:#9a3412">평가 현황</span>
-        <span style="margin-left:auto;font-size:13px;color:#ea580c;font-weight:700">총 ${reports.length}건</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-        ${gradeCardsHtml}
+    <div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:14px">⭐</span>
+        <span style="font-size:14px;font-weight:700;color:#9a3412">평가 현황</span>
+        <span style="margin-left:auto;font-size:12px;color:#ea580c;font-weight:700">총 ${reports.length}건</span>
       </div>
       ${reportsHtml}
     </div>`;
@@ -288,39 +235,33 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
 
 function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
   return (
-    <div style={{ background: '#f0fdf4', borderRadius: 18, padding: '18px 18px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 20 }}>📋</span>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#166534' }}>계획별 실천률</h3>
+    <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '12px 14px 10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>📋</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#166534' }}>계획별 실천률</h3>
       </div>
       {rows.length === 0 ? (
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>등록된 계획이 없어요.</p>
       ) : (
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 7 }}>
           {rows.map((row) => {
-            const stars = Math.round(row.achievementRate / 20);
             const barColor = row.achievementRate >= 80
               ? 'linear-gradient(90deg, #22c55e, #16a34a)'
               : row.achievementRate >= 50
               ? 'linear-gradient(90deg, #facc15, #f59e0b)'
               : 'linear-gradient(90deg, #fb923c, #ef4444)';
             return (
-              <div key={row.planId} style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{row.title}</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: row.achievementRate >= 80 ? '#16a34a' : row.achievementRate >= 50 ? '#d97706' : '#ef4444' }}>
+              <div key={row.planId} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{row.title}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: row.achievementRate >= 80 ? '#16a34a' : row.achievementRate >= 50 ? '#d97706' : '#ef4444' }}>
                     {row.achievementRate}%
                   </span>
                 </div>
-                <div style={{ background: '#e2e8f0', borderRadius: 99, height: 10, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{ background: '#e2e8f0', borderRadius: 99, height: 7, overflow: 'hidden', marginBottom: 4 }}>
                   <div style={{ width: `${row.achievementRate}%`, height: '100%', borderRadius: 99, background: barColor, transition: 'width 0.4s ease' }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>{row.completed}/{row.totalPossible}번 실천</span>
-                  <span style={{ fontSize: 13, letterSpacing: 2 }}>
-                    {'⭐'.repeat(stars)}{'☆'.repeat(5 - stars)}
-                  </span>
-                </div>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>{row.completed}/{row.totalPossible}번 실천</span>
               </div>
             );
           })}
@@ -333,56 +274,31 @@ function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
 function EmotionDonutChart({ distribution, totalFeeds }: { distribution: EmotionDistributionItem[]; totalFeeds: number }) {
   const activeItems = distribution.filter((d) => d.count > 0);
 
-  const categoryTotals: Record<string, { count: number; ratio: number }> = {};
-  activeItems.forEach((item) => {
-    const cat = EMOTION_META[item.emotionType].category;
-    if (!categoryTotals[cat]) categoryTotals[cat] = { count: 0, ratio: 0 };
-    categoryTotals[cat].count += item.count;
-    categoryTotals[cat].ratio += item.ratio;
-  });
-
-  const sortedCategories = Object.entries(categoryTotals)
-    .sort((a, b) => b[1].ratio - a[1].ratio);
-
   const topEmotions = [...activeItems]
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, 5);
 
   return (
-    <div style={{ background: '#f5f3ff', borderRadius: 18, padding: '18px 18px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 20 }}>💭</span>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#5b21b6' }}>감정 기록</h3>
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: '#7c3aed', fontWeight: 700 }}>총 {totalFeeds}건</span>
+    <div style={{ background: '#f5f3ff', borderRadius: 12, padding: '12px 14px 10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>💭</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#5b21b6' }}>감정 기록</h3>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7c3aed', fontWeight: 700 }}>총 {totalFeeds}건</span>
       </div>
       {totalFeeds === 0 ? (
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>기록된 감정이 없어요.</p>
       ) : (
-        <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-            {sortedCategories.map(([cat, data]) => {
-              const meta = CATEGORY_META[cat] ?? { emoji: '❓', label: cat, color: '#64748b', bg: '#f1f5f9' };
-              return (
-                <div key={cat} style={{ background: meta.bg, borderRadius: 99, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ fontSize: 18 }}>{meta.emoji}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: meta.color }}>{meta.label}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: meta.color }}>{Math.round(data.ratio)}%</span>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {topEmotions.map((item) => (
-              <div key={item.emotionType} style={{ background: '#fff', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 60 }}>{EMOTION_META[item.emotionType].label}</span>
-                <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 99, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${item.ratio}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #a78bfa, #7c3aed)' }} />
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#6d28d9', minWidth: 36, textAlign: 'right' }}>{item.ratio}%</span>
+        <div style={{ display: 'grid', gap: 5 }}>
+          {topEmotions.map((item) => (
+            <div key={item.emotionType} style={{ background: '#fff', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', minWidth: 56 }}>{EMOTION_META[item.emotionType].label}</span>
+              <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 99, height: 6, overflow: 'hidden' }}>
+                <div style={{ width: `${item.ratio}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #a78bfa, #7c3aed)' }} />
               </div>
-            ))}
-          </div>
-        </>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9', minWidth: 34, textAlign: 'right' }}>{item.ratio}%</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -394,10 +310,10 @@ const GRADE_BG: Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low:
 
 function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loading: boolean }) {
   if (loading) return (
-    <div style={{ background: '#fff7ed', borderRadius: 18, padding: '18px 18px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 20 }}>⭐</span>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#9a3412' }}>평가 현황</h3>
+    <div style={{ background: '#fff7ed', borderRadius: 12, padding: '12px 14px 10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>⭐</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#9a3412' }}>평가 현황</h3>
       </div>
       <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>불러오는 중...</p>
     </div>
@@ -408,34 +324,23 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
     if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
   }));
 
-  const GRADE_EMOJI: Record<string, string> = { high: '🌟', mid: '👍', low: '💪' };
-
   return (
-    <div style={{ background: '#fff7ed', borderRadius: 18, padding: '18px 18px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 20 }}>⭐</span>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#9a3412' }}>평가 현황</h3>
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: '#ea580c', fontWeight: 700 }}>총 {reports.length}건</span>
+    <div style={{ background: '#fff7ed', borderRadius: 12, padding: '12px 14px 10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>⭐</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#9a3412' }}>평가 현황</h3>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ea580c', fontWeight: 700 }}>총 {reports.length}건</span>
       </div>
       {reports.length === 0 ? (
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>작성된 평가가 없어요.</p>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-            {(['high', 'mid', 'low'] as const).map((g) => (
-              <div key={g} style={{ background: GRADE_BG[g], borderRadius: 14, padding: '14px 10px', textAlign: 'center' }}>
-                <div style={{ fontSize: 20, marginBottom: 2 }}>{GRADE_EMOJI[g]}</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: GRADE_COLOR[g], lineHeight: 1.1 }}>{gradeCount[g]}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: GRADE_COLOR[g], marginTop: 2 }}>{GRADE_LABEL[g]}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gap: 6 }}>
+          <div style={{ display: 'grid', gap: 5 }}>
             {reports.slice(0, 6).map((r) => {
               const gc = { high: 0, mid: 0, low: 0 };
               r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
               return (
-                <div key={r.id} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div key={r.id} style={{ background: '#fff', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                   <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                     {gc.high > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: GRADE_BG.high, color: GRADE_COLOR.high }}>잘함 {gc.high}</span>}
@@ -465,10 +370,10 @@ function AiGrowthSection({
   onAnalyze: (forceRefresh: boolean) => void;
 }) {
   return (
-    <div style={{ background: '#fdf4ff', borderRadius: 18, padding: '18px 18px 14px', border: '1px solid #f0abfc' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 20 }}>✨</span>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#86198f' }}>AI 성장 분석</h3>
+    <div style={{ background: '#fdf4ff', borderRadius: 12, padding: '12px 14px 10px', border: '1px solid #f0abfc' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14 }}>✨</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#86198f' }}>AI 성장 분석</h3>
         {result?.cached && (
           <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a21caf', background: '#fae8ff', borderRadius: 20, padding: '2px 8px' }}>캐시됨</span>
         )}
@@ -883,21 +788,11 @@ export default function StatsDashboard({ classId, students, className }: { class
               </div>
             </div>
 
-            {/* 요약 히어로 카드 3개 */}
             {snapshot && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                <div style={{ background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', borderRadius: 16, padding: '14px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#065f46', fontWeight: 600, marginBottom: 4 }}>🎯 오늘 실천률</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: '#064e3b', lineHeight: 1.1 }}>{snapshot.today.achievementRate}%</div>
-                </div>
-                <div style={{ background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)', borderRadius: 16, padding: '14px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#4c1d95', fontWeight: 600, marginBottom: 4 }}>💭 감정 피드</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: '#3b0764', lineHeight: 1.1 }}>{snapshot.emotions.totalFeeds}건</div>
-                </div>
-                <div style={{ background: 'linear-gradient(135deg, #fef9c3, #fde68a)', borderRadius: 16, padding: '14px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, marginBottom: 4 }}>⭐ 평가</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: '#78350f', lineHeight: 1.1 }}>{evalReports.length}건</div>
-                </div>
+              <div style={{ display: 'flex', gap: 16, padding: '7px 12px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569' }}>
+                <span>🎯 실천률 <strong style={{ color: '#064e3b' }}>{snapshot.today.achievementRate}%</strong></span>
+                <span>💭 감정 <strong style={{ color: '#3b0764' }}>{snapshot.emotions.totalFeeds}건</strong></span>
+                <span>⭐ 평가 <strong style={{ color: '#78350f' }}>{evalReports.length}건</strong></span>
               </div>
             )}
 
