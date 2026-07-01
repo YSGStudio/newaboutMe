@@ -537,7 +537,7 @@ export default function StatsDashboard({ classId, students, className }: { class
     <style>${PDF_STYLES}</style>
   </head>
   <body>
-    <div style="text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
+    <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #e5e7eb;page-break-after:always;break-after:page">
       <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">별빛로그 전체 리포트</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
     </div>
@@ -661,7 +661,7 @@ export default function StatsDashboard({ classId, students, className }: { class
     <style>${PDF_STYLES}</style>
   </head>
   <body>
-    <div style="text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #e5e7eb">
+    <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #e5e7eb;page-break-after:always;break-after:page">
       <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">${escapeHtml(classTitle)} AI 성장 리포트</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
     </div>
