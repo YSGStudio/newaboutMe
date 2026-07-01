@@ -304,7 +304,6 @@ function EmotionDonutChart({ distribution, totalFeeds }: { distribution: Emotion
   );
 }
 
-const GRADE_LABEL: Record<string, string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<string, string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
 const GRADE_BG: Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low: '#fee2e2' };
 
