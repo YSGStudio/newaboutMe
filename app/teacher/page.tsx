@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -60,6 +60,16 @@ type FeedItem = {
   feed_reactions: { id: string; reaction_type: ReactionType; student_id: string }[];
 };
 
+type TeacherRole = 'general' | 'paid' | 'admin';
+
+type TeacherListItem = {
+  id: string;
+  name: string;
+  role: TeacherRole;
+  paidUntil: string | null;
+  createdAt: string;
+};
+
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, {
     ...init,
@@ -74,7 +84,20 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings' | 'admin'>('class');
+
+  // 교사 역할 정보
+  const [teacherRole, setTeacherRole] = useState<TeacherRole>('general');
+  const [teacherPaidUntil, setTeacherPaidUntil] = useState<string | null>(null);
+  const canUseAi = teacherRole === 'admin' || (teacherRole === 'paid' && (!teacherPaidUntil || teacherPaidUntil >= new Date().toISOString().slice(0, 10)));
+
+  // 권한설정 탭 (관리자 전용)
+  const [adminTeachers, setAdminTeachers] = useState<TeacherListItem[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminSavingId, setAdminSavingId] = useState('');
+  const [adminMessage, setAdminMessage] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const adminEdits = useRef<Map<string, { role: TeacherRole; paidUntil: string }>>(new Map());
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -122,6 +145,16 @@ export default function TeacherPage() {
       setAuthError('');
     }, 2500);
   };
+
+  const loadTeacherRole = useCallback(async () => {
+    try {
+      const data = await api<{ teacher: { role: TeacherRole; paidUntil: string | null } }>('/api/auth/teacher/me');
+      setTeacherRole(data.teacher.role);
+      setTeacherPaidUntil(data.teacher.paidUntil);
+    } catch {
+      // 역할 로드 실패해도 기본값(general) 유지
+    }
+  }, []);
 
   const loadClasses = useCallback(async () => {
     try {
@@ -250,7 +283,8 @@ export default function TeacherPage() {
 
   useEffect(() => {
     loadClasses();
-  }, [loadClasses]);
+    loadTeacherRole();
+  }, [loadClasses, loadTeacherRole]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -294,7 +328,7 @@ export default function TeacherPage() {
       }
       setAuthMessage('인증 성공. 학급 데이터를 불러옵니다.');
       setHasTeacherSession(true);
-      await loadClasses();
+      await Promise.all([loadClasses(), loadTeacherRole()]);
       clearNoticeLater();
     } catch (error) {
       setAuthError((error as Error).message);
@@ -442,6 +476,52 @@ export default function TeacherPage() {
     }
   };
 
+  const loadAdminTeachers = useCallback(async () => {
+    setAdminLoading(true);
+    try {
+      const data = await api<{ teachers: TeacherListItem[] }>('/api/admin/teachers');
+      setAdminTeachers(data.teachers);
+      adminEdits.current = new Map(
+        data.teachers.map((t) => [t.id, { role: t.role, paidUntil: t.paidUntil ?? '' }])
+      );
+    } catch (err) {
+      setAdminError((err as Error).message);
+    } finally {
+      setAdminLoading(false);
+    }
+  }, []);
+
+  const onSaveTeacherRole = async (teacherId: string) => {
+    const edit = adminEdits.current.get(teacherId);
+    if (!edit) return;
+    setAdminSavingId(teacherId);
+    setAdminError('');
+    setAdminMessage('');
+    try {
+      await api('/api/admin/teachers', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          teacherId,
+          role: edit.role,
+          paidUntil: edit.role === 'paid' && edit.paidUntil ? edit.paidUntil : null,
+        }),
+      });
+      setAdminTeachers((prev) =>
+        prev.map((t) =>
+          t.id === teacherId
+            ? { ...t, role: edit.role, paidUntil: edit.role === 'paid' ? (edit.paidUntil || null) : null }
+            : t
+        )
+      );
+      setAdminMessage('저장되었습니다.');
+      setTimeout(() => setAdminMessage(''), 2000);
+    } catch (err) {
+      setAdminError((err as Error).message);
+    } finally {
+      setAdminSavingId('');
+    }
+  };
+
   const isAuthed = hasTeacherSession;
 
   const onChangeFeedDate = (nextDate: string) => {
@@ -568,12 +648,16 @@ export default function TeacherPage() {
                 { key: 'letters', label: '클래스메일' },
                 { key: 'stats', label: '성장리포트' },
                 { key: 'settings', label: '학급설정' },
+                ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }] : []),
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings');
+                setActiveTab(key as typeof activeTab);
                 if (key === 'letters' && selectedClassId && !lettersLoaded) {
                   loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
+                }
+                if (key === 'admin' && adminTeachers.length === 0) {
+                  loadAdminTeachers().catch((err: Error) => setAdminError(err.message));
                 }
               }}
             />
@@ -1051,7 +1135,7 @@ export default function TeacherPage() {
             </div>
           )}
 
-          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} />}
+          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canUseAi={canUseAi} />}
 
           {activeTab === 'settings' && (
             <section className="card">
@@ -1060,6 +1144,98 @@ export default function TeacherPage() {
                 <p className="hint" style={{ margin: 0 }}>이 학급에서 사용할 뱃지와 칭호를 맞춤 설정합니다.</p>
               </div>
               <ClassSettings classId={selectedClassId} />
+            </section>
+          )}
+
+          {activeTab === 'admin' && teacherRole === 'admin' && (
+            <section className="card">
+              <div className="row space-between" style={{ marginBottom: 16, alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px' }}>권한설정</h2>
+                  <p className="hint" style={{ margin: 0 }}>교사 회원의 등급을 일반/유료로 관리합니다. 유료회원만 AI 분석을 사용할 수 있습니다.</p>
+                </div>
+                <button type="button" className="outline" style={{ width: 'auto' }} onClick={loadAdminTeachers} disabled={adminLoading}>
+                  {adminLoading ? '로딩 중...' : '새로고침'}
+                </button>
+              </div>
+
+              {adminMessage && <p style={{ color: '#16a34a', fontSize: 13, marginBottom: 10 }}>{adminMessage}</p>}
+              {adminError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{adminError}</p>}
+
+              {adminLoading && <p className="hint">교사 목록을 불러오는 중...</p>}
+
+              {!adminLoading && adminTeachers.length === 0 && (
+                <p className="hint">등록된 교사가 없습니다.</p>
+              )}
+
+              {!adminLoading && adminTeachers.length > 0 && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {adminTeachers.map((teacher) => {
+                    const ROLE_LABEL: Record<TeacherRole, string> = { general: '일반', paid: '유료', admin: '관리자' };
+                    const ROLE_COLOR: Record<TeacherRole, string> = { general: '#64748b', paid: '#16a34a', admin: '#7c3aed' };
+                    return (
+                      <article key={teacher.id} className="card" style={{ padding: 14 }}>
+                        <div className="row space-between" style={{ marginBottom: 10, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div>
+                            <strong style={{ fontSize: 15 }}>{teacher.name}</strong>
+                            <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: ROLE_COLOR[teacher.role] }}>
+                              [{ROLE_LABEL[teacher.role]}]
+                            </span>
+                            {teacher.paidUntil && teacher.role === 'paid' && (
+                              <span style={{ marginLeft: 8, fontSize: 11, color: '#64748b' }}>
+                                ~ {teacher.paidUntil}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                            가입: {new Date(teacher.createdAt).toLocaleDateString('ko-KR')}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '0 0 120px' }}>
+                            <label style={{ fontSize: 12, marginBottom: 4 }}>등급</label>
+                            <select
+                              defaultValue={teacher.role}
+                              onChange={(e) => {
+                                const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '' };
+                                adminEdits.current.set(teacher.id, { ...current, role: e.target.value as TeacherRole });
+                              }}
+                              disabled={teacher.role === 'admin'}
+                            >
+                              <option value="general">일반</option>
+                              <option value="paid">유료</option>
+                            </select>
+                          </div>
+                          <div style={{ flex: '0 0 160px' }}>
+                            <label style={{ fontSize: 12, marginBottom: 4 }}>유료 만료일</label>
+                            <input
+                              type="date"
+                              defaultValue={teacher.paidUntil ?? ''}
+                              onChange={(e) => {
+                                const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '' };
+                                adminEdits.current.set(teacher.id, { ...current, paidUntil: e.target.value });
+                              }}
+                              disabled={teacher.role === 'admin'}
+                            />
+                            <p className="hint" style={{ margin: '2px 0 0', fontSize: 11 }}>비워두면 무기한 유료</p>
+                          </div>
+                          <div style={{ flex: '0 0 auto', paddingBottom: 0 }}>
+                            <button
+                              type="button"
+                              className="ghost"
+                              style={{ width: 'auto', padding: '10px 18px', fontSize: 13 }}
+                              onClick={() => onSaveTeacherRole(teacher.id)}
+                              disabled={adminSavingId === teacher.id || teacher.role === 'admin'}
+                            >
+                              {adminSavingId === teacher.id ? '저장 중...' : '저장'}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           )}
         </>

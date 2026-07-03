@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireAiAccess } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isPeriod } from '@/lib/stats';
 import { getOrGenerateGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
@@ -38,6 +38,8 @@ async function processInChunks(
 export async function POST(req: Request) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+  const aiBlock = requireAiAccess(auth.teacher);
+  if (aiBlock) return aiBlock;
 
   const body = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);

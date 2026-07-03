@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireAiAccess } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSavedSubjectReport, generateAndSaveSubjectReport, NoEvalDataError } from '@/lib/ai/subjectReport';
 
@@ -34,6 +34,8 @@ export async function GET(_: Request, { params }: Params) {
 export async function POST(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+  const aiBlock = requireAiAccess(auth.teacher);
+  if (aiBlock) return aiBlock;
 
   const student = await loadStudentOrNull(params.studentId, auth.teacher.id);
   if (!student) return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });

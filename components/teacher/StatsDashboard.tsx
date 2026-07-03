@@ -381,12 +381,13 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
 }
 
 function AiGrowthSection({
-  result, loading, error, onAnalyze,
+  result, loading, error, onAnalyze, canUseAi,
 }: {
   result: GrowthAiResult | null;
   loading: boolean;
   error: string;
   onAnalyze: (forceRefresh: boolean) => void;
+  canUseAi: boolean;
 }) {
   return (
     <div style={{ background: '#fdf4ff', borderRadius: 12, padding: '12px 14px 10px', border: '1px solid #f0abfc' }}>
@@ -398,7 +399,13 @@ function AiGrowthSection({
         )}
       </div>
 
-      {!result && !loading && (
+      {!canUseAi && (
+        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#dc2626', textAlign: 'center', padding: '8px 0' }}>
+          유료회원만 사용가능합니다. 관리자에게 문의해주세요.
+        </p>
+      )}
+
+      {canUseAi && !result && !loading && (
         <button type="button" className="ghost" style={{ width: '100%' }} onClick={() => onAnalyze(false)}>
           ✨ 분석하기
         </button>
@@ -412,7 +419,7 @@ function AiGrowthSection({
 
       <Notice type="error" message={error} />
 
-      {result && !loading && (
+      {canUseAi && result && !loading && (
         <>
           <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
             <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#15803d' }}>일일계획 실천 분석</p>
@@ -439,12 +446,13 @@ function AiGrowthSection({
 }
 
 function HollandSection({
-  result, loading, error, onGenerate,
+  result, loading, error, onGenerate, canUseAi,
 }: {
   result: HollandAiResult | null;
   loading: boolean;
   error: string;
   onGenerate: () => void;
+  canUseAi: boolean;
 }) {
   const primaryColor = result ? (HOLLAND_TYPE_COLOR[result.primaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
   const secondaryColor = result?.secondaryType ? (HOLLAND_TYPE_COLOR[result.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
@@ -461,7 +469,13 @@ function HollandSection({
         )}
       </div>
 
-      {!result && !loading && (
+      {!canUseAi && (
+        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#dc2626', textAlign: 'center', padding: '8px 0' }}>
+          유료회원만 사용가능합니다. 관리자에게 문의해주세요.
+        </p>
+      )}
+
+      {canUseAi && !result && !loading && (
         <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
             계획·감정·평가 데이터를 바탕으로 홀란드 RIASEC 성향을 분석합니다.
@@ -480,7 +494,7 @@ function HollandSection({
 
       {error && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#ef4444' }}>{error}</p>}
 
-      {result && !loading && (
+      {canUseAi && result && !loading && (
         <>
           {/* 주된 성향 */}
           <div style={{ background: primaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
@@ -530,7 +544,7 @@ function HollandSection({
   );
 }
 
-export default function StatsDashboard({ classId, students, className }: { classId: string; students: StudentItem[]; className?: string }) {
+export default function StatsDashboard({ classId, students, className, canUseAi = true }: { classId: string; students: StudentItem[]; className?: string; canUseAi?: boolean }) {
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState('');
@@ -832,15 +846,19 @@ export default function StatsDashboard({ classId, students, className }: { class
           >
             {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
           </button>
-          <button
-            type="button"
-            className="ghost"
-            style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
-            onClick={analyzeAllStudents}
-            disabled={students.length === 0 || classAiRunning || exportAllLoading || isLoading}
-          >
-            {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
-          </button>
+          {canUseAi ? (
+            <button
+              type="button"
+              className="ghost"
+              style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
+              onClick={analyzeAllStudents}
+              disabled={students.length === 0 || classAiRunning || exportAllLoading || isLoading}
+            >
+              {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
+            </button>
+          ) : (
+            <span style={{ fontSize: 12, color: '#dc2626', padding: '6px 2px' }}>유료회원만 사용가능합니다</span>
+          )}
           {classAiResults && !classAiRunning && (
             <button
               type="button"
@@ -947,8 +965,8 @@ export default function StatsDashboard({ classId, students, className }: { class
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <EvalSection reports={evalReports} loading={evalLoading} />
-                <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
-                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} />
+                <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} canUseAi={canUseAi} />
+                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} canUseAi={canUseAi} />
               </div>
             )}
           </div>
