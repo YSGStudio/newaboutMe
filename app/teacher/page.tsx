@@ -82,9 +82,15 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 };
 
 export default function TeacherPage() {
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
+
+  // 비밀번호 변경 모달
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [changePwLoading, setChangePwLoading] = useState(false);
+  const [changePwMessage, setChangePwMessage] = useState('');
+  const [changePwError, setChangePwError] = useState('');
   const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings' | 'admin'>('class');
 
   // 교사 역할 정보
@@ -321,15 +327,23 @@ export default function TeacherPage() {
     try {
       if (authMode === 'signup') {
         await api('/api/auth/teacher/signup', { method: 'POST', body: JSON.stringify(payload) });
+        setAuthMessage('가입이 완료되었습니다. 로그인해주세요.');
+        setAuthMode('login');
+      } else if (authMode === 'forgot') {
+        await api('/api/auth/teacher/reset-password/request', {
+          method: 'POST',
+          body: JSON.stringify({ email: payload.email }),
+        });
+        setAuthMessage('입력하신 이메일로 비밀번호 재설정 링크를 보냈습니다. 이메일을 확인해주세요.');
       } else {
         await api('/api/auth/teacher/login', {
           method: 'POST',
           body: JSON.stringify({ email: payload.email, password: payload.password })
         });
+        setAuthMessage('인증 성공. 학급 데이터를 불러옵니다.');
+        setHasTeacherSession(true);
+        await Promise.all([loadClasses(), loadTeacherRole()]);
       }
-      setAuthMessage('인증 성공. 학급 데이터를 불러옵니다.');
-      setHasTeacherSession(true);
-      await Promise.all([loadClasses(), loadTeacherRole()]);
       clearNoticeLater();
     } catch (error) {
       setAuthError((error as Error).message);
@@ -523,6 +537,38 @@ export default function TeacherPage() {
     }
   };
 
+  const onChangePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setChangePwError('');
+    setChangePwMessage('');
+    setChangePwLoading(true);
+
+    const form = new FormData(event.currentTarget);
+    const currentPassword = String(form.get('currentPassword'));
+    const newPassword = String(form.get('newPassword'));
+    const confirmPassword = String(form.get('confirmPassword'));
+
+    if (newPassword !== confirmPassword) {
+      setChangePwError('새 비밀번호가 일치하지 않습니다.');
+      setChangePwLoading(false);
+      return;
+    }
+
+    try {
+      await api('/api/auth/teacher/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setChangePwMessage('비밀번호가 변경되었습니다.');
+      (event.target as HTMLFormElement).reset();
+      setTimeout(() => { setShowChangePw(false); setChangePwMessage(''); }, 1800);
+    } catch (err) {
+      setChangePwError((err as Error).message);
+    } finally {
+      setChangePwLoading(false);
+    }
+  };
+
   const isAuthed = hasTeacherSession;
 
   const onChangeFeedDate = (nextDate: string) => {
@@ -564,6 +610,9 @@ export default function TeacherPage() {
               <button className="outline" type="button" onClick={onRefreshData} disabled={refreshLoading}>
                 {refreshLoading ? '새로고침 중...' : '새로고침'}
               </button>
+              <button className="outline" type="button" onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
+                비밀번호 변경
+              </button>
               <button className="outline" type="button" onClick={onLogout}>
                 로그아웃
               </button>
@@ -589,6 +638,13 @@ export default function TeacherPage() {
             >
               회원가입
             </button>
+            <button
+              className={authMode === 'forgot' ? 'ghost' : 'outline'}
+              onClick={() => setAuthMode('forgot')}
+              type="button"
+            >
+              비밀번호 찾기
+            </button>
           </div>
 
           <form className="grid" onSubmit={onTeacherAuth}>
@@ -602,11 +658,21 @@ export default function TeacherPage() {
               <label>이메일</label>
               <input name="email" type="email" required />
             </div>
-            <div>
-              <label>비밀번호</label>
-              <input name="password" type="password" minLength={8} required />
-            </div>
-            <SubmitButton loading={authLoading} idleText={authMode === 'signup' ? '회원가입' : '로그인'} />
+            {authMode !== 'forgot' && (
+              <div>
+                <label>비밀번호</label>
+                <input name="password" type="password" minLength={8} required />
+              </div>
+            )}
+            {authMode === 'forgot' && (
+              <p className="hint" style={{ margin: '0 0 8px' }}>
+                가입하신 이메일 주소를 입력하면 비밀번호 재설정 링크를 보내드립니다.
+              </p>
+            )}
+            <SubmitButton
+              loading={authLoading}
+              idleText={authMode === 'signup' ? '회원가입' : authMode === 'forgot' ? '재설정 링크 보내기' : '로그인'}
+            />
           </form>
           <Notice type="success" message={authMessage} />
           <Notice type="error" message={authError} />
@@ -1314,6 +1380,52 @@ export default function TeacherPage() {
                 {deletePasswordLoading ? '확인 중...' : '삭제'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 비밀번호 변경 모달 */}
+      {showChangePw && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <p style={{ margin: '0 0 20px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>비밀번호 변경</p>
+            <form className="grid" onSubmit={onChangePassword}>
+              <div>
+                <label style={{ fontSize: 13 }}>현재 비밀번호</label>
+                <input name="currentPassword" type="password" required placeholder="현재 비밀번호" />
+              </div>
+              <div>
+                <label style={{ fontSize: 13 }}>새 비밀번호</label>
+                <input name="newPassword" type="password" minLength={8} required placeholder="8자 이상" />
+              </div>
+              <div>
+                <label style={{ fontSize: 13 }}>새 비밀번호 확인</label>
+                <input name="confirmPassword" type="password" minLength={8} required placeholder="동일하게 입력" />
+              </div>
+              {changePwError && <p style={{ margin: 0, fontSize: 13, color: '#dc2626' }}>{changePwError}</p>}
+              {changePwMessage && <p style={{ margin: 0, fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{changePwMessage}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="outline"
+                  onClick={() => setShowChangePw(false)}
+                  disabled={changePwLoading}
+                  style={{ fontSize: 14, padding: '8px 18px' }}
+                >
+                  취소
+                </button>
+                <SubmitButton loading={changePwLoading} idleText="변경" style={{ width: 'auto', padding: '8px 24px' }} />
+              </div>
+            </form>
           </div>
         </div>
       )}
