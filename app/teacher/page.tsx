@@ -610,7 +610,7 @@ export default function TeacherPage() {
               <button className="outline" type="button" onClick={onRefreshData} disabled={refreshLoading}>
                 {refreshLoading ? '새로고침 중...' : '새로고침'}
               </button>
-              <button className="outline" type="button" onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
+              <button className="outline" type="button" style={{ whiteSpace: 'nowrap' }} onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
                 비밀번호 변경
               </button>
               <button className="outline" type="button" onClick={onLogout}>
@@ -1419,7 +1419,7 @@ export default function TeacherPage() {
                   className="outline"
                   onClick={() => setShowChangePw(false)}
                   disabled={changePwLoading}
-                  style={{ fontSize: 14, padding: '8px 18px' }}
+                  style={{ width: 'auto', fontSize: 14, padding: '8px 18px' }}
                 >
                   취소
                 </button>
