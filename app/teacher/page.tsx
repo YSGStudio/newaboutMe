@@ -1169,69 +1169,70 @@ export default function TeacherPage() {
               )}
 
               {!adminLoading && adminTeachers.length > 0 && (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {adminTeachers.map((teacher) => {
-                    const ROLE_LABEL: Record<TeacherRole, string> = { general: '일반', paid: '유료', admin: '관리자' };
+                <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                  {/* 헤더 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 150px 70px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    {['이름', '현재등급', '변경등급', '유료 만료일', ''].map((h) => (
+                      <span key={h} style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>{h}</span>
+                    ))}
+                  </div>
+                  {adminTeachers.map((teacher, idx) => {
                     const ROLE_COLOR: Record<TeacherRole, string> = { general: '#64748b', paid: '#16a34a', admin: '#7c3aed' };
+                    const ROLE_LABEL: Record<TeacherRole, string> = { general: '일반', paid: '유료', admin: '관리자' };
                     return (
-                      <article key={teacher.id} className="card" style={{ padding: 14 }}>
-                        <div className="row space-between" style={{ marginBottom: 10, alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <div>
-                            <strong style={{ fontSize: 15 }}>{teacher.name}</strong>
-                            <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: ROLE_COLOR[teacher.role] }}>
-                              [{ROLE_LABEL[teacher.role]}]
-                            </span>
-                            {teacher.paidUntil && teacher.role === 'paid' && (
-                              <span style={{ marginLeft: 8, fontSize: 11, color: '#64748b' }}>
-                                ~ {teacher.paidUntil}
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                            가입: {new Date(teacher.createdAt).toLocaleDateString('ko-KR')}
+                      <div
+                        key={teacher.id}
+                        style={{
+                          display: 'grid', gridTemplateColumns: '1fr 70px 110px 150px 70px',
+                          gap: 8, alignItems: 'center', padding: '10px 14px',
+                          background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                          borderBottom: idx < adminTeachers.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{teacher.name}</span>
+                          <span style={{ display: 'block', fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                            가입 {new Date(teacher.createdAt).toLocaleDateString('ko-KR')}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                          <div style={{ flex: '0 0 120px' }}>
-                            <label style={{ fontSize: 12, marginBottom: 4 }}>등급</label>
-                            <select
-                              defaultValue={teacher.role}
-                              onChange={(e) => {
-                                const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '' };
-                                adminEdits.current.set(teacher.id, { ...current, role: e.target.value as TeacherRole });
-                              }}
-                              disabled={teacher.role === 'admin'}
-                            >
-                              <option value="general">일반</option>
-                              <option value="paid">유료</option>
-                            </select>
-                          </div>
-                          <div style={{ flex: '0 0 160px' }}>
-                            <label style={{ fontSize: 12, marginBottom: 4 }}>유료 만료일</label>
-                            <input
-                              type="date"
-                              defaultValue={teacher.paidUntil ?? ''}
-                              onChange={(e) => {
-                                const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '' };
-                                adminEdits.current.set(teacher.id, { ...current, paidUntil: e.target.value });
-                              }}
-                              disabled={teacher.role === 'admin'}
-                            />
-                            <p className="hint" style={{ margin: '2px 0 0', fontSize: 11 }}>비워두면 무기한 유료</p>
-                          </div>
-                          <div style={{ flex: '0 0 auto', paddingBottom: 0 }}>
-                            <button
-                              type="button"
-                              className="ghost"
-                              style={{ width: 'auto', padding: '10px 18px', fontSize: 13 }}
-                              onClick={() => onSaveTeacherRole(teacher.id)}
-                              disabled={adminSavingId === teacher.id || teacher.role === 'admin'}
-                            >
-                              {adminSavingId === teacher.id ? '저장 중...' : '저장'}
-                            </button>
-                          </div>
-                        </div>
-                      </article>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: ROLE_COLOR[teacher.role] }}>
+                          {ROLE_LABEL[teacher.role]}
+                          {teacher.role === 'paid' && teacher.paidUntil && (
+                            <span style={{ display: 'block', fontSize: 10, fontWeight: 400, color: '#94a3b8' }}>~{teacher.paidUntil}</span>
+                          )}
+                        </span>
+                        <select
+                          defaultValue={teacher.role}
+                          onChange={(e) => {
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '' };
+                            adminEdits.current.set(teacher.id, { ...current, role: e.target.value as TeacherRole });
+                          }}
+                          disabled={teacher.role === 'admin'}
+                          style={{ fontSize: 13, padding: '6px 8px' }}
+                        >
+                          <option value="general">일반</option>
+                          <option value="paid">유료</option>
+                        </select>
+                        <input
+                          type="date"
+                          defaultValue={teacher.paidUntil ?? ''}
+                          onChange={(e) => {
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '' };
+                            adminEdits.current.set(teacher.id, { ...current, paidUntil: e.target.value });
+                          }}
+                          disabled={teacher.role === 'admin'}
+                          style={{ fontSize: 12, padding: '6px 8px' }}
+                        />
+                        <button
+                          type="button"
+                          className="ghost"
+                          style={{ width: '100%', padding: '7px 0', fontSize: 12 }}
+                          onClick={() => onSaveTeacherRole(teacher.id)}
+                          disabled={adminSavingId === teacher.id || teacher.role === 'admin'}
+                        >
+                          {adminSavingId === teacher.id ? '...' : '저장'}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
