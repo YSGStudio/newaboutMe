@@ -65,6 +65,7 @@ type TeacherRole = 'general' | 'paid' | 'admin';
 type TeacherListItem = {
   id: string;
   name: string;
+  email: string;
   role: TeacherRole;
   paidUntil: string | null;
   createdAt: string;
@@ -1171,8 +1172,8 @@ export default function TeacherPage() {
               {!adminLoading && adminTeachers.length > 0 && (
                 <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
                   {/* 헤더 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 150px 70px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    {['이름', '현재등급', '변경등급', '유료 만료일', ''].map((h) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px 110px 150px 70px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    {['이름', '아이디(이메일)', '현재등급', '변경등급', '유료 만료일', ''].map((h) => (
                       <span key={h} style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>{h}</span>
                     ))}
                   </div>
@@ -1183,7 +1184,7 @@ export default function TeacherPage() {
                       <div
                         key={teacher.id}
                         style={{
-                          display: 'grid', gridTemplateColumns: '1fr 70px 110px 150px 70px',
+                          display: 'grid', gridTemplateColumns: '90px 1fr 70px 110px 150px 70px',
                           gap: 8, alignItems: 'center', padding: '10px 14px',
                           background: idx % 2 === 0 ? '#fff' : '#fafafa',
                           borderBottom: idx < adminTeachers.length - 1 ? '1px solid #f1f5f9' : 'none',
@@ -1195,6 +1196,9 @@ export default function TeacherPage() {
                             가입 {new Date(teacher.createdAt).toLocaleDateString('ko-KR')}
                           </span>
                         </div>
+                        <span style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {teacher.email || '-'}
+                        </span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: ROLE_COLOR[teacher.role] }}>
                           {ROLE_LABEL[teacher.role]}
                           {teacher.role === 'paid' && teacher.paidUntil && (

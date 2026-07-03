@@ -24,9 +24,14 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // auth.users에서 이메일 일괄 조회
+  const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+  const emailMap = new Map((usersData?.users ?? []).map((u) => [u.id, u.email ?? '']));
+
   const teachers = (data ?? []).map((t) => ({
     id: t.id,
     name: t.name,
+    email: emailMap.get(t.id) ?? '',
     role: t.role ?? 'general',
     paidUntil: t.paid_until ?? null,
     createdAt: t.created_at,
