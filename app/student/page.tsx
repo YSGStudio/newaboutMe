@@ -109,6 +109,22 @@ type EvalReportDetail = {
 const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
 
+const SUBJECT_COLOR: Record<string, string> = {
+  국어: '#ef4444',
+  영어: '#8b5cf6',
+  수학: '#3b82f6',
+  사회: '#f59e0b',
+  과학: '#10b981',
+  역사: '#b45309',
+  도덕: '#64748b',
+  실과: '#84cc16',
+  정보: '#6366f1',
+  음악: '#ec4899',
+  미술: '#f97316',
+  체육: '#06b6d4',
+};
+const DEFAULT_SUBJECT_COLOR = '#94a3b8';
+
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
 const otherEmotionColor = '#94a3b8';
 
@@ -1456,7 +1472,8 @@ export default function StudentPage() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
                   {evalReports.map((r) => {
                     const sortedItems = [...(r.eval_report_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-                    const topColor = GRADE_COLOR[sortedItems[0]?.grade as 'high' | 'mid' | 'low'] ?? '#3b82f6';
+                    const subjectSnapshot = sortedItems[0]?.rubric_subject_snapshot;
+                    const topColor = (subjectSnapshot && SUBJECT_COLOR[subjectSnapshot]) ?? DEFAULT_SUBJECT_COLOR;
                     const cardTitle = sortedItems[0]?.rubric_title_snapshot ?? r.title;
                     const isLoading = loadingEvalId === r.id;
                     return (
