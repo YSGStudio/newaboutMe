@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import { EMOTION_META, EmotionType } from '@/types/domain';
+import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 
 type StudentItem = {
   id: string;
@@ -54,8 +55,11 @@ type EvalReportSummary = {
   id: string;
   title: string;
   created_at: string;
-  eval_report_items: { id: string; grade: string }[];
+  eval_report_items: { id: string; grade: string; sort_order: number; rubric_subject_snapshot: string | null }[];
 };
+
+const getReportSubject = (r: EvalReportSummary): string | null =>
+  [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order)[0]?.rubric_subject_snapshot ?? null;
 
 type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; ai: GrowthAiResult | null };
 
@@ -179,16 +183,26 @@ const buildStudentHtmlBlock = (
   reports.forEach((r) => r.eval_report_items.forEach((item) => {
     if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
   }));
+  const gradeSummaryHtml = (['high', 'mid', 'low'] as const).filter((g) => gradeCount[g] > 0)
+    .map((g) => `<span style="flex:1;text-align:center;font-size:12px;font-weight:800;padding:6px 0;border-radius:8px;background:${gradeBg[g]};color:${gradeColor[g]}">${gradeLabel[g]} ${gradeCount[g]}</span>`)
+    .join('');
+
   const reportsHtml = reports.length === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">작성된 평가가 없어요.</p>'
-    : reports.slice(0, 10).map((r) => {
+    : reports.map((r) => {
         const gc = { high: 0, mid: 0, low: 0 };
         r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
         const badges = (['high', 'mid', 'low'] as const).filter((g) => gc[g] > 0)
           .map((g) => `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${gradeBg[g]};color:${gradeColor[g]}">${gradeLabel[g]} ${gc[g]}</span>`)
           .join('&nbsp;');
+        const subject = getReportSubject(r);
+        const accent = (subject && SUBJECT_COLOR[subject]) ?? DEFAULT_SUBJECT_COLOR;
+        const subjectChip = subject
+          ? `<span style="font-size:11px;font-weight:700;color:${accent};background:${accent}1a;border-radius:5px;padding:2px 6px;flex-shrink:0">${escapeHtml(subject)}</span>`
+          : '';
         return `
-          <div style="background:#fff;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="background:#fff;border-radius:10px;padding:10px 12px 10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05);border-left:4px solid ${accent}">
+            ${subjectChip}
             <span style="font-size:13px;color:#1e293b;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.title)}</span>
             <span style="display:flex;gap:4px;flex-shrink:0">${badges}</span>
             <span style="font-size:12px;color:#94a3b8;flex-shrink:0">${new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</span>
@@ -222,6 +236,7 @@ const buildStudentHtmlBlock = (
         <span style="font-size:14px;font-weight:700;color:#9a3412">평가 현황</span>
         <span style="margin-left:auto;font-size:12px;color:#ea580c;font-weight:700">총 ${reports.length}건</span>
       </div>
+      ${reports.length > 0 ? `<div style="display:flex;gap:6px;margin-bottom:10px">${gradeSummaryHtml}</div>` : ''}
       ${reportsHtml}
     </div>`;
 };
@@ -354,12 +369,22 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>작성된 평가가 없어요.</p>
       ) : (
         <>
-          <div style={{ display: 'grid', gap: 5 }}>
-            {reports.slice(0, 6).map((r) => {
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {gradeCount.high > 0 && <span style={{ flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 800, padding: '6px 0', borderRadius: 8, background: GRADE_BG.high, color: GRADE_COLOR.high }}>잘함 {gradeCount.high}</span>}
+            {gradeCount.mid  > 0 && <span style={{ flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 800, padding: '6px 0', borderRadius: 8, background: GRADE_BG.mid,  color: GRADE_COLOR.mid  }}>보통 {gradeCount.mid}</span>}
+            {gradeCount.low  > 0 && <span style={{ flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 800, padding: '6px 0', borderRadius: 8, background: GRADE_BG.low,  color: GRADE_COLOR.low  }}>노력 {gradeCount.low}</span>}
+          </div>
+          <div style={{ display: 'grid', gap: 6, maxHeight: 360, overflowY: 'auto', paddingRight: 2 }}>
+            {reports.map((r) => {
               const gc = { high: 0, mid: 0, low: 0 };
               r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
+              const subject = getReportSubject(r);
+              const accent = (subject && SUBJECT_COLOR[subject]) ?? DEFAULT_SUBJECT_COLOR;
               return (
-                <div key={r.id} style={{ background: '#fff', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div key={r.id} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: `4px solid ${accent}` }}>
+                  {subject && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: accent, background: `${accent}1a`, borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>{subject}</span>
+                  )}
                   <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                     {gc.high > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: GRADE_BG.high, color: GRADE_COLOR.high }}>잘함 {gc.high}</span>}
@@ -370,9 +395,6 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
                 </div>
               );
             })}
-            {reports.length > 6 && (
-              <p style={{ margin: '4px 0 0', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>외 {reports.length - 6}건 더 있음</p>
-            )}
           </div>
         </>
       )}

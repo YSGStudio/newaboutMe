@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import { SUBJECT_LIST } from '@/lib/subjects';
 
 // ── Types ──────────────────────────────────────────────────────────
 type RubricCriterion = {
@@ -260,7 +261,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
                   style={{ width: 110 }}
                 >
                   <option value="">선택 안 함</option>
-                  {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
+                  {SUBJECT_LIST.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
@@ -603,7 +604,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
                     style={{ width: 140 }}
                   >
                     <option value="">선택 안 함</option>
-                    {['국어','수학','사회','과학','영어','음악','미술','체육','도덕','실과','정보','역사'].map((s) => (
+                    {SUBJECT_LIST.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>

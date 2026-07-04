@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: Params) {
 
   let query = supabaseAdmin
     .from('eval_reports')
-    .select('id, title, created_at, eval_report_items(id, grade, sort_order), eval_report_images(id, storage_path, sort_order), eval_report_links(id)')
+    .select('id, title, created_at, eval_report_items(id, grade, sort_order, rubric_subject_snapshot), eval_report_images(id, storage_path, sort_order), eval_report_links(id)')
     .eq('student_id', params.studentId)
     .eq('teacher_id', auth.teacher.id);
 

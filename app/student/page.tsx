@@ -8,6 +8,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { formatDateInSeoul } from '@/lib/date';
+import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionType } from '@/types/domain';
 import type { AwardedBadge } from '@/lib/badges';
 
@@ -108,22 +109,6 @@ type EvalReportDetail = {
 
 const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
-
-const SUBJECT_COLOR: Record<string, string> = {
-  국어: '#ef4444',
-  영어: '#8b5cf6',
-  수학: '#3b82f6',
-  사회: '#f59e0b',
-  과학: '#10b981',
-  역사: '#b45309',
-  도덕: '#64748b',
-  실과: '#84cc16',
-  정보: '#6366f1',
-  음악: '#ec4899',
-  미술: '#f97316',
-  체육: '#06b6d4',
-};
-const DEFAULT_SUBJECT_COLOR = '#94a3b8';
 
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
 const otherEmotionColor = '#94a3b8';
