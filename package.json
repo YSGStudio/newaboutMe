@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.8",
+    "bcryptjs": "^3.0.3",
     "next": "14.2.18",
     "openai": "^6.45.0",
     "react": "18.3.1",
@@ -18,6 +19,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.10",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

@@ -3,6 +3,7 @@ import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate } from '@/lib/utils';
 import { studentCreateSchema } from '@/lib/validators';
+import { hashPassword, DEFAULT_STUDENT_PASSWORD } from '@/lib/password';
 
 type Params = { params: { id: string } };
 
@@ -128,7 +129,8 @@ export async function POST(req: Request, { params }: Params) {
     .insert({
       class_id: params.id,
       name: parsed.data.name,
-      student_number: parsed.data.studentNumber
+      student_number: parsed.data.studentNumber,
+      password_hash: await hashPassword(DEFAULT_STUDENT_PASSWORD)
     })
     .select('id,name,student_number,created_at')
     .single();

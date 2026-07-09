@@ -328,7 +328,8 @@ export default function StudentPage() {
         method: 'POST',
         body: JSON.stringify({
           classCode: String(form.get('classCode')).trim(),
-          name: String(form.get('name'))
+          name: String(form.get('name')),
+          password: String(form.get('password'))
         })
       });
 
@@ -865,6 +866,10 @@ export default function StudentPage() {
             <div>
               <label>이름</label>
               <input name="name" placeholder="김마음" required />
+            </div>
+            <div>
+              <label>비밀번호</label>
+              <input name="password" type="password" placeholder="••••" required maxLength={4} inputMode="numeric" pattern="[0-9]{4}" />
             </div>
             <SubmitButton loading={loginLoading} idleText="로그인" />
           </form>
