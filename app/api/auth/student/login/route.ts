@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentLoginSchema } from '@/lib/validators';
+import { verifyPassword } from '@/lib/password';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
 
   const { data: student } = await supabaseAdmin
     .from('students')
-    .select('id,name,student_number')
+    .select('id,name,student_number,password_hash')
     .eq('class_id', classRow.id)
     .eq('name', parsed.data.name);
 
@@ -38,6 +39,11 @@ export async function POST(req: Request) {
   }
 
   const matchedStudent = student[0];
+
+  const passwordOk = await verifyPassword(parsed.data.password, matchedStudent.password_hash);
+  if (!passwordOk) {
+    return NextResponse.json({ error: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
+  }
 
   await createStudentSession(matchedStudent.id);
 

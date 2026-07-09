@@ -10,6 +10,7 @@ import StatsDashboard from '@/components/teacher/StatsDashboard';
 import EvalDashboard from '@/components/teacher/EvalDashboard';
 import ClassSettings from '@/components/teacher/ClassSettings';
 import { formatDateInSeoul } from '@/lib/date';
+import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
 
 type LetterRow = {
@@ -125,6 +126,18 @@ export default function TeacherPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deletePasswordError, setDeletePasswordError] = useState('');
   const [deletePasswordLoading, setDeletePasswordLoading] = useState(false);
+
+  // 학생 비밀번호 개별 변경
+  const [passwordEditStudent, setPasswordEditStudent] = useState<StudentItem | null>(null);
+  const [newStudentPassword, setNewStudentPassword] = useState('');
+  const [passwordEditError, setPasswordEditError] = useState('');
+  const [passwordEditLoading, setPasswordEditLoading] = useState(false);
+
+  // 학급 전체 비밀번호 초기화
+  const [showResetAllPasswordConfirm, setShowResetAllPasswordConfirm] = useState(false);
+  const [resetPasswordTeacherPw, setResetPasswordTeacherPw] = useState('');
+  const [resetPasswordError, setResetPasswordError] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
   // 클래스메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
@@ -488,6 +501,69 @@ export default function TeacherPage() {
     } finally {
       setDeletingStudentId('');
       setDeletePasswordLoading(false);
+    }
+  };
+
+  const onChangeStudentPassword = (student: StudentItem) => {
+    setPasswordEditStudent(student);
+    setNewStudentPassword('');
+    setPasswordEditError('');
+  };
+
+  const onConfirmChangeStudentPassword = async () => {
+    if (!passwordEditStudent) return;
+    setPasswordEditError('');
+    setPasswordEditLoading(true);
+
+    try {
+      await api(`/api/students/${passwordEditStudent.id}/password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password: newStudentPassword }),
+      });
+      setPasswordEditStudent(null);
+      setNewStudentPassword('');
+      setAuthMessage('비밀번호가 변경되었습니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setPasswordEditError((error as Error).message);
+    } finally {
+      setPasswordEditLoading(false);
+    }
+  };
+
+  const onResetAllPasswords = () => {
+    setShowResetAllPasswordConfirm(true);
+    setResetPasswordTeacherPw('');
+    setResetPasswordError('');
+  };
+
+  const onConfirmResetAllPasswords = async () => {
+    if (!selectedClassId) return;
+    setResetPasswordError('');
+    setResetPasswordLoading(true);
+
+    try {
+      await api('/api/auth/teacher/verify', {
+        method: 'POST',
+        body: JSON.stringify({ password: resetPasswordTeacherPw }),
+      });
+    } catch {
+      setResetPasswordError('비밀번호가 올바르지 않습니다.');
+      setResetPasswordLoading(false);
+      return;
+    }
+
+    try {
+      await api(`/api/classes/${selectedClassId}/students/reset-password`, { method: 'POST' });
+      setShowResetAllPasswordConfirm(false);
+      setResetPasswordTeacherPw('');
+      setAuthMessage('학급 전체 학생의 비밀번호가 1234로 초기화되었습니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setAuthError((error as Error).message);
+      clearNoticeLater();
+    } finally {
+      setResetPasswordLoading(false);
     }
   };
 
@@ -863,20 +939,37 @@ export default function TeacherPage() {
             <section className="card">
               <div className="row space-between" style={{ alignItems: 'center', marginBottom: 16 }}>
                 <h2 style={{ margin: 0 }}>학생 관리</h2>
-                <button
-                  type="button"
-                  style={{
-                    width: 'auto', fontSize: 13, fontWeight: 600,
-                    padding: '7px 14px',
-                    background: showAddStudent ? '#ede9fe' : '#6366f1',
-                    color: showAddStudent ? '#6366f1' : '#fff',
-                    border: '1.5px solid #6366f1',
-                    borderRadius: 10, cursor: 'pointer',
-                  }}
-                  onClick={() => setShowAddStudent((v) => !v)}
-                >
-                  {showAddStudent ? '접기 ▲' : '학생 추가 ▼'}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    style={{
+                      width: 'auto', fontSize: 13, fontWeight: 600,
+                      padding: '7px 14px',
+                      background: '#fff',
+                      color: '#dc2626',
+                      border: '1.5px solid #fca5a5',
+                      borderRadius: 10, cursor: 'pointer',
+                    }}
+                    onClick={onResetAllPasswords}
+                    disabled={!selectedClassId}
+                  >
+                    비밀번호 전체 초기화
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      width: 'auto', fontSize: 13, fontWeight: 600,
+                      padding: '7px 14px',
+                      background: showAddStudent ? '#ede9fe' : '#6366f1',
+                      color: showAddStudent ? '#6366f1' : '#fff',
+                      border: '1.5px solid #6366f1',
+                      borderRadius: 10, cursor: 'pointer',
+                    }}
+                    onClick={() => setShowAddStudent((v) => !v)}
+                  >
+                    {showAddStudent ? '접기 ▲' : '학생 추가 ▼'}
+                  </button>
+                </div>
               </div>
 
               {showAddStudent && (
@@ -952,19 +1045,29 @@ export default function TeacherPage() {
                             </div>
                           )}
 
-                          <button
-                            type="button"
-                            className="outline"
-                            style={{
-                              marginTop: 10, fontSize: 12, padding: '4px 10px',
-                              color: '#dc2626', borderColor: '#fca5a5',
-                              alignSelf: 'flex-start',
-                            }}
-                            onClick={() => onDeleteStudent(student)}
-                            disabled={deletingStudentId === student.id}
-                          >
-                            {deletingStudentId === student.id ? '삭제 중...' : '삭제'}
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                            <button
+                              type="button"
+                              className="outline"
+                              style={{ fontSize: 12, padding: '4px 10px', alignSelf: 'flex-start' }}
+                              onClick={() => onChangeStudentPassword(student)}
+                            >
+                              비밀번호 변경
+                            </button>
+                            <button
+                              type="button"
+                              className="outline"
+                              style={{
+                                fontSize: 12, padding: '4px 10px',
+                                color: '#dc2626', borderColor: '#fca5a5',
+                                alignSelf: 'flex-start',
+                              }}
+                              onClick={() => onDeleteStudent(student)}
+                              disabled={deletingStudentId === student.id}
+                            >
+                              {deletingStudentId === student.id ? '삭제 중...' : '삭제'}
+                            </button>
+                          </div>
                         </article>
                       );
                     })}
@@ -1378,6 +1481,147 @@ export default function TeacherPage() {
                 }}
               >
                 {deletePasswordLoading ? '확인 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 학생 개별 비밀번호 변경 모달 */}
+      {passwordEditStudent && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
+                학생 비밀번호 변경
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                <strong style={{ color: '#1e1b4b' }}>
+                  {passwordEditStudent.student_number}번 {passwordEditStudent.name}
+                </strong> 학생의 새 비밀번호(숫자 4자리)를 입력하세요.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                value={newStudentPassword}
+                onChange={(e) => setNewStudentPassword(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirmChangeStudentPassword(); }}
+                placeholder="1234"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: passwordEditError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {passwordEditError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{passwordEditError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setPasswordEditStudent(null); setNewStudentPassword(''); setPasswordEditError(''); }}
+                disabled={passwordEditLoading}
+                style={{ fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmChangeStudentPassword}
+                disabled={passwordEditLoading || !STUDENT_PASSWORD_REGEX.test(newStudentPassword)}
+                style={{
+                  background: '#6366f1', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14,
+                  fontWeight: 600, cursor: 'pointer',
+                  opacity: (passwordEditLoading || !STUDENT_PASSWORD_REGEX.test(newStudentPassword)) ? 0.5 : 1,
+                }}
+              >
+                {passwordEditLoading ? '변경 중...' : '변경'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 학급 전체 비밀번호 초기화 확인 모달 */}
+      {showResetAllPasswordConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 400,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
+                비밀번호 전체 초기화
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                이 학급의 <strong style={{ color: '#dc2626' }}>모든 학생</strong> 비밀번호가 1234로 초기화됩니다.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+                계속하려면 내 비밀번호를 입력하세요
+              </label>
+              <input
+                type="password"
+                value={resetPasswordTeacherPw}
+                onChange={(e) => setResetPasswordTeacherPw(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirmResetAllPasswords(); }}
+                placeholder="비밀번호"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: resetPasswordError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {resetPasswordError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{resetPasswordError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setShowResetAllPasswordConfirm(false); setResetPasswordTeacherPw(''); setResetPasswordError(''); }}
+                disabled={resetPasswordLoading}
+                style={{ fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmResetAllPasswords}
+                disabled={resetPasswordLoading || !resetPasswordTeacherPw}
+                style={{
+                  background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14,
+                  fontWeight: 600, cursor: 'pointer', opacity: (!resetPasswordTeacherPw || resetPasswordLoading) ? 0.5 : 1,
+                }}
+              >
+                {resetPasswordLoading ? '확인 중...' : '초기화'}
               </button>
             </div>
           </div>

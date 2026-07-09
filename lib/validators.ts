@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EMOTION_TYPES } from '@/types/domain';
+import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 
 export const teacherSignupSchema = z.object({
   email: z.string().email(),
@@ -32,7 +33,12 @@ export const studentLoginSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9]{1,6}$/, '학급코드는 1~6자리 숫자여야 합니다.'),
-  name: z.string().min(1).max(30)
+  name: z.string().min(1).max(30),
+  password: z.string().regex(STUDENT_PASSWORD_REGEX, '비밀번호는 숫자 4자리여야 합니다.')
+});
+
+export const studentPasswordChangeSchema = z.object({
+  password: z.string().regex(STUDENT_PASSWORD_REGEX, '비밀번호는 숫자 4자리여야 합니다.')
 });
 
 export const feedCreateSchema = z.object({
