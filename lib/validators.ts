@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EMOTION_TYPES } from '@/types/domain';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
+import { MAX_NOMINATIONS_PER_TYPE } from '@/lib/relationship';
 
 export const teacherSignupSchema = z.object({
   email: z.string().email(),
@@ -61,4 +62,19 @@ export const planUpdateSchema = z.object({
 
 export const planCheckSchema = z.object({
   isCompleted: z.boolean().nullable()
+});
+
+export const relationshipSurveyCreateSchema = z.object({
+  classId: z.string().uuid(),
+  includesNegative: z.boolean().optional().default(false)
+});
+
+const relationshipQuestionTypeSchema = z.enum(['positive', 'negative', 'role_leader', 'role_isolated']);
+
+export const relationshipResponseSubmitSchema = z.object({
+  nominations: z.array(z.object({
+    questionType: relationshipQuestionTypeSchema,
+    targetId: z.string().uuid()
+  })).max(MAX_NOMINATIONS_PER_TYPE * 4),
+  openResponse: z.string().max(300).trim().optional()
 });

@@ -157,7 +157,7 @@ export default function StudentPage() {
   const [emotionStats, setEmotionStats] = useState<EmotionStats>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval' | 'letters'>('emotion');
+  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval' | 'relationship' | 'letters'>('emotion');
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
@@ -171,6 +171,19 @@ export default function StudentPage() {
   const [evalModalError, setEvalModalError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lightboxLoadingId, setLightboxLoadingId] = useState('');
+
+  // 교우관계 설문 상태
+  const [relationshipLoaded, setRelationshipLoaded] = useState(false);
+  const [activeSurvey, setActiveSurvey] = useState<{ id: string; title: string; includesNegative: boolean } | null>(null);
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
+  const [surveyClassmates, setSurveyClassmates] = useState<Classmate[]>([]);
+  const [positivePicks, setPositivePicks] = useState<string[]>([]);
+  const [negativePicks, setNegativePicks] = useState<string[]>([]);
+  const [leaderPicks, setLeaderPicks] = useState<string[]>([]);
+  const [isolatedPicks, setIsolatedPicks] = useState<string[]>([]);
+  const [openResponseText, setOpenResponseText] = useState('');
+  const [surveySubmitting, setSurveySubmitting] = useState(false);
+  const [surveyError, setSurveyError] = useState('');
 
   // 클래스메일 상태
   const [letterBox, setLetterBox] = useState<'received' | 'sent'>('received');
@@ -338,7 +351,7 @@ export default function StudentPage() {
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats(), loadBadgeProfile()]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats(), loadBadgeProfile(), loadRelationshipStatus()]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -722,6 +735,52 @@ export default function StudentPage() {
     }
   };
 
+  const loadRelationshipStatus = async () => {
+    try {
+      const d = await api<{
+        survey: { id: string; title: string; includesNegative: boolean } | null;
+        alreadyCompleted?: boolean;
+        classmates?: Classmate[];
+      }>('/api/relationship/surveys/active');
+      setActiveSurvey(d.survey);
+      setSurveyCompleted(Boolean(d.alreadyCompleted));
+      setSurveyClassmates(d.classmates ?? []);
+    } catch {
+      // 무시 — 배너 노출 실패는 치명적이지 않음
+    } finally {
+      setRelationshipLoaded(true);
+    }
+  };
+
+  const togglePick = (list: string[], setList: (v: string[]) => void, id: string, max: number) => {
+    setList(list.includes(id) ? list.filter((x) => x !== id) : list.length < max ? [...list, id] : list);
+  };
+
+  const onSubmitRelationshipSurvey = async () => {
+    if (!activeSurvey) return;
+    setSurveySubmitting(true);
+    setSurveyError('');
+    try {
+      const nominations = [
+        ...positivePicks.map((targetId) => ({ questionType: 'positive', targetId })),
+        ...negativePicks.map((targetId) => ({ questionType: 'negative', targetId })),
+        ...leaderPicks.map((targetId) => ({ questionType: 'role_leader', targetId })),
+        ...isolatedPicks.map((targetId) => ({ questionType: 'role_isolated', targetId }))
+      ];
+      await api(`/api/relationship/surveys/${activeSurvey.id}/responses`, {
+        method: 'POST',
+        body: JSON.stringify({ nominations, openResponse: openResponseText.trim() || undefined })
+      });
+      setSurveyCompleted(true);
+      setMessage('설문 응답이 제출되었습니다.');
+      clearNoticeLater();
+    } catch (err) {
+      setSurveyError((err as Error).message);
+    } finally {
+      setSurveySubmitting(false);
+    }
+  };
+
   const handleNewBadges = (newBadges: AwardedBadge[]) => {
     if (!newBadges || newBadges.length === 0) return;
     setBadgePopupQueue((prev) => [...prev, ...newBadges]);
@@ -899,6 +958,7 @@ export default function StudentPage() {
                 { key: 'plan', label: '오늘의 계획' },
                 { key: 'stats', label: '나의 감정통계' },
                 { key: 'eval', label: '평가기록' },
+                { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}` },
                 ...(lettersEnabled ? [{
                   key: 'letters',
                   label: `클래스메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
@@ -906,9 +966,10 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval' | 'letters');
+                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval' | 'relationship' | 'letters');
                 if (key === 'stats' && !emotionStats) loadEmotionStats();
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
+                if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
                   if (!receivedLoaded) loadReceived().catch(() => null);
                   if (!classmatesLoaded) loadClassmates().catch(() => null);
@@ -1555,6 +1616,131 @@ export default function StudentPage() {
                     );
                   })}
                 </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'relationship' && (
+            <section className="card">
+              <h2 style={{ marginTop: 0 }}>교우관계 설문</h2>
+              {!relationshipLoaded ? (
+                <p className="hint">불러오는 중...</p>
+              ) : !activeSurvey ? (
+                <EmptyState title="진행 중인 설문이 없습니다" description="선생님이 설문을 시작하면 여기에 표시돼요." />
+              ) : surveyCompleted ? (
+                <EmptyState title="이미 응답했어요" description="다음 설문이 시작되면 다시 알려드릴게요." />
+              ) : (
+                <form
+                  className="grid"
+                  style={{ gap: 20 }}
+                  onSubmit={(e) => { e.preventDefault(); onSubmitRelationshipSurvey(); }}
+                >
+                  <Notice type="error" message={surveyError} />
+
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>함께 놀고 싶은 친구를 골라주세요 (최대 3명)</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {surveyClassmates.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => togglePick(positivePicks, setPositivePicks, c.id, 3)}
+                          style={{
+                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
+                            border: positivePicks.includes(c.id) ? '1.5px solid #6366f1' : '1.5px solid #e2e8f0',
+                            background: positivePicks.includes(c.id) ? '#eef2ff' : '#fff',
+                            color: positivePicks.includes(c.id) ? '#6366f1' : '#334155',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {c.student_number}번 {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>우리 반에서 리더 역할을 하는 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {surveyClassmates.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => togglePick(leaderPicks, setLeaderPicks, c.id, 3)}
+                          style={{
+                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
+                            border: leaderPicks.includes(c.id) ? '1.5px solid #16a34a' : '1.5px solid #e2e8f0',
+                            background: leaderPicks.includes(c.id) ? '#dcfce7' : '#fff',
+                            color: leaderPicks.includes(c.id) ? '#16a34a' : '#334155',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {c.student_number}번 {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>혼자 있는 것 같은 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {surveyClassmates.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => togglePick(isolatedPicks, setIsolatedPicks, c.id, 3)}
+                          style={{
+                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
+                            border: isolatedPicks.includes(c.id) ? '1.5px solid #0ea5e9' : '1.5px solid #e2e8f0',
+                            background: isolatedPicks.includes(c.id) ? '#e0f2fe' : '#fff',
+                            color: isolatedPicks.includes(c.id) ? '#0369a1' : '#334155',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {c.student_number}번 {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {activeSurvey.includesNegative && (
+                    <div>
+                      <p style={{ margin: '0 0 8px', fontWeight: 700 }}>요즘 함께 하기 어려운 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {surveyClassmates.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => togglePick(negativePicks, setNegativePicks, c.id, 3)}
+                            style={{
+                              width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
+                              border: negativePicks.includes(c.id) ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                              background: negativePicks.includes(c.id) ? '#fee2e2' : '#fff',
+                              color: negativePicks.includes(c.id) ? '#dc2626' : '#334155',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {c.student_number}번 {c.name}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="hint" style={{ marginTop: 6 }}>이 응답은 선생님만 확인하며, 친구에게 전달되지 않아요.</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label>요즘 반에서 기억에 남는 일이 있다면 적어주세요 (선택)</label>
+                    <textarea
+                      value={openResponseText}
+                      onChange={(e) => setOpenResponseText(e.target.value)}
+                      maxLength={300}
+                      placeholder="예: 오늘 모둠활동이 재미있었어요"
+                      style={{ minHeight: 70 }}
+                    />
+                  </div>
+
+                  <SubmitButton loading={surveySubmitting} idleText="제출하기" disabled={positivePicks.length === 0} />
+                </form>
               )}
             </section>
           )}
