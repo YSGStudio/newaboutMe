@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
+import RelationshipDashboard from '@/components/teacher/RelationshipDashboard';
 import EvalDashboard from '@/components/teacher/EvalDashboard';
 import ClassSettings from '@/components/teacher/ClassSettings';
 import { formatDateInSeoul } from '@/lib/date';
@@ -92,7 +93,7 @@ export default function TeacherPage() {
   const [changePwLoading, setChangePwLoading] = useState(false);
   const [changePwMessage, setChangePwMessage] = useState('');
   const [changePwError, setChangePwError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'letters' | 'settings' | 'admin'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'settings' | 'admin'>('class');
 
   // 교사 역할 정보
   const [teacherRole, setTeacherRole] = useState<TeacherRole>('general');
@@ -790,6 +791,7 @@ export default function TeacherPage() {
                 { key: 'eval', label: '평가피드백' },
                 { key: 'letters', label: '클래스메일' },
                 { key: 'stats', label: '성장리포트' },
+                { key: 'relationship', label: '교우관계' },
                 { key: 'settings', label: '학급설정' },
                 ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }] : []),
               ]}
@@ -1306,6 +1308,18 @@ export default function TeacherPage() {
           )}
 
           {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canUseAi={canUseAi} />}
+
+          {activeTab === 'relationship' && (
+            <section className="card">
+              <div style={{ marginBottom: 20 }}>
+                <h2 style={{ margin: '0 0 4px' }}>교우관계</h2>
+                <p className="hint" style={{ margin: 0 }}>
+                  짧은 설문으로 학급 내 교우관계·고립 학생·갈등 조짐을 파악합니다.
+                </p>
+              </div>
+              <RelationshipDashboard classId={selectedClassId} />
+            </section>
+          )}
 
           {activeTab === 'settings' && (
             <section className="card">
