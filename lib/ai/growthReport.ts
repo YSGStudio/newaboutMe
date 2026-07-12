@@ -115,6 +115,22 @@ export async function getOrGenerateGrowthReport(
   };
 }
 
+// 오늘 생성분이 아니어도, 해당 학생·기간의 가장 최근 저장 결과를 그대로 불러온다.
+// (보고서를 다시 열었을 때 매번 새로 분석하지 않고 지난 결과를 바로 보여주기 위함)
+export async function getSavedGrowthReport(studentId: string, period: Period): Promise<GrowthReportApiResult | null> {
+  const { data } = await supabaseAdmin
+    .from('ai_growth_reports')
+    .select('plan_analysis, emotion_insight, growth_suggestion, created_at')
+    .eq('student_id', studentId)
+    .eq('period', period)
+    .order('generated_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+  return buildApiResultFromCache(data as CachedRow);
+}
+
 function buildApiResultFromCache(cached: CachedRow): GrowthReportApiResult {
   return {
     planAnalysis: cached.plan_analysis,

@@ -933,9 +933,6 @@ export default function TeacherPage() {
               <div className="grid two" style={{ alignItems: 'start', gap: 14 }}>
                 <article className="card" style={{ padding: 12 }}>
                   <h3 style={{ marginTop: 0, marginBottom: 10 }}>새 학급 만들기</h3>
-                  {!canCreateClass && (
-                    <Notice type="info" message="무료회원은 학급을 1개까지 만들 수 있습니다. 추가 학급이 필요하면 유료회원으로 전환해주세요." />
-                  )}
                   <form className="grid" onSubmit={onCreateClass} ref={classFormRef}>
                     <div>
                       <label>학급명</label>

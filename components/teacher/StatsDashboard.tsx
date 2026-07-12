@@ -628,14 +628,16 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       setEvalLoading(true);
       setDetailError('');
       try {
-        const [snapshotData, evalData, hollandData] = await Promise.all([
+        const [snapshotData, evalData, hollandData, growthData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
           api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`),
           api<{ report: HollandAiResult | null }>(`/api/ai/holland-report/${activeStudentId}`),
+          api<{ report: GrowthAiResult | null }>(`/api/ai/growth-report/${activeStudentId}?period=${period}`),
         ]);
         setSnapshot(snapshotData);
         setEvalReports(evalData.reports);
         if (hollandData.report) setHollandResult(hollandData.report);
+        if (growthData.report) setAiResult(growthData.report);
       } catch (err) {
         setSnapshot(null);
         setDetailError((err as Error).message);

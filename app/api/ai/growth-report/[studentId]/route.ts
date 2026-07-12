@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
-import { isPeriod } from '@/lib/stats';
-import { getOrGenerateGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
+import { isPeriod, type Period } from '@/lib/stats';
+import { getOrGenerateGrowthReport, getSavedGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
 
 type Params = { params: { studentId: string } };
 
@@ -11,6 +11,22 @@ const bodySchema = z.object({
   period: z.string().refine(isPeriod, { message: 'period는 week/month/semester 중 하나여야 합니다.' }),
   forceRefresh: z.boolean().optional(),
 });
+
+// 학생 선택 시 저장된 성장 리포트를 자동으로 불러온다 (없으면 report: null)
+export async function GET(req: Request, { params }: Params) {
+  const auth = await requireTeacher();
+  if ('error' in auth) return auth.error;
+
+  const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
+  if ('error' in owned) return owned.error;
+
+  const url = new URL(req.url);
+  const periodParam = url.searchParams.get('period');
+  const period: Period = isPeriod(periodParam) ? periodParam : 'month';
+
+  const report = await getSavedGrowthReport(params.studentId, period);
+  return NextResponse.json({ report });
+}
 
 export async function POST(req: Request, { params }: Params) {
   const auth = await requireTeacher();
