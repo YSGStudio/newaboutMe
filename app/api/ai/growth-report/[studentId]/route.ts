@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireTeacher, requireAiAccess } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { requireTeacher, requireAiAccess, requireTeacherStudent } from '@/lib/auth';
+import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
 import { isPeriod } from '@/lib/stats';
 import { getOrGenerateGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
 
@@ -22,14 +22,13 @@ export async function POST(req: Request, { params }: Params) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id, name, student_number, classes!inner(teacher_id)')
-    .eq('id', params.studentId)
-    .maybeSingle();
+  const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
+  if ('error' in owned) return owned.error;
+  const student = owned.student;
 
-  if (!student || (student.classes as unknown as { teacher_id: string }).teacher_id !== auth.teacher.id) {
-    return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
+  const usage = await getAiUsage(auth.teacher);
+  if (usage.remaining !== null && usage.remaining <= 0) {
+    return quotaExceededResponse(usage);
   }
 
   try {
@@ -41,6 +40,10 @@ export async function POST(req: Request, { params }: Params) {
       parsed.data.period,
       parsed.data.forceRefresh ?? false,
     );
+    // 캐시 반환은 OpenAI를 호출하지 않으므로 사용량에서 제외
+    if (!result.cached) {
+      await logAiUsage(auth.teacher.id, 'growth_report', student.id);
+    }
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof InsufficientDataError) {

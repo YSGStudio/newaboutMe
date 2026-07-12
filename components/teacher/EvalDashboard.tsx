@@ -797,7 +797,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 }
 
 // ── Main: EvalDashboard ───────────────────────────────────────────
-export default function EvalDashboard({ classId, students }: { classId: string; students: StudentItem[] }) {
+export default function EvalDashboard({ classId, students, onAiUsageChanged }: { classId: string; students: StudentItem[]; onAiUsageChanged?: () => void }) {
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
   const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric' | 'lookup' | 'comprehensive'>('overview');
   const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
@@ -1166,6 +1166,7 @@ export default function EvalDashboard({ classId, students }: { classId: string; 
     try {
       const result = await api<ComprehensiveResult>(`/api/ai/subject-report/${comprehensiveStudentId}`, { method: 'POST' });
       setComprehensiveResult(result);
+      onAiUsageChanged?.();
     } catch (err) { setComprehensiveError((err as Error).message); }
     finally { setComprehensiveAnalyzing(false); }
   };

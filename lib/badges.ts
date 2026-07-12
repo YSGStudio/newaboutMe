@@ -1,5 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { todayDate, getSeoulDayRange } from '@/lib/date';
+import { todayDate, formatDateInSeoul } from '@/lib/date';
+import { EMOTION_META } from '@/types/domain';
+import type { EmotionType } from '@/types/domain';
 
 export type BadgeCategory = 'emotion' | 'plan' | 'reflection' | 'letter';
 export type BadgeTrigger = 'emotion_save' | 'plan_complete' | 'reflection_save' | 'mail_send';
@@ -85,29 +87,24 @@ async function awardBadgeList(
   badgeIds: string[],
   classTitles?: ClassTitleSetting[],
 ): Promise<AwardedBadge[]> {
-  // 이미 획득한 뱃지 목록
-  const { data: earned } = await supabase
-    .from('student_badges')
-    .select('badge_id')
-    .eq('student_id', studentId);
+  // 이미 획득한 뱃지 목록 + 학생 현재 badge_count 조회
+  const [{ data: earned }, { data: studentRow }] = await Promise.all([
+    supabase.from('student_badges').select('badge_id').eq('student_id', studentId),
+    supabase.from('students').select('badge_count').eq('id', studentId).single(),
+  ]);
 
   const earnedSet = new Set((earned ?? []).map((r: { badge_id: string }) => r.badge_id));
+  const remaining = badgeIds.filter((id) => !earnedSet.has(id));
+  if (remaining.length === 0) return [];
 
-  // 학생 현재 badge_count 조회
-  const { data: studentRow } = await supabase
-    .from('students')
-    .select('badge_count')
-    .eq('id', studentId)
-    .single();
+  // 검사 대상 뱃지가 필요로 하는 데이터만 일괄 로드한 뒤 조건은 메모리에서 판정
+  const stats = await loadBadgeStats(supabase, studentId, remaining);
 
   let currentCount: number = studentRow?.badge_count ?? 0;
   const newlyAwarded: AwardedBadge[] = [];
 
-  for (const badgeId of badgeIds) {
-    if (earnedSet.has(badgeId)) continue;
-
-    const met = await checkCondition(supabase, studentId, badgeId);
-    if (!met) continue;
+  for (const badgeId of remaining) {
+    if (!checkCondition(stats, badgeId)) continue;
 
     const { error: insertError } = await supabase
       .from('student_badges')
@@ -122,15 +119,17 @@ async function awardBadgeList(
     const newTitle = getTitleByBadgeCount(currentCount, classTitles);
     const prevTitle = getTitleByBadgeCount(currentCount - 1, classTitles);
 
-    await supabase
-      .from('students')
-      .update({ badge_count: currentCount, title: newTitle })
-      .eq('id', studentId);
-
     newlyAwarded.push({
       badge: BADGE_MAP[badgeId],
       newTitle: newTitle !== prevTitle ? newTitle : null,
     });
+  }
+
+  if (newlyAwarded.length > 0) {
+    await supabase
+      .from('students')
+      .update({ badge_count: currentCount, title: getTitleByBadgeCount(currentCount, classTitles) })
+      .eq('id', studentId);
   }
 
   return newlyAwarded;
@@ -149,167 +148,162 @@ export async function checkAndAwardBadge(
   return awardBadgeList(supabase, studentId, ids, classTitles);
 }
 
-async function checkCondition(
+type BadgeStats = {
+  emotion: { total: number; typeCount: number; categoryCount: number; recordedDates: Set<string> } | null;
+  plans: { perfectDays: number; checkedAllDays: number; anyCompleted: boolean; todayPerfect: boolean } | null;
+  reflectionCount: number | null;
+  letterCount: number | null;
+};
+
+// 검사할 뱃지들이 필요로 하는 테이블만 골라 각 1회씩 조회한다.
+// (기존에는 뱃지마다 개별 쿼리를 날려 요청당 최대 15~20 쿼리가 발생했음)
+async function loadBadgeStats(
   supabase: SupabaseClient,
   studentId: string,
-  badgeId: string
-): Promise<boolean> {
+  badgeIds: string[],
+): Promise<BadgeStats> {
+  const needsEmotion = badgeIds.some((id) => id.startsWith('emotion_') || id === 'plan_perfect_day');
+  const needsPlans = badgeIds.some((id) => id.startsWith('plan_'));
+  const needsReflection = badgeIds.some((id) => id.startsWith('reflection_'));
+  const needsLetters = badgeIds.some((id) => id.startsWith('letter_'));
+
+  const [emotionRes, plansRes, reflectionRes, letterRes] = await Promise.all([
+    needsEmotion
+      ? supabase.from('emotion_feeds').select('emotion_type,created_at').eq('student_id', studentId)
+      : Promise.resolve(null),
+    needsPlans
+      ? supabase.from('plans').select('id').eq('student_id', studentId).eq('is_active', true)
+      : Promise.resolve(null),
+    needsReflection
+      ? supabase.from('eval_reflections').select('id', { count: 'exact', head: true }).eq('student_id', studentId)
+      : Promise.resolve(null),
+    needsLetters
+      ? supabase.from('letters').select('id', { count: 'exact', head: true }).eq('sender_id', studentId)
+      : Promise.resolve(null),
+  ]);
+
+  let emotion: BadgeStats['emotion'] = null;
+  if (emotionRes) {
+    const rows = (emotionRes.data ?? []) as { emotion_type: string; created_at: string }[];
+    const types = new Set<string>();
+    const categories = new Set<string>();
+    const recordedDates = new Set<string>();
+    for (const row of rows) {
+      types.add(row.emotion_type);
+      const category = EMOTION_META[row.emotion_type as EmotionType]?.category;
+      if (category) categories.add(category);
+      recordedDates.add(formatDateInSeoul(new Date(row.created_at)));
+    }
+    emotion = { total: rows.length, typeCount: types.size, categoryCount: categories.size, recordedDates };
+  }
+
+  let plans: BadgeStats['plans'] = null;
+  if (plansRes) {
+    const planIds = ((plansRes.data ?? []) as { id: string }[]).map((p) => p.id);
+    if (planIds.length === 0) {
+      plans = { perfectDays: 0, checkedAllDays: 0, anyCompleted: false, todayPerfect: false };
+    } else {
+      const { data: checks } = await supabase
+        .from('plan_checks')
+        .select('plan_id,check_date,is_completed')
+        .in('plan_id', planIds);
+
+      const byDate = new Map<string, { total: number; completed: number; plans: Set<string> }>();
+      let anyCompleted = false;
+      for (const c of (checks ?? []) as { plan_id: string; check_date: string; is_completed: boolean }[]) {
+        const entry = byDate.get(c.check_date) ?? { total: 0, completed: 0, plans: new Set<string>() };
+        entry.total += 1;
+        entry.plans.add(c.plan_id);
+        if (c.is_completed) {
+          entry.completed += 1;
+          anyCompleted = true;
+        }
+        byDate.set(c.check_date, entry);
+      }
+
+      let perfectDays = 0;
+      let checkedAllDays = 0;
+      for (const entry of byDate.values()) {
+        if (entry.total > 0 && entry.total === entry.completed) perfectDays += 1;
+        if (entry.plans.size >= planIds.length) checkedAllDays += 1;
+      }
+
+      const todayEntry = byDate.get(todayDate());
+      const todayPerfect = Boolean(
+        todayEntry && todayEntry.plans.size >= planIds.length && todayEntry.total === todayEntry.completed
+      );
+
+      plans = { perfectDays, checkedAllDays, anyCompleted, todayPerfect };
+    }
+  }
+
+  return {
+    emotion,
+    plans,
+    reflectionCount: reflectionRes ? reflectionRes.count ?? 0 : null,
+    letterCount: letterRes ? letterRes.count ?? 0 : null,
+  };
+}
+
+// 오늘 포함 최근 7일의 KST 날짜 문자열 목록
+function last7SeoulDates(): string[] {
+  return Array.from({ length: 7 }, (_, i) => formatDateInSeoul(new Date(Date.now() - i * 86400000)));
+}
+
+function checkCondition(stats: BadgeStats, badgeId: string): boolean {
   switch (badgeId) {
     // ── 감정 기록 ──────────────────────────────────────────
-    case 'emotion_first': {
-      const { count } = await supabase
-        .from('emotion_feeds')
-        .select('id', { count: 'exact', head: true })
-        .eq('student_id', studentId);
-      return (count ?? 0) >= 1;
-    }
+    case 'emotion_first':
+      return (stats.emotion?.total ?? 0) >= 1;
     case 'emotion_10':
+      return (stats.emotion?.total ?? 0) >= 10;
     case 'emotion_30':
-    case 'emotion_100': {
-      const threshold = badgeId === 'emotion_10' ? 10 : badgeId === 'emotion_30' ? 30 : 100;
-      const { count } = await supabase
-        .from('emotion_feeds')
-        .select('id', { count: 'exact', head: true })
-        .eq('student_id', studentId);
-      return (count ?? 0) >= threshold;
-    }
+      return (stats.emotion?.total ?? 0) >= 30;
+    case 'emotion_100':
+      return (stats.emotion?.total ?? 0) >= 100;
     case 'emotion_7days': {
-      // 오늘 포함 최근 7일 모두 기록 존재하는지
-      const dates: string[] = [];
-      for (let i = 0; i < 7; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-        dates.push(kst.toISOString().slice(0, 10));
-      }
-      const checks = await Promise.all(
-        dates.map(async (date) => {
-          const { startIso, endIso } = getSeoulDayRange(date);
-          const { count } = await supabase
-            .from('emotion_feeds')
-            .select('id', { count: 'exact', head: true })
-            .eq('student_id', studentId)
-            .gte('created_at', startIso)
-            .lte('created_at', endIso);
-          return (count ?? 0) > 0;
-        })
-      );
-      return checks.every(Boolean);
+      const recorded = stats.emotion?.recordedDates;
+      if (!recorded) return false;
+      return last7SeoulDates().every((date) => recorded.has(date));
     }
-    case 'emotion_rainbow': {
-      const { data } = await supabase
-        .from('emotion_feeds')
-        .select('emotion_type')
-        .eq('student_id', studentId);
-      if (!data) return false;
-      // emotion_type → category 매핑은 서버에서 할 수 없으므로 emotion_type 자체로 카테고리 추론
-      // 6 카테고리: joy_vitality, affection_bond, anxiety_tension, sadness_lethargy, anger_rejection, social_emotions
-      const EMOTION_CATEGORY_MAP: Record<string, string> = {
-        moved: 'joy_vitality', joyful: 'joy_vitality', surprised: 'joy_vitality',
-        satisfied: 'joy_vitality', fulfilled: 'joy_vitality', refreshed: 'joy_vitality',
-        amazed: 'joy_vitality', passionate: 'joy_vitality', excited: 'joy_vitality',
-        thankful: 'affection_bond', longing: 'affection_bond', affectionate: 'affection_bond',
-        trusting: 'affection_bond', loving: 'affection_bond',
-        worried: 'anxiety_tension', curious: 'anxiety_tension', flustered: 'anxiety_tension',
-        fearful: 'anxiety_tension', burdened: 'anxiety_tension', anxious: 'anxiety_tension',
-        shy: 'anxiety_tension',
-        pitiful: 'sadness_lethargy', sad: 'sadness_lethargy', lonely: 'sadness_lethargy',
-        lethargic: 'sadness_lethargy', hopeless: 'sadness_lethargy',
-        hateful: 'anger_rejection', disappointed: 'anger_rejection', wronged: 'anger_rejection',
-        disgusted: 'anger_rejection', angry: 'anger_rejection',
-        sorry: 'social_emotions', envious: 'social_emotions', embarrassed: 'social_emotions',
-        jealous: 'social_emotions',
-      };
-      const cats = new Set(data.map((r: { emotion_type: string }) => EMOTION_CATEGORY_MAP[r.emotion_type]).filter(Boolean));
-      return cats.size >= 6;
-    }
-    case 'emotion_10types': {
-      const { data } = await supabase
-        .from('emotion_feeds')
-        .select('emotion_type')
-        .eq('student_id', studentId);
-      if (!data) return false;
-      const types = new Set(data.map((r: { emotion_type: string }) => r.emotion_type));
-      return types.size >= 10;
-    }
+    case 'emotion_rainbow':
+      return (stats.emotion?.categoryCount ?? 0) >= 6;
+    case 'emotion_10types':
+      return (stats.emotion?.typeCount ?? 0) >= 10;
 
     // ── 계획 관리 ──────────────────────────────────────────
-    case 'plan_first': {
-      const { data: myPlans } = await supabase
-        .from('plans')
-        .select('id')
-        .eq('student_id', studentId);
-      if (!myPlans || myPlans.length === 0) return false;
-      const { count } = await supabase
-        .from('plan_checks')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_completed', true)
-        .in('plan_id', myPlans.map((p: { id: string }) => p.id));
-      return (count ?? 0) >= 1;
-    }
+    case 'plan_first':
+      return stats.plans?.anyCompleted ?? false;
     case 'plan_perfect_1':
+      return (stats.plans?.perfectDays ?? 0) >= 1;
     case 'plan_perfect_5':
-    case 'plan_perfect_30': {
-      const threshold = badgeId === 'plan_perfect_1' ? 1 : badgeId === 'plan_perfect_5' ? 5 : 30;
-      const perfectDays = await countPerfectPlanDays(supabase, studentId);
-      return perfectDays >= threshold;
-    }
-    case 'plan_check_100': {
-      const checkedDays = await countAllCheckedDays(supabase, studentId);
-      return checkedDays >= 100;
-    }
+      return (stats.plans?.perfectDays ?? 0) >= 5;
+    case 'plan_perfect_30':
+      return (stats.plans?.perfectDays ?? 0) >= 30;
+    case 'plan_check_100':
+      return (stats.plans?.checkedAllDays ?? 0) >= 100;
     case 'plan_perfect_day': {
-      const today = todayDate();
-      const { startIso, endIso } = getSeoulDayRange(today);
-      const { count: emotionCount } = await supabase
-        .from('emotion_feeds')
-        .select('id', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .gte('created_at', startIso)
-        .lte('created_at', endIso);
-      if ((emotionCount ?? 0) < 1) return false;
-      const perfectDays = await countPerfectPlanDays(supabase, studentId);
-      // 오늘이 완벽한 날인지 확인
-      const todayPerfect = await isTodayPerfect(supabase, studentId);
-      return (emotionCount ?? 0) >= 1 && todayPerfect && perfectDays >= 0;
+      const recordedToday = stats.emotion?.recordedDates.has(todayDate()) ?? false;
+      return recordedToday && (stats.plans?.todayPerfect ?? false);
     }
 
     // ── 성찰일기 ──────────────────────────────────────────
-    case 'reflection_first': {
-      const { count } = await supabase
-        .from('eval_reflections')
-        .select('id', { count: 'exact', head: true })
-        .eq('student_id', studentId);
-      return (count ?? 0) >= 1;
-    }
+    case 'reflection_first':
+      return (stats.reflectionCount ?? 0) >= 1;
     case 'reflection_5':
+      return (stats.reflectionCount ?? 0) >= 5;
     case 'reflection_10':
-    case 'reflection_20': {
-      const threshold = badgeId === 'reflection_5' ? 5 : badgeId === 'reflection_10' ? 10 : 20;
-      const { count } = await supabase
-        .from('eval_reflections')
-        .select('id', { count: 'exact', head: true })
-        .eq('student_id', studentId);
-      return (count ?? 0) >= threshold;
-    }
+      return (stats.reflectionCount ?? 0) >= 10;
+    case 'reflection_20':
+      return (stats.reflectionCount ?? 0) >= 20;
 
     // ── 클래스메일 ──────────────────────────────────────────
-    case 'letter_first': {
-      const { count } = await supabase
-        .from('letters')
-        .select('id', { count: 'exact', head: true })
-        .eq('sender_id', studentId);
-      return (count ?? 0) >= 1;
-    }
+    case 'letter_first':
+      return (stats.letterCount ?? 0) >= 1;
     case 'letter_10':
-    case 'letter_20': {
-      const threshold = badgeId === 'letter_10' ? 10 : 20;
-      const { count } = await supabase
-        .from('letters')
-        .select('id', { count: 'exact', head: true })
-        .eq('sender_id', studentId);
-      return (count ?? 0) >= threshold;
-    }
+      return (stats.letterCount ?? 0) >= 10;
+    case 'letter_20':
+      return (stats.letterCount ?? 0) >= 20;
 
     default:
       return false;
@@ -382,25 +376,3 @@ export async function countAllCheckedDays(supabase: SupabaseClient, studentId: s
   return count;
 }
 
-async function isTodayPerfect(supabase: SupabaseClient, studentId: string): Promise<boolean> {
-  const today = todayDate();
-
-  const { data: plans } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('student_id', studentId)
-    .eq('is_active', true);
-
-  if (!plans || plans.length === 0) return false;
-
-  const planIds = plans.map((p: { id: string }) => p.id);
-
-  const { data: checks } = await supabase
-    .from('plan_checks')
-    .select('is_completed')
-    .in('plan_id', planIds)
-    .eq('check_date', today);
-
-  if (!checks || checks.length === 0 || checks.length < plans.length) return false;
-  return checks.every((c: { is_completed: boolean }) => c.is_completed === true);
-}

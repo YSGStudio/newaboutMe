@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, isWeekendDate, safeRate } from '@/lib/stats';
 import { EMOTION_TYPES } from '@/types/domain';
@@ -10,15 +10,9 @@ export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const { data: student, error: studentError } = await supabaseAdmin
-    .from('students')
-    .select('id,name,student_number,class_id,classes!inner(teacher_id)')
-    .eq('id', params.id)
-    .eq('classes.teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (studentError) return NextResponse.json({ error: studentError.message }, { status: 500 });
-  if (!student) return NextResponse.json({ error: '학생 접근 권한이 없습니다.' }, { status: 403 });
+  const owned = await requireTeacherStudent(auth.teacher.id, params.id);
+  if ('error' in owned) return owned.error;
+  const student = owned.student;
 
   const url = new URL(req.url);
   const period = isPeriod(url.searchParams.get('period')) ? (url.searchParams.get('period') as 'week' | 'month' | 'semester') : 'month';
@@ -90,6 +84,14 @@ export async function GET(req: Request, { params }: Params) {
       completed: todayCompleted,
       total: todayTotal,
       achievementRate: safeRate(todayCompleted, todayTotal)
+    },
+    average: {
+      completed: Array.from(completedByPlan.values()).reduce((acc, v) => acc + v, 0),
+      totalPossible: planList.length * range.weekdays,
+      achievementRate: safeRate(
+        Array.from(completedByPlan.values()).reduce((acc, v) => acc + v, 0),
+        planList.length * range.weekdays
+      )
     },
     plans: planList.map((plan) => {
       const completed = completedByPlan.get(plan.id) ?? 0;

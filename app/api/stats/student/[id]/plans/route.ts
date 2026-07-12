@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
 
@@ -9,14 +9,9 @@ export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id,name,class_id,classes!inner(teacher_id)')
-    .eq('id', params.id)
-    .eq('classes.teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (!student) return NextResponse.json({ error: '학생 접근 권한이 없습니다.' }, { status: 403 });
+  const owned = await requireTeacherStudent(auth.teacher.id, params.id);
+  if ('error' in owned) return owned.error;
+  const student = owned.student;
 
   const url = new URL(req.url);
   const period = isPeriod(url.searchParams.get('period')) ? (url.searchParams.get('period') as 'week' | 'month' | 'semester') : 'month';

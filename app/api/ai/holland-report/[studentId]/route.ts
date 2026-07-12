@@ -1,30 +1,17 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher, requireAiAccess } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { requireTeacher, requireAiAccess, requireTeacherStudent } from '@/lib/auth';
+import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
 import { getSavedHollandReport, generateAndSaveHollandReport, InsufficientHollandDataError } from '@/lib/ai/hollandReport';
 
 type Params = { params: { studentId: string } };
-
-async function loadStudentOrNull(studentId: string, teacherId: string) {
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id, name, student_number, classes!inner(teacher_id)')
-    .eq('id', studentId)
-    .maybeSingle();
-
-  if (!student || (student.classes as unknown as { teacher_id: string }).teacher_id !== teacherId) {
-    return null;
-  }
-  return student;
-}
 
 // 학생 선택 시 저장된 결과 조회 (없으면 report: null)
 export async function GET(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const student = await loadStudentOrNull(params.studentId, auth.teacher.id);
-  if (!student) return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
+  const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
+  if ('error' in owned) return owned.error;
 
   const report = await getSavedHollandReport(params.studentId);
   return NextResponse.json({ report });
@@ -37,11 +24,18 @@ export async function POST(_: Request, { params }: Params) {
   const aiBlock = requireAiAccess(auth.teacher);
   if (aiBlock) return aiBlock;
 
-  const student = await loadStudentOrNull(params.studentId, auth.teacher.id);
-  if (!student) return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
+  const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
+  if ('error' in owned) return owned.error;
+  const student = owned.student;
+
+  const usage = await getAiUsage(auth.teacher);
+  if (usage.remaining !== null && usage.remaining <= 0) {
+    return quotaExceededResponse(usage);
+  }
 
   try {
     const result = await generateAndSaveHollandReport(student.id, auth.teacher.id, student.student_number, student.name);
+    await logAiUsage(auth.teacher.id, 'holland_report', student.id);
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof InsufficientHollandDataError) {

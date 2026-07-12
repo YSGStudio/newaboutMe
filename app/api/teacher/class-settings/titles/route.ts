@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
@@ -22,13 +22,8 @@ export async function PUT(req: Request) {
 
   const { classId, titles } = parsed.data;
 
-  const { data: cls } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-  if (!cls) return NextResponse.json({ error: '학급을 찾을 수 없습니다.' }, { status: 404 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, classId);
+  if (forbidden) return forbidden;
 
   const rows = titles.map((t) => ({
     class_id: classId,

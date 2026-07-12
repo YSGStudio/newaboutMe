@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 
 export async function GET(req: Request) {
   const auth = await requireTeacher();
@@ -10,15 +10,8 @@ export async function GET(req: Request) {
   const classId = searchParams.get('classId');
   if (!classId) return NextResponse.json({ error: 'classId required' }, { status: 400 });
 
-  // Verify class belongs to this teacher
-  const { data: classRow } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (!classRow) return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, classId);
+  if (forbidden) return forbidden;
 
   const { data: letters, error } = await supabaseAdmin
     .from('letters')

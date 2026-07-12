@@ -135,6 +135,73 @@ const buildEmotionChartItems = (distribution: EmotionDistributionItem[]): Emotio
   return items.sort((a, b) => b.ratio - a.ratio);
 };
 
+const EMOTION_STATS_POPUP_STYLES = `
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+    margin: 0; padding: 24px 16px; color: #1f2937; background: #f1f5f9;
+  }
+  .card { max-width: 420px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 22px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+`;
+
+// conic-gradient의 색상 정지점은 누적(0→100%) 값이어야 각 조각의 실제 비중과 일치한다.
+// (조각별 비중을 그대로 정지점으로 넘기면 브라우저가 값을 앞선 정지점으로 clamp해 그래프가 실제 데이터와 달라진다)
+const buildEmotionConicGradient = (chartItems: EmotionChartItem[]): string => {
+  let cursor = 0;
+  const stops = chartItems.map((item) => {
+    const start = cursor;
+    cursor += item.ratio;
+    return { color: item.color, start, end: cursor };
+  });
+  if (stops.length > 0) stops[stops.length - 1].end = 100; // 반올림 오차로 100%에 못 미치는 틈 방지
+  return stops.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(', ');
+};
+
+const buildEmotionStatsHtml = (stats: NonNullable<EmotionStats>): string => {
+  const chartItems = buildEmotionChartItems(stats.distribution);
+  const gradient = buildEmotionConicGradient(chartItems);
+
+  const legendRows = chartItems.map((item) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;margin-bottom:8px">
+      <span style="display:flex;align-items:center;gap:8px;min-width:0;text-align:left">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${item.color};flex-shrink:0"></span>
+        <span style="color:#334155">${item.label}</span>
+      </span>
+      <strong style="color:#0f172a;flex-shrink:0">${item.ratio}%</strong>
+    </div>`).join('');
+
+  const body = stats.totalFeeds === 0
+    ? `<p style="text-align:center;color:#64748b;padding:48px 0">아직 기록된 감정이 없어요.</p>`
+    : `
+      <div style="display:flex;justify-content:center;margin-bottom:22px">
+        <div style="width:220px;height:220px;border-radius:50%;background:conic-gradient(${gradient});position:relative">
+          <div style="position:absolute;inset:44px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;color:#64748b">
+            <div>
+              <strong style="display:block;font-size:24px;line-height:1.1;color:#0f172a">${stats.totalFeeds}</strong>
+              <span style="font-size:12px">총 감정 기록</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>${legendRows}</div>`;
+
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>나의 감정통계</title>
+    <style>${EMOTION_STATS_POPUP_STYLES}</style>
+  </head>
+  <body>
+    <div class="card">
+      <h1 style="font-size:18px;margin:0 0 4px;color:#0f172a">나의 감정통계</h1>
+      <p style="margin:0 0 20px;font-size:13px;color:#64748b">${stats.range.startDate} ~ ${stats.range.endDate} 기록 기준</p>
+      ${body}
+    </div>
+  </body>
+</html>`;
+};
+
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, {
     ...init,
@@ -154,10 +221,9 @@ export default function StudentPage() {
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
-  const [emotionStats, setEmotionStats] = useState<EmotionStats>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'stats' | 'eval' | 'relationship' | 'letters'>('emotion');
+  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'eval' | 'relationship' | 'letters'>('emotion');
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
@@ -316,11 +382,23 @@ export default function StudentPage() {
     }
   };
 
-  const loadEmotionStats = async () => {
+  const openEmotionStatsWindow = async () => {
+    if (statsLoading) return;
     setStatsLoading(true);
     try {
       const data = await api<NonNullable<EmotionStats>>('/api/stats/student/me/emotions');
-      setEmotionStats(data);
+      const popup = window.open('', '_blank', 'width=460,height=680');
+      if (!popup) {
+        window.alert('팝업이 차단되어 감정통계를 열 수 없습니다. 팝업 차단을 해제한 뒤 다시 눌러주세요.');
+        return;
+      }
+      popup.document.open();
+      popup.document.write(buildEmotionStatsHtml(data));
+      popup.document.close();
+      popup.focus();
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
     } finally {
       setStatsLoading(false);
     }
@@ -351,7 +429,7 @@ export default function StudentPage() {
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadEmotionStats(), loadBadgeProfile(), loadRelationshipStatus()]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -502,7 +580,6 @@ export default function StudentPage() {
       });
       formEl.reset();
       setMyFeed(data.feed);
-      await loadEmotionStats();
       handleNewBadges(data.newBadges ?? []);
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
@@ -695,7 +772,6 @@ export default function StudentPage() {
     setPlans([]);
     setPlanAchievements([]);
     setMyFeed(null);
-    setEmotionStats(null);
     setEvalReports([]);
     setEvalReportsLoaded(false);
     setEvalDetail(null);
@@ -956,7 +1032,6 @@ export default function StudentPage() {
               items={[
                 { key: 'emotion', label: '오늘의 감정' },
                 { key: 'plan', label: '오늘의 계획' },
-                { key: 'stats', label: '나의 감정통계' },
                 { key: 'eval', label: '평가기록' },
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}` },
                 ...(lettersEnabled ? [{
@@ -966,8 +1041,7 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'emotion' | 'plan' | 'stats' | 'eval' | 'relationship' | 'letters');
-                if (key === 'stats' && !emotionStats) loadEmotionStats();
+                setActiveTab(key as 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters');
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
                 if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
@@ -992,6 +1066,15 @@ export default function StudentPage() {
                       onChange={(event) => { setMonthlyViewMonth(''); onChangeEmotionDate(event.target.value); }}
                     />
                   </div>
+                  <button
+                    type="button"
+                    className="outline"
+                    style={{ width: 'auto', padding: '8px 14px', flexShrink: 0 }}
+                    onClick={openEmotionStatsWindow}
+                    disabled={statsLoading}
+                  >
+                    {statsLoading ? '불러오는 중...' : '📊 감정통계 보기'}
+                  </button>
                   <div style={{ minWidth: 150 }}>
                     <label style={{ marginBottom: 4 }}>월별 감정 모아보기</label>
                     <select
@@ -1286,98 +1369,6 @@ export default function StudentPage() {
                   })
                 )}
               </div>
-            </section>
-          )}
-
-          {activeTab === 'stats' && (
-            <section className="card">
-              <div className="row space-between" style={{ marginBottom: 8 }}>
-                <h2 style={{ margin: 0 }}>나의 감정통계</h2>
-                <button
-                  type="button"
-                  className="outline"
-                  style={{ width: 'auto' }}
-                  onClick={loadEmotionStats}
-                  disabled={statsLoading}
-                >
-                  {statsLoading ? '불러오는 중...' : '새로고침'}
-                </button>
-              </div>
-              <p className="hint" style={{ marginTop: 0 }}>
-                {emotionStats ? `${emotionStats.range.startDate} ~ ${emotionStats.range.endDate} 이번 달 감정 기록` : ''}
-              </p>
-
-              {statsLoading ? (
-                <p className="hint">감정 통계를 불러오는 중입니다...</p>
-              ) : !emotionStats || emotionStats.totalFeeds === 0 ? (
-                <EmptyState title="감정 기록이 없습니다" description="이번 달 감정을 기록하면 통계가 표시됩니다." />
-              ) : (() => {
-                const chartItems = buildEmotionChartItems(emotionStats.distribution);
-                const segments = chartItems.map((item) => `${item.color} ${item.ratio}%`).join(', ');
-                return (
-                  <div className="grid" style={{ gap: 18, justifyItems: 'center', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: 260,
-                        height: 260,
-                        borderRadius: '50%',
-                        background: `conic-gradient(${segments})`,
-                        position: 'relative'
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 52,
-                          borderRadius: '50%',
-                          background: 'white',
-                          display: 'grid',
-                          placeItems: 'center',
-                          textAlign: 'center',
-                          color: '#64748b'
-                        }}
-                      >
-                        <div>
-                          <strong style={{ display: 'block', fontSize: 28, lineHeight: 1.1, color: '#0f172a' }}>
-                            {emotionStats.totalFeeds}
-                          </strong>
-                          <span style={{ fontSize: 13 }}>총 감정 기록</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid" style={{ gap: 8, width: '100%', maxWidth: 460 }}>
-                      {chartItems.map((item) => (
-                        <div
-                          key={item.key}
-                          className="row space-between"
-                          style={{
-                            padding: '10px 14px',
-                            borderRadius: 12,
-                            border: '1px solid #e2e8f0',
-                            background: '#f8fafc'
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, textAlign: 'left' }}>
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                background: item.color,
-                                flexShrink: 0
-                              }}
-                            />
-                            <span style={{ color: '#334155' }}>{item.label}</span>
-                          </span>
-                          <strong style={{ color: '#0f172a', flexShrink: 0 }}>{item.ratio}%</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
             </section>
           )}
 

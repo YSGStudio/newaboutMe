@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     .select('id,title,is_active,created_at,plan_checks(id,is_completed,check_date,checked_at)')
     .eq('student_id', auth.student.id)
     .eq('is_active', true)
+    .eq('plan_checks.check_date', date)
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

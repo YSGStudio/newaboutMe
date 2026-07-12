@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate } from '@/lib/utils';
 import { studentCreateSchema } from '@/lib/validators';
@@ -7,23 +7,12 @@ import { hashPassword, DEFAULT_STUDENT_PASSWORD } from '@/lib/password';
 
 type Params = { params: { id: string } };
 
-async function ensureTeacherClass(teacherId: string, classId: string) {
-  const { data } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', teacherId)
-    .maybeSingle();
-
-  return Boolean(data);
-}
-
 export async function GET(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const allowed = await ensureTeacherClass(auth.teacher.id, params.id);
-  if (!allowed) return NextResponse.json({ error: '학급 접근 권한이 없습니다.' }, { status: 403 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, params.id);
+  if (forbidden) return forbidden;
 
   const { data, error } = await supabaseAdmin
     .from('students')
@@ -115,8 +104,8 @@ export async function POST(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const allowed = await ensureTeacherClass(auth.teacher.id, params.id);
-  if (!allowed) return NextResponse.json({ error: '학급 접근 권한이 없습니다.' }, { status: 403 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, params.id);
+  if (forbidden) return forbidden;
 
   const body = await req.json();
   const parsed = studentCreateSchema.safeParse(body);

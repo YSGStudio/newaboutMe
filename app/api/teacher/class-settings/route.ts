@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: Request) {
@@ -10,13 +10,8 @@ export async function GET(req: Request) {
   const classId = searchParams.get('classId');
   if (!classId) return NextResponse.json({ error: 'classId required' }, { status: 400 });
 
-  const { data: cls } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-  if (!cls) return NextResponse.json({ error: '학급을 찾을 수 없습니다.' }, { status: 404 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, classId);
+  if (forbidden) return forbidden;
 
   const [{ data: badgeRows }, { data: titleRows }] = await Promise.all([
     supabaseAdmin.from('class_badge_settings').select('badge_id,is_enabled').eq('class_id', classId),

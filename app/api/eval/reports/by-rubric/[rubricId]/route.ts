@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 type Params = { params: { rubricId: string } };
@@ -20,13 +20,8 @@ export async function GET(req: Request, { params }: Params) {
     .maybeSingle();
   if (!rubric) return NextResponse.json({ error: '채점기준을 찾을 수 없습니다.' }, { status: 404 });
 
-  const { data: cls } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-  if (!cls) return NextResponse.json({ error: '학급을 찾을 수 없습니다.' }, { status: 404 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, classId);
+  if (forbidden) return forbidden;
 
   const { data: students } = await supabaseAdmin
     .from('students')

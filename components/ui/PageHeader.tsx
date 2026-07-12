@@ -4,10 +4,12 @@ import { ReactNode } from 'react';
 type Props = {
   title: string;
   subtitle?: string;
+  /** 제목 옆(왼쪽 상단)에 붙는 배지 영역 */
+  badge?: ReactNode;
   right?: ReactNode;
 };
 
-export default function PageHeader({ title, subtitle, right }: Props) {
+export default function PageHeader({ title, subtitle, badge, right }: Props) {
   return (
     <header className="card sticky-header" style={{ padding: '12px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
@@ -39,6 +41,7 @@ export default function PageHeader({ title, subtitle, right }: Props) {
             <p className="hint" style={{ marginTop: 2, fontSize: 12 }}>{subtitle}</p>
           )}
         </div>
+        {badge && <div style={{ flexShrink: 0 }}>{badge}</div>}
       </div>
       {right && <div className="header-actions">{right}</div>}
     </header>

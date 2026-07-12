@@ -4,8 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentLoginSchema } from '@/lib/validators';
 import { verifyPassword } from '@/lib/password';
 
+// 브루트포스 방어: 연속 실패 시 일정 시간 로그인 잠금
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 5;
+
 export async function POST(req: Request) {
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const parsed = studentLoginSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
 
   const { data: student } = await supabaseAdmin
     .from('students')
-    .select('id,name,student_number,password_hash')
+    .select('id,name,student_number,password_hash,failed_login_attempts,locked_until')
     .eq('class_id', classRow.id)
     .eq('name', parsed.data.name);
 
@@ -40,9 +44,40 @@ export async function POST(req: Request) {
 
   const matchedStudent = student[0];
 
+  if (matchedStudent.locked_until && new Date(matchedStudent.locked_until).getTime() > Date.now()) {
+    const remainMinutes = Math.ceil((new Date(matchedStudent.locked_until).getTime() - Date.now()) / 60000);
+    return NextResponse.json(
+      { error: `비밀번호를 여러 번 틀려 잠시 잠겼어요. ${remainMinutes}분 후에 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const passwordOk = await verifyPassword(parsed.data.password, matchedStudent.password_hash);
   if (!passwordOk) {
+    const attempts = (matchedStudent.failed_login_attempts ?? 0) + 1;
+    const willLock = attempts >= MAX_FAILED_ATTEMPTS;
+    await supabaseAdmin
+      .from('students')
+      .update({
+        failed_login_attempts: willLock ? 0 : attempts,
+        locked_until: willLock ? new Date(Date.now() + LOCK_MINUTES * 60000).toISOString() : null
+      })
+      .eq('id', matchedStudent.id);
+
+    if (willLock) {
+      return NextResponse.json(
+        { error: `비밀번호를 ${MAX_FAILED_ATTEMPTS}번 틀려 ${LOCK_MINUTES}분간 잠겼어요. 잠시 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
     return NextResponse.json({ error: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
+  }
+
+  if ((matchedStudent.failed_login_attempts ?? 0) > 0 || matchedStudent.locked_until) {
+    await supabaseAdmin
+      .from('students')
+      .update({ failed_login_attempts: 0, locked_until: null })
+      .eq('id', matchedStudent.id);
   }
 
   await createStudentSession(matchedStudent.id);

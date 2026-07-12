@@ -70,7 +70,15 @@ type TeacherListItem = {
   email: string;
   role: TeacherRole;
   paidUntil: string | null;
+  aiMonthlyLimit: number;
+  aiUsedThisMonth: number;
   createdAt: string;
+};
+
+type AiUsage = {
+  used: number;
+  limit: number | null;     // null = 무제한(관리자)
+  remaining: number | null;
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -100,13 +108,16 @@ export default function TeacherPage() {
   const [teacherPaidUntil, setTeacherPaidUntil] = useState<string | null>(null);
   const canUseAi = teacherRole === 'admin' || (teacherRole === 'paid' && (!teacherPaidUntil || teacherPaidUntil >= new Date().toISOString().slice(0, 10)));
 
+  // AI 분석 사용량 (헤더 배지)
+  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+
   // 권한설정 탭 (관리자 전용)
   const [adminTeachers, setAdminTeachers] = useState<TeacherListItem[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminSavingId, setAdminSavingId] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [adminError, setAdminError] = useState('');
-  const adminEdits = useRef<Map<string, { role: TeacherRole; paidUntil: string }>>(new Map());
+  const adminEdits = useRef<Map<string, { role: TeacherRole; paidUntil: string; aiMonthlyLimit: number }>>(new Map());
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -174,6 +185,15 @@ export default function TeacherPage() {
       setTeacherPaidUntil(data.teacher.paidUntil);
     } catch {
       // 역할 로드 실패해도 기본값(general) 유지
+    }
+  }, []);
+
+  const loadAiUsage = useCallback(async () => {
+    try {
+      const data = await api<{ usage: AiUsage }>('/api/ai/usage');
+      setAiUsage(data.usage);
+    } catch {
+      // 사용량 로드 실패는 배지만 비워둔다
     }
   }, []);
 
@@ -305,7 +325,8 @@ export default function TeacherPage() {
   useEffect(() => {
     loadClasses();
     loadTeacherRole();
-  }, [loadClasses, loadTeacherRole]);
+    loadAiUsage();
+  }, [loadClasses, loadTeacherRole, loadAiUsage]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -356,7 +377,7 @@ export default function TeacherPage() {
         });
         setAuthMessage('인증 성공. 학급 데이터를 불러옵니다.');
         setHasTeacherSession(true);
-        await Promise.all([loadClasses(), loadTeacherRole()]);
+        await Promise.all([loadClasses(), loadTeacherRole(), loadAiUsage()]);
       }
       clearNoticeLater();
     } catch (error) {
@@ -437,6 +458,9 @@ export default function TeacherPage() {
     setFeeds([]);
     setSelectedClassId('');
     setHasTeacherSession(false);
+    setAiUsage(null);
+    setTeacherRole('general');
+    setTeacherPaidUntil(null);
     setAuthMessage('로그아웃 되었습니다.');
     clearNoticeLater();
   };
@@ -574,7 +598,7 @@ export default function TeacherPage() {
       const data = await api<{ teachers: TeacherListItem[] }>('/api/admin/teachers');
       setAdminTeachers(data.teachers);
       adminEdits.current = new Map(
-        data.teachers.map((t) => [t.id, { role: t.role, paidUntil: t.paidUntil ?? '' }])
+        data.teachers.map((t) => [t.id, { role: t.role, paidUntil: t.paidUntil ?? '', aiMonthlyLimit: t.aiMonthlyLimit }])
       );
     } catch (err) {
       setAdminError((err as Error).message);
@@ -596,12 +620,13 @@ export default function TeacherPage() {
           teacherId,
           role: edit.role,
           paidUntil: edit.role === 'paid' && edit.paidUntil ? edit.paidUntil : null,
+          aiMonthlyLimit: edit.aiMonthlyLimit,
         }),
       });
       setAdminTeachers((prev) =>
         prev.map((t) =>
           t.id === teacherId
-            ? { ...t, role: edit.role, paidUntil: edit.role === 'paid' ? (edit.paidUntil || null) : null }
+            ? { ...t, role: edit.role, paidUntil: edit.role === 'paid' ? (edit.paidUntil || null) : null, aiMonthlyLimit: edit.aiMonthlyLimit }
             : t
         )
       );
@@ -681,6 +706,31 @@ export default function TeacherPage() {
       <PageHeader
         title="교사 대시보드"
         subtitle="학급과 학생을 빠르게 관리하세요"
+        badge={
+          isAuthed && canUseAi && aiUsage ? (
+            <span
+              title={
+                aiUsage.limit === null
+                  ? `이번 달 AI 분석 ${aiUsage.used}회 사용 (관리자 무제한)`
+                  : `이번 달 AI 분석 ${aiUsage.used}/${aiUsage.limit}회 사용`
+              }
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+                background: aiUsage.remaining === null ? '#ede9fe'
+                  : aiUsage.remaining <= 0 ? '#fee2e2'
+                  : aiUsage.remaining <= 5 ? '#fef3c7'
+                  : '#eef2ff',
+                color: aiUsage.remaining === null ? '#7c3aed'
+                  : aiUsage.remaining <= 0 ? '#dc2626'
+                  : aiUsage.remaining <= 5 ? '#b45309'
+                  : '#4f46e5',
+              }}
+            >
+              ✨ AI 분석 {aiUsage.remaining === null ? '무제한' : `${aiUsage.remaining}회 남음`}
+            </span>
+          ) : null
+        }
         right={
           isAuthed ? (
             <div className="row" style={{ width: 'auto' }}>
@@ -1136,7 +1186,7 @@ export default function TeacherPage() {
             </section>
           )}
 
-          {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} />}
+          {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} onAiUsageChanged={loadAiUsage} />}
 
           {activeTab === 'letters' && (
             <section className="card">
@@ -1307,7 +1357,7 @@ export default function TeacherPage() {
             </div>
           )}
 
-          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canUseAi={canUseAi} />}
+          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canUseAi={canUseAi} onAiUsageChanged={loadAiUsage} />}
 
           {activeTab === 'relationship' && (
             <section className="card">
@@ -1355,8 +1405,8 @@ export default function TeacherPage() {
               {!adminLoading && adminTeachers.length > 0 && (
                 <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
                   {/* 헤더 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px 110px 150px 70px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    {['이름', '아이디(이메일)', '현재등급', '변경등급', '유료 만료일', ''].map((h) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 110px 60px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    {['이름', '아이디(이메일)', '현재등급', '변경등급', '유료 만료일', 'AI 사용/월한도', ''].map((h) => (
                       <span key={h} style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>{h}</span>
                     ))}
                   </div>
@@ -1367,7 +1417,7 @@ export default function TeacherPage() {
                       <div
                         key={teacher.id}
                         style={{
-                          display: 'grid', gridTemplateColumns: '90px 1fr 70px 110px 150px 70px',
+                          display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 110px 60px',
                           gap: 8, alignItems: 'center', padding: '10px 14px',
                           background: idx % 2 === 0 ? '#fff' : '#fafafa',
                           borderBottom: idx < adminTeachers.length - 1 ? '1px solid #f1f5f9' : 'none',
@@ -1391,7 +1441,7 @@ export default function TeacherPage() {
                         <select
                           defaultValue={teacher.role}
                           onChange={(e) => {
-                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '' };
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '', aiMonthlyLimit: teacher.aiMonthlyLimit };
                             adminEdits.current.set(teacher.id, { ...current, role: e.target.value as TeacherRole });
                           }}
                           disabled={teacher.role === 'admin'}
@@ -1404,12 +1454,35 @@ export default function TeacherPage() {
                           type="date"
                           defaultValue={teacher.paidUntil ?? ''}
                           onChange={(e) => {
-                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '' };
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '', aiMonthlyLimit: teacher.aiMonthlyLimit };
                             adminEdits.current.set(teacher.id, { ...current, paidUntil: e.target.value });
                           }}
                           disabled={teacher.role === 'admin'}
                           style={{ fontSize: 12, padding: '6px 8px' }}
                         />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span
+                            title="이번 달 사용량"
+                            style={{ fontSize: 12, fontWeight: 700, color: teacher.aiUsedThisMonth >= teacher.aiMonthlyLimit ? '#dc2626' : '#334155', flexShrink: 0 }}
+                          >
+                            {teacher.aiUsedThisMonth}
+                          </span>
+                          <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>/</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={10000}
+                            defaultValue={teacher.aiMonthlyLimit}
+                            onChange={(e) => {
+                              const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '', aiMonthlyLimit: teacher.aiMonthlyLimit };
+                              const parsedLimit = parseInt(e.target.value, 10);
+                              adminEdits.current.set(teacher.id, { ...current, aiMonthlyLimit: Number.isNaN(parsedLimit) ? teacher.aiMonthlyLimit : parsedLimit });
+                            }}
+                            disabled={teacher.role === 'admin'}
+                            title={teacher.role === 'admin' ? '관리자는 한도 없이 사용합니다' : '월 AI 분석 한도'}
+                            style={{ fontSize: 12, padding: '6px 6px', width: '100%', minWidth: 0 }}
+                          />
+                        </div>
                         <button
                           type="button"
                           className="ghost"

@@ -9,6 +9,7 @@ export type TeacherProfile = {
   name: string;
   role: TeacherRole;
   paidUntil: string | null;
+  aiMonthlyLimit: number;
 };
 
 export async function requireTeacher() {
@@ -23,7 +24,7 @@ export async function requireTeacher() {
 
   const { data: profile } = await supabaseAdmin
     .from('teacher_profiles')
-    .select('id,name,role,paid_until')
+    .select('id,name,role,paid_until,ai_monthly_limit')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -36,9 +37,57 @@ export async function requireTeacher() {
     name: profile.name,
     role: (profile.role ?? 'general') as TeacherRole,
     paidUntil: profile.paid_until ?? null,
+    aiMonthlyLimit: profile.ai_monthly_limit ?? 30,
   };
 
   return { user, teacher };
+}
+
+/** 교사가 해당 학급의 담당자인지 확인. 아니면 403 응답을 반환한다. */
+export async function requireTeacherClass(teacherId: string, classId: string): Promise<NextResponse | null> {
+  const { data } = await supabaseAdmin
+    .from('classes')
+    .select('id')
+    .eq('id', classId)
+    .eq('teacher_id', teacherId)
+    .maybeSingle();
+
+  if (!data) {
+    return NextResponse.json({ error: '학급 접근 권한이 없습니다.' }, { status: 403 });
+  }
+  return null;
+}
+
+export type OwnedStudent = {
+  id: string;
+  name: string;
+  student_number: number;
+  class_id: string;
+};
+
+/** 교사가 해당 학생 소속 학급의 담당자인지 확인. 통과 시 학생 기본 정보를 반환한다. */
+export async function requireTeacherStudent(teacherId: string, studentId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('students')
+    .select('id,name,student_number,class_id,classes!inner(teacher_id)')
+    .eq('id', studentId)
+    .eq('classes.teacher_id', teacherId)
+    .maybeSingle();
+
+  if (error) {
+    return { error: NextResponse.json({ error: error.message }, { status: 500 }) };
+  }
+  if (!data) {
+    return { error: NextResponse.json({ error: '학생 접근 권한이 없습니다.' }, { status: 403 }) };
+  }
+
+  const student: OwnedStudent = {
+    id: data.id,
+    name: data.name,
+    student_number: data.student_number,
+    class_id: data.class_id
+  };
+  return { student };
 }
 
 /** AI 기능 사용 가능 여부: admin 또는 paid이고 만료일 미경과 */

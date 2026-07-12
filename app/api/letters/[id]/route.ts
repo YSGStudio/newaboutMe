@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireStudentSession } from '@/lib/student-session';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 
 const letterUpdateSchema = z.object({
   title: z.string().min(1).max(50).optional(),
@@ -58,15 +58,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   if (error || !letter) return NextResponse.json({ error: 'Letter not found' }, { status: 404 });
 
-  // 교사 소속 학급 확인
-  const { data: classRow } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', letter.class_id)
-    .eq('teacher_id', teacherAuth.teacher.id)
-    .maybeSingle();
-
-  if (!classRow) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const forbidden = await requireTeacherClass(teacherAuth.teacher.id, letter.class_id);
+  if (forbidden) return forbidden;
 
   const [{ data: sender }, { data: recipient }] = await Promise.all([
     supabaseAdmin.from('students').select('id, name, student_number').eq('id', letter.sender_id).maybeSingle(),
@@ -95,14 +88,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (!letter) return NextResponse.json({ error: 'Letter not found' }, { status: 404 });
 
-  const { data: classRow } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', letter.class_id)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (!classRow) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, letter.class_id);
+  if (forbidden) return forbidden;
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (parsed.data.title !== undefined) updates.title = parsed.data.title.trim();
@@ -134,14 +121,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   if (!letter) return NextResponse.json({ error: 'Letter not found' }, { status: 404 });
 
-  const { data: classRow } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', letter.class_id)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (!classRow) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, letter.class_id);
+  if (forbidden) return forbidden;
 
   const { error } = await supabaseAdmin.from('letters').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

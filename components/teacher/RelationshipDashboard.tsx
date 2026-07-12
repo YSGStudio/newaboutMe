@@ -76,29 +76,58 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   return json;
 };
 
-const nameList = (items: RosterRef[]) =>
-  items.length === 0 ? '없음' : items.map((s) => `${s.studentNumber}번 ${s.name}`).join(', ');
+function NameChips({ items }: { items: RosterRef[] }) {
+  if (items.length === 0) {
+    return <span style={{ fontSize: 12.5, color: '#94a3b8' }}>없음</span>;
+  }
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 5 }}>
+      {items.map((s) => (
+        <span key={s.id} style={{
+          fontSize: 12, fontWeight: 600, color: '#3730a3', background: '#eef2ff',
+          border: '1px solid #e0e7ff', borderRadius: 20, padding: '2px 9px'
+        }}>
+          {s.studentNumber}번 {s.name}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: '#94a3b8', letterSpacing: 0.2 }}>{label}</span>
+      <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.5 }}>{children}</div>
+    </div>
+  );
+}
 
 function Sociogram({ nodes, edges }: { nodes: SociogramNode[]; edges: SociogramEdge[] }) {
-  const size = 360;
+  const size = 430;
   const center = size / 2;
-  const radius = size / 2 - 36;
+  const radius = size / 2 - 62; // 바깥쪽 이름 라벨 공간 확보
   const n = nodes.length;
 
   if (n === 0) return null;
 
-  const positions = new Map<string, { x: number; y: number }>();
+  const maxIn = Math.max(1, ...nodes.map((node) => node.positiveInCount));
+  // 지명을 많이 받을수록 원이 커짐 (13~21px)
+  const nodeRadius = (count: number) => 13 + (count / maxIn) * 8;
+
+  const positions = new Map<string, { x: number; y: number; angle: number }>();
   nodes.forEach((node, i) => {
     const angle = (2 * Math.PI * i) / n - Math.PI / 2;
     positions.set(node.studentId, {
       x: center + radius * Math.cos(angle),
-      y: center + radius * Math.sin(angle)
+      y: center + radius * Math.sin(angle),
+      angle
     });
   });
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #eef0fb', borderRadius: 16, padding: '20px 16px 16px' }}>
-      <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ maxWidth: 380, display: 'block', margin: '0 auto' }}>
+    <div style={{ background: '#fff', border: '1px solid #eef0fb', borderRadius: 16, padding: '20px 12px 14px' }}>
+      <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ maxWidth: 460, display: 'block', margin: '0 auto' }}>
         <defs>
           <marker id="relationship-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
             <path d="M0,0 L6,3 L0,6 Z" fill="#cbd5e1" />
@@ -122,11 +151,18 @@ function Sociogram({ nodes, edges }: { nodes: SociogramNode[]; edges: SociogramE
           const fill = node.isConflictRisk ? '#fee2e2' : node.isIsolated ? '#f1f5f9' : '#eef2ff';
           const stroke = node.isConflictRisk ? '#dc2626' : node.isIsolated ? '#94a3b8' : '#6366f1';
           const pos = positions.get(node.studentId)!;
+          const r = nodeRadius(node.positiveInCount);
+          const labelDist = r + 13;
+          const labelX = pos.x + labelDist * Math.cos(pos.angle);
+          const labelY = pos.y + labelDist * Math.sin(pos.angle);
           return (
             <g key={node.studentId}>
-              <circle cx={pos.x} cy={pos.y} r={17} fill={fill} stroke={stroke} strokeWidth={2} />
+              <circle cx={pos.x} cy={pos.y} r={r} fill={fill} stroke={stroke} strokeWidth={2} />
               <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#1e1b4b">
                 {node.studentNumber}
+              </text>
+              <text x={labelX} y={labelY + 3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="#64748b">
+                {node.name}
               </text>
               <title>
                 {node.name} · 피지명 {node.positiveInCount}회{node.negativeInCount > 0 ? ` · 부정지명 ${node.negativeInCount}회` : ''}
@@ -135,12 +171,15 @@ function Sociogram({ nodes, edges }: { nodes: SociogramNode[]; edges: SociogramE
           );
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', marginTop: 14, fontSize: 11, color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, fontSize: 11, color: '#64748b' }}>
         <LegendItem swatch={<span style={{ display: 'inline-block', width: 18, height: 2, background: '#818cf8', borderRadius: 2 }} />} label="상호 지명" />
         <LegendItem swatch={<span style={{ display: 'inline-block', width: 18, height: 1, background: '#cbd5e1' }} />} label="일방 지명" />
         <LegendItem swatch={<span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: '#f1f5f9', border: '2px solid #94a3b8' }} />} label="고립" />
         <LegendItem swatch={<span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: '#fee2e2', border: '2px solid #dc2626' }} />} label="갈등 위험" />
       </div>
+      <p style={{ margin: '8px 0 0', fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
+        원이 클수록 친구들에게 많이 지명받은 학생입니다.
+      </p>
     </div>
   );
 }
@@ -427,7 +466,14 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
               <div className="row space-between" style={{ alignItems: 'flex-start' }}>
                 <div>
                   <h4 style={{ margin: '0 0 3px', color: '#312e81' }}>🕸️ {selectedSurvey.title} · 학급 전체 관계도</h4>
-                  <p className="hint" style={{ margin: 0, fontSize: 12 }}>마감된 설문의 응답을 집계한 결과입니다.</p>
+                  <p className="hint" style={{ margin: 0, fontSize: 12 }}>
+                    마감된 설문의 응답을 집계한 결과입니다.
+                    {studentGrid.length > 0 && (
+                      <span style={{ marginLeft: 8, fontWeight: 700, color: '#6366f1' }}>
+                        응답 {studentGrid.filter((s) => s.completed).length}/{studentGrid.length}명
+                      </span>
+                    )}
+                  </p>
                 </div>
                 {report && (
                   <button
@@ -579,19 +625,43 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
                       )}
                     </div>
 
-                    <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
-                      <p style={{ margin: 0 }}><strong>상호 지명 친구</strong> — {nameList(detail.received.mutualFriends)}</p>
-                      <p style={{ margin: 0 }}><strong>리더로 지목된 횟수</strong> — {detail.received.roleLeaderCount}회</p>
-                      <p style={{ margin: 0 }}><strong>고립으로 지목된 횟수</strong> — {detail.received.roleIsolatedCount}회</p>
-                      <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: 0 }} />
-                      <p style={{ margin: 0 }}><strong>함께 놀고 싶다고 뽑은 친구</strong> — {nameList(detail.picked.positive)}</p>
+                    <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', display: 'grid', gap: 12 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#6366f1' }}>친구들에게 받은 지명</p>
+                      <DetailRow label="상호 지명 친구">
+                        <NameChips items={detail.received.mutualFriends} />
+                      </DetailRow>
+                      <DetailRow label="역할 지목">
+                        리더 <strong style={{ color: '#16a34a' }}>{detail.received.roleLeaderCount}회</strong>
+                        <span style={{ margin: '0 6px', color: '#cbd5e1' }}>·</span>
+                        혼자인 것 같음 <strong style={{ color: '#d97706' }}>{detail.received.roleIsolatedCount}회</strong>
+                      </DetailRow>
+                    </div>
+
+                    <div style={{ background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', display: 'grid', gap: 12 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#0ea5e9' }}>이 학생의 선택</p>
+                      <DetailRow label="함께 놀고 싶은 친구">
+                        <NameChips items={detail.picked.positive} />
+                      </DetailRow>
                       {detail.picked.negative.length > 0 && (
-                        <p style={{ margin: 0 }}><strong>함께 하기 어렵다고 뽑은 친구</strong> — {nameList(detail.picked.negative)}</p>
+                        <DetailRow label="함께 하기 어려운 친구">
+                          <NameChips items={detail.picked.negative} />
+                        </DetailRow>
                       )}
-                      <p style={{ margin: 0 }}><strong>리더로 뽑은 친구</strong> — {nameList(detail.picked.roleLeader)}</p>
-                      <p style={{ margin: 0 }}><strong>혼자인 것 같다고 뽑은 친구</strong> — {nameList(detail.picked.roleIsolated)}</p>
+                      <DetailRow label="리더로 뽑은 친구">
+                        <NameChips items={detail.picked.roleLeader} />
+                      </DetailRow>
+                      <DetailRow label="혼자인 것 같다고 뽑은 친구">
+                        <NameChips items={detail.picked.roleIsolated} />
+                      </DetailRow>
                       {detail.openResponse && (
-                        <p style={{ margin: 0 }}><strong>개방형 응답</strong> — {detail.openResponse}</p>
+                        <DetailRow label="개방형 응답">
+                          <span style={{
+                            display: 'block', background: '#faf9ff', borderLeft: '3px solid #ddd6fe',
+                            borderRadius: 6, padding: '8px 10px'
+                          }}>
+                            &ldquo;{detail.openResponse}&rdquo;
+                          </span>
+                        </DetailRow>
                       )}
                     </div>
                   </>

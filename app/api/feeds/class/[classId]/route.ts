@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
@@ -17,13 +17,8 @@ export async function GET(req: Request, { params }: Params) {
   let allowedClassId: string | null = null;
 
   if (!('error' in teacherAuth)) {
-    const { data: classRow } = await supabaseAdmin
-      .from('classes')
-      .select('id')
-      .eq('id', params.classId)
-      .eq('teacher_id', teacherAuth.teacher.id)
-      .maybeSingle();
-    if (classRow) allowedClassId = classRow.id;
+    const forbidden = await requireTeacherClass(teacherAuth.teacher.id, params.classId);
+    if (!forbidden) allowedClassId = params.classId;
   }
 
   if (!allowedClassId) {

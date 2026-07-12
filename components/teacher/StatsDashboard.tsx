@@ -38,6 +38,11 @@ type StudentSnapshot = {
     total: number;
     achievementRate: number;
   };
+  average: {
+    completed: number;
+    totalPossible: number;
+    achievementRate: number;
+  };
   plans: Array<{
     planId: string;
     title: string;
@@ -209,11 +214,20 @@ const buildStudentHtmlBlock = (
           </div>`;
       }).join('');
 
+  const summaryTile = (icon: string, value: string, label: string, accent: string) => `
+    <div style="flex:1;background:${accent}0d;border:1px solid ${accent}26;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px;line-height:1">${icon}</span>
+      <div>
+        <p style="margin:0;font-size:18px;font-weight:800;color:#0f172a;line-height:1.2">${value}</p>
+        <p style="margin:0;font-size:11.5px;color:#64748b;white-space:nowrap">${label}</p>
+      </div>
+    </div>`;
+
   return `
-    <div style="display:flex;gap:16px;padding:7px 12px;background:#f8fafc;border-radius:8px;font-size:13px;color:#475569;margin-bottom:10px">
-      <span>🎯 실천률 <strong style="color:#064e3b">${snap.today.achievementRate}%</strong></span>
-      <span>💭 감정 <strong style="color:#3b0764">${snap.emotions.totalFeeds}건</strong></span>
-      <span>⭐ 평가 <strong style="color:#78350f">${reports.length}건</strong></span>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      ${summaryTile('🎯', `${snap.average.achievementRate}%`, '평균 실천률', '#16a34a')}
+      ${summaryTile('💭', `${snap.emotions.totalFeeds}건`, '감정 기록', '#7c3aed')}
+      ${summaryTile('⭐', `${reports.length}건`, '평가', '#d97706')}
     </div>
     <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
@@ -246,25 +260,24 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
     return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">AI 분석을 불러올 수 없습니다.</p>`;
   }
 
+  const aiCard = (label: string, body: string, accent: string) => `
+    <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid ${accent}">
+      <p style="margin:0 0 5px;font-size:12px;font-weight:700;color:${accent}">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${accent};margin-right:6px;vertical-align:middle"></span>${label}
+      </p>
+      <p style="margin:0;font-size:13px;color:#334155;line-height:1.65">${escapeHtml(body)}</p>
+    </div>`;
+
   return `
     <div style="background:#fdf4ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #f0abfc">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
         <span style="font-size:20px">✨</span>
         <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 분석</span>
       </div>
-      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#15803d">일일계획 실천 분석</p>
-        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.planAnalysis)}</p>
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#7c3aed">감정 패턴 인사이트</p>
-        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.emotionInsight)}</p>
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#0369a1">맞춤 성장 제언</p>
-        <p style="margin:0;font-size:13px;color:#374151;line-height:1.6">${escapeHtml(ai.growthSuggestion)}</p>
-      </div>
-      <p style="margin:0;font-size:11px;color:#9333ea;text-align:center">⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.</p>
+      ${aiCard('일일계획 실천 분석', ai.planAnalysis, '#16a34a')}
+      ${aiCard('감정 패턴 인사이트', ai.emotionInsight, '#7c3aed')}
+      ${aiCard('맞춤 성장 제언', ai.growthSuggestion, '#0284c7')}
+      <p style="margin:2px 0 0;font-size:11px;color:#9333ea;text-align:center">⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.</p>
     </div>`;
 };
 
@@ -341,6 +354,27 @@ function EmotionDonutChart({ distribution, totalFeeds }: { distribution: Emotion
 
 const GRADE_COLOR: Record<string, string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
 const GRADE_BG: Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low: '#fee2e2' };
+
+function SummaryTile({ icon, label, value, accent }: { icon: string; label: string; value: string; accent: string }) {
+  return (
+    <div style={{
+      background: `${accent}0d`, border: `1px solid ${accent}26`, borderRadius: 12,
+      padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0
+    }}>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>{value}</p>
+        <p style={{ margin: 0, fontSize: 11.5, color: '#64748b', whiteSpace: 'nowrap' }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+const AI_GROWTH_SECTIONS: { key: keyof Pick<GrowthAiResult, 'planAnalysis' | 'emotionInsight' | 'growthSuggestion'>; label: string; accent: string }[] = [
+  { key: 'planAnalysis', label: '일일계획 실천 분석', accent: '#16a34a' },
+  { key: 'emotionInsight', label: '감정 패턴 인사이트', accent: '#7c3aed' },
+  { key: 'growthSuggestion', label: '맞춤 성장 제언', accent: '#0284c7' },
+];
 
 function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loading: boolean }) {
   if (loading) return (
@@ -443,17 +477,16 @@ function AiGrowthSection({
 
       {canUseAi && result && !loading && (
         <>
-          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#15803d' }}>일일계획 실천 분석</p>
-            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.planAnalysis}</p>
-          </div>
-          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>감정 패턴 인사이트</p>
-            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.emotionInsight}</p>
-          </div>
-          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#0369a1' }}>맞춤 성장 제언</p>
-            <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{result.growthSuggestion}</p>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+            {AI_GROWTH_SECTIONS.map(({ key, label, accent }) => (
+              <div key={key} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', borderLeft: `3px solid ${accent}` }}>
+                <p style={{ margin: '0 0 5px', fontSize: 12, fontWeight: 700, color: accent, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: accent, flexShrink: 0 }} />
+                  {label}
+                </p>
+                <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.65 }}>{result[key]}</p>
+              </div>
+            ))}
           </div>
           <button type="button" className="outline" style={{ width: '100%', fontSize: 12 }} onClick={() => onAnalyze(true)} disabled={loading}>
             🔄 재분석
@@ -566,7 +599,7 @@ function HollandSection({
   );
 }
 
-export default function StatsDashboard({ classId, students, className, canUseAi = true }: { classId: string; students: StudentItem[]; className?: string; canUseAi?: boolean }) {
+export default function StatsDashboard({ classId, students, className, canUseAi = true, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canUseAi?: boolean; onAiUsageChanged?: () => void }) {
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState('');
@@ -635,6 +668,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
     try {
       const result = await apiPost<GrowthAiResult>(`/api/ai/growth-report/${activeStudentId}`, { period, forceRefresh });
       setAiResult(result);
+      if (!result.cached) onAiUsageChanged?.();
     } catch (err) {
       setAiError((err as Error).message);
     } finally {
@@ -649,6 +683,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
     try {
       const result = await apiPost<HollandAiResult>(`/api/ai/holland-report/${activeStudentId}`, {});
       setHollandResult(result);
+      onAiUsageChanged?.();
     } catch (err) {
       setHollandError((err as Error).message);
     } finally {
@@ -801,6 +836,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
     } finally {
       setClassAiRunning(false);
       setClassAiProgress({ done: 0, total: 0 });
+      onAiUsageChanged?.();
     }
   };
 
@@ -965,10 +1001,10 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
             </div>
 
             {snapshot && (
-              <div style={{ display: 'flex', gap: 16, padding: '7px 12px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569' }}>
-                <span>🎯 실천률 <strong style={{ color: '#064e3b' }}>{snapshot.today.achievementRate}%</strong></span>
-                <span>💭 감정 <strong style={{ color: '#3b0764' }}>{snapshot.emotions.totalFeeds}건</strong></span>
-                <span>⭐ 평가 <strong style={{ color: '#78350f' }}>{evalReports.length}건</strong></span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <SummaryTile icon="🎯" label="평균 실천률" value={`${snapshot.average.achievementRate}%`} accent="#16a34a" />
+                <SummaryTile icon="💭" label="감정 기록" value={`${snapshot.emotions.totalFeeds}건`} accent="#7c3aed" />
+                <SummaryTile icon="⭐" label="평가" value={`${evalReports.length}건`} accent="#d97706" />
               </div>
             )}
 

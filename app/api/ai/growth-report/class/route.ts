@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireTeacher, requireAiAccess } from '@/lib/auth';
+import { requireTeacher, requireAiAccess, requireTeacherClass } from '@/lib/auth';
+import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isPeriod } from '@/lib/stats';
 import { getOrGenerateGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
@@ -45,14 +46,8 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { data: cls } = await supabaseAdmin
-    .from('classes')
-    .select('id')
-    .eq('id', parsed.data.classId)
-    .eq('teacher_id', auth.teacher.id)
-    .maybeSingle();
-
-  if (!cls) return NextResponse.json({ error: '학급을 찾을 수 없습니다.' }, { status: 404 });
+  const forbidden = await requireTeacherClass(auth.teacher.id, parsed.data.classId);
+  if (forbidden) return forbidden;
 
   const { data: students, error: studentsError } = await supabaseAdmin
     .from('students')
@@ -65,7 +60,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ results: [], total: 0, succeeded: 0, failed: 0 });
   }
 
+  const usage = await getAiUsage(auth.teacher);
+  if (usage.remaining !== null && usage.remaining <= 0) {
+    return quotaExceededResponse(usage);
+  }
+
+  // 배치 도중 한도 소진 시 이후 학생은 건너뛴다. 캐시 반환은 사용량에서 제외.
+  // (동시 실행 CHUNK 단위로 검사하므로 최대 CHUNK-1회 초과될 수 있음 — 허용 오차)
+  let generatedCount = 0;
+
   const results = await processInChunks(students, async (s): Promise<StudentResult> => {
+    if (usage.remaining !== null && generatedCount >= usage.remaining) {
+      return { studentId: s.id, status: 'error', message: '이번 달 AI 분석 사용 한도를 모두 사용해 건너뛰었습니다.' };
+    }
     try {
       const result = await getOrGenerateGrowthReport(
         s.id,
@@ -75,6 +82,10 @@ export async function POST(req: Request) {
         parsed.data.period,
         parsed.data.forceRefresh ?? false,
       );
+      if (!result.cached) {
+        generatedCount += 1;
+        await logAiUsage(auth.teacher.id, 'growth_report', s.id);
+      }
       return { studentId: s.id, status: 'success', cached: result.cached };
     } catch (err) {
       const message = err instanceof InsufficientDataError ? err.message : (err as Error).message;

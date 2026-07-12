@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod } from '@/lib/stats';
 
@@ -9,15 +9,8 @@ export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id, classes!inner(teacher_id)')
-    .eq('id', params.studentId)
-    .maybeSingle();
-
-  if (!student || (student.classes as unknown as { teacher_id: string }).teacher_id !== auth.teacher.id) {
-    return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
-  }
+  const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
+  if ('error' in owned) return owned.error;
 
   // period가 명시된 경우(성장보고서 등)에만 기간 필터를 적용한다.
   // period가 없으면(예: 평가 작성 탭의 학생별 보고서 목록) 전체 기록을 그대로 반환해 기존 동작을 유지한다.

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
@@ -31,15 +31,8 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   // 학생이 내 학급 소속인지 확인
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id, classes!inner(teacher_id)')
-    .eq('id', parsed.data.studentId)
-    .maybeSingle();
-
-  if (!student || (student.classes as unknown as { teacher_id: string }).teacher_id !== auth.teacher.id) {
-    return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
-  }
+  const owned = await requireTeacherStudent(auth.teacher.id, parsed.data.studentId);
+  if ('error' in owned) return owned.error;
 
   const { data: report, error: reportError } = await supabaseAdmin
     .from('eval_reports')
