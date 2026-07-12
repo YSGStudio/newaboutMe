@@ -132,6 +132,8 @@ export default function TeacherPage() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
+  const [deleteConfirmClass, setDeleteConfirmClass] = useState<ClassItem | null>(null);
+  const [deleteClassNameInput, setDeleteClassNameInput] = useState('');
   const [deletingStudentId, setDeletingStudentId] = useState('');
   const [togglingLettersClassId, setTogglingLettersClassId] = useState('');
   const [deleteConfirmStudent, setDeleteConfirmStudent] = useState<StudentItem | null>(null);
@@ -485,9 +487,14 @@ export default function TeacherPage() {
     clearNoticeLater();
   };
 
-  const onDeleteClass = async (classId: string) => {
-    const confirmed = window.confirm('학급을 즉시 삭제할까요? 학생/피드/계획 데이터도 함께 삭제됩니다.');
-    if (!confirmed) return;
+  const onDeleteClass = (klass: ClassItem) => {
+    setDeleteConfirmClass(klass);
+    setDeleteClassNameInput('');
+  };
+
+  const onConfirmDeleteClass = async () => {
+    if (!deleteConfirmClass || deleteClassNameInput !== deleteConfirmClass.class_name) return;
+    const classId = deleteConfirmClass.id;
 
     setDeletingClassId(classId);
     setAuthError('');
@@ -498,6 +505,8 @@ export default function TeacherPage() {
         setSelectedClassId('');
         setStudents([]);
       }
+      setDeleteConfirmClass(null);
+      setDeleteClassNameInput('');
       await loadClasses();
       setAuthMessage('학급이 삭제되었습니다.');
       clearNoticeLater();
@@ -901,6 +910,16 @@ export default function TeacherPage() {
               )}
 
               <div style={{
+                background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 12,
+                padding: '12px 16px', marginBottom: 12,
+              }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#3730a3', lineHeight: 1.6 }}>
+                  🏫 <strong>학급 생성 한도 안내</strong> — 무료회원은 학급을 <strong>1개</strong>까지, 유료회원은 <strong>무제한</strong>으로
+                  생성할 수 있습니다. 현재 등급은 {teacherRole === 'admin' ? '관리자' : teacherRole === 'paid' ? '유료회원' : '무료회원'}입니다.
+                </p>
+              </div>
+
+              <div style={{
                 background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12,
                 padding: '12px 16px', marginBottom: 14,
               }}>
@@ -1012,7 +1031,7 @@ export default function TeacherPage() {
                               <button
                                 type="button"
                                 className="outline"
-                                onClick={() => onDeleteClass(c.id)}
+                                onClick={() => onDeleteClass(c)}
                                 disabled={deletingClassId === c.id}
                               >
                                 {deletingClassId === c.id ? '삭제 중...' : '학급 삭제'}
@@ -1548,6 +1567,18 @@ export default function TeacherPage() {
             </p>
 
             <div style={{
+              background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 12,
+              padding: '14px 16px', marginBottom: 12,
+            }}>
+              <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800, color: '#3730a3' }}>
+                🏫 학급 생성 한도 안내
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: '#312e81', lineHeight: 1.7 }}>
+                무료회원은 학급을 <strong>1개</strong>까지, 유료회원은 <strong>무제한</strong>으로 생성할 수 있습니다.
+              </p>
+            </div>
+
+            <div style={{
               background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12,
               padding: '14px 16px', marginBottom: 18,
             }}>
@@ -1579,6 +1610,74 @@ export default function TeacherPage() {
                 disabled={classLoading}
               >
                 {classLoading ? '생성 중...' : '동의하고 학급 생성'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 학급 삭제 확인 모달 — 학급명을 그대로 입력해야 삭제 가능 */}
+      {deleteConfirmClass && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 420,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
+                정말 삭제하시겠습니까?
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                <strong style={{ color: '#dc2626' }}>{deleteConfirmClass.class_name}</strong> 학급을 삭제합니다.<br />
+                소속 학생, 감정 기록, 계획, 편지, 평가, 설문 등 모든 데이터가 함께 삭제되며 복구할 수 없습니다.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+                계속하려면 학급명 <strong style={{ color: '#dc2626' }}>{deleteConfirmClass.class_name}</strong>을(를) 그대로 입력하세요
+              </label>
+              <input
+                type="text"
+                value={deleteClassNameInput}
+                onChange={(e) => setDeleteClassNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirmDeleteClass(); }}
+                placeholder={deleteConfirmClass.class_name}
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setDeleteConfirmClass(null); setDeleteClassNameInput(''); }}
+                disabled={deletingClassId === deleteConfirmClass.id}
+                style={{ fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmDeleteClass}
+                disabled={deletingClassId === deleteConfirmClass.id || deleteClassNameInput !== deleteConfirmClass.class_name}
+                style={{
+                  background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14,
+                  cursor: deleteClassNameInput !== deleteConfirmClass.class_name ? 'not-allowed' : 'pointer',
+                  opacity: deleteClassNameInput !== deleteConfirmClass.class_name ? 0.5 : 1,
+                }}
+              >
+                {deletingClassId === deleteConfirmClass.id ? '삭제 중...' : '학급 삭제'}
               </button>
             </div>
           </div>
