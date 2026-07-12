@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
-import { getMonthlyUsageByTeacher } from '@/lib/ai/usage';
+import { getMonthlyUsageByTeacher, FREE_MONTHLY_AI_LIMIT, PAID_MONTHLY_AI_LIMIT } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { todayDate } from '@/lib/date';
 
 function requireAdmin(role: string) {
   if (role !== 'admin') {
@@ -20,7 +21,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('teacher_profiles')
-    .select('id, name, role, paid_until, ai_monthly_limit, created_at')
+    .select('id, name, role, paid_until, created_at')
     .order('created_at', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -32,16 +33,22 @@ export async function GET() {
   ]);
   const emailMap = new Map((usersData?.users ?? []).map((u) => [u.id, u.email ?? '']));
 
-  const teachers = (data ?? []).map((t) => ({
-    id: t.id,
-    name: t.name,
-    email: emailMap.get(t.id) ?? '',
-    role: t.role ?? 'general',
-    paidUntil: t.paid_until ?? null,
-    aiMonthlyLimit: t.ai_monthly_limit ?? 30,
-    aiUsedThisMonth: usageByTeacher.get(t.id) ?? 0,
-    createdAt: t.created_at,
-  }));
+  const today = todayDate();
+  const teachers = (data ?? []).map((t) => {
+    const role = (t.role ?? 'general') as 'general' | 'paid' | 'admin';
+    const paidActive = role === 'admin' || (role === 'paid' && (!t.paid_until || t.paid_until >= today));
+    return {
+      id: t.id,
+      name: t.name,
+      email: emailMap.get(t.id) ?? '',
+      role,
+      paidUntil: t.paid_until ?? null,
+      // 관리자는 무제한(null), 그 외는 등급 고정 한도
+      aiMonthlyLimit: role === 'admin' ? null : (paidActive ? PAID_MONTHLY_AI_LIMIT : FREE_MONTHLY_AI_LIMIT),
+      aiUsedThisMonth: usageByTeacher.get(t.id) ?? 0,
+      createdAt: t.created_at,
+    };
+  });
 
   return NextResponse.json({ teachers });
 }
@@ -50,7 +57,6 @@ const patchSchema = z.object({
   teacherId: z.string().uuid(),
   role: z.enum(['general', 'paid', 'admin']),
   paidUntil: z.string().nullable().optional(),
-  aiMonthlyLimit: z.number().int().min(0).max(10000).optional(),
 });
 
 // 교사 권한 변경 (관리자 전용)
@@ -64,16 +70,13 @@ export async function PATCH(req: Request) {
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { teacherId, role, paidUntil, aiMonthlyLimit } = parsed.data;
+  const { teacherId, role, paidUntil } = parsed.data;
 
-  const updateData: { role: string; paid_until?: string | null; ai_monthly_limit?: number } = { role };
+  const updateData: { role: string; paid_until?: string | null } = { role };
   if (role === 'paid') {
     updateData.paid_until = paidUntil ?? null;
   } else {
     updateData.paid_until = null;
-  }
-  if (aiMonthlyLimit !== undefined) {
-    updateData.ai_monthly_limit = aiMonthlyLimit;
   }
 
   const { error } = await supabaseAdmin

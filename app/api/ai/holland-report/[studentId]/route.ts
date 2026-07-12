@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher, requireAiAccess, requireTeacherStudent } from '@/lib/auth';
+import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
 import { getSavedHollandReport, generateAndSaveHollandReport, InsufficientHollandDataError } from '@/lib/ai/hollandReport';
 
@@ -21,8 +21,6 @@ export async function GET(_: Request, { params }: Params) {
 export async function POST(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
-  const aiBlock = requireAiAccess(auth.teacher);
-  if (aiBlock) return aiBlock;
 
   const owned = await requireTeacherStudent(auth.teacher.id, params.studentId);
   if ('error' in owned) return owned.error;

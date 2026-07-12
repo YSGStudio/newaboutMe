@@ -2,9 +2,15 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate, getSeoulDayRange } from '@/lib/date';
+import { hasActivePaidPlan } from '@/lib/auth';
 import type { TeacherProfile } from '@/lib/auth';
 
 export type AiFeature = 'growth_report' | 'holland_report' | 'subject_report';
+
+// 등급별 월 고정 한도. 사용량은 이번 달 로그 개수를 그때그때 세는 방식이라
+// 저장된 잔여치가 없고, 매월 1일(서울 기준) 자동으로 이 값 기준 재계산된다 — 이월/차감 없음.
+export const FREE_MONTHLY_AI_LIMIT = 20;
+export const PAID_MONTHLY_AI_LIMIT = 100;
 
 export type AiUsage = {
   used: number;             // 이번 달(서울 기준) 사용 횟수
@@ -16,7 +22,12 @@ export type AiUsage = {
 const seoulMonthStartIso = () =>
   getSeoulDayRange(`${todayDate().slice(0, 7)}-01`).startIso;
 
-export async function getAiUsage(teacher: Pick<TeacherProfile, 'id' | 'role' | 'aiMonthlyLimit'>): Promise<AiUsage> {
+export function monthlyAiLimit(teacher: TeacherProfile): number | null {
+  if (teacher.role === 'admin') return null; // 무제한
+  return hasActivePaidPlan(teacher) ? PAID_MONTHLY_AI_LIMIT : FREE_MONTHLY_AI_LIMIT;
+}
+
+export async function getAiUsage(teacher: TeacherProfile): Promise<AiUsage> {
   const { count } = await supabaseAdmin
     .from('ai_usage_logs')
     .select('id', { count: 'exact', head: true })
@@ -24,16 +35,17 @@ export async function getAiUsage(teacher: Pick<TeacherProfile, 'id' | 'role' | '
     .gte('created_at', seoulMonthStartIso());
 
   const used = count ?? 0;
-  if (teacher.role === 'admin') {
+  const limit = monthlyAiLimit(teacher);
+  if (limit === null) {
     return { used, limit: null, remaining: null };
   }
-  return { used, limit: teacher.aiMonthlyLimit, remaining: Math.max(0, teacher.aiMonthlyLimit - used) };
+  return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
 export function quotaExceededResponse(usage: AiUsage): NextResponse {
   return NextResponse.json(
     {
-      error: `이번 달 AI 분석 사용 한도(${usage.limit}회)를 모두 사용했습니다. 다음 달에 초기화되며, 한도 조정은 관리자에게 문의해주세요.`,
+      error: `이번 달 AI 분석 사용 한도(${usage.limit}회)를 모두 사용했습니다. 다음 달 1일에 초기화됩니다.`,
       usage,
     },
     { status: 429 }

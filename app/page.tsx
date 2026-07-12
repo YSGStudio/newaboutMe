@@ -3,18 +3,18 @@ import Link from 'next/link';
 const features = [
   {
     icon: '✨',
-    title: '감정 기록',
-    desc: '오늘의 감정을 선택하고 짧은 글로 남겨요. 쌓인 기록이 나만의 감정 지도가 됩니다.',
+    title: '감정 기록 & 통계',
+    desc: '오늘의 감정을 선택하고 짧은 글로 남겨요. 월별 모아보기와 감정통계 그래프로 나만의 감정 지도를 확인해요.',
   },
   {
     icon: '📋',
     title: '계획 관리',
-    desc: '오늘 할 일을 계획하고 하나씩 체크해요. 작은 실천이 쌓여 큰 성장이 됩니다.',
+    desc: '오늘 할 일을 계획하고 하나씩 체크해요. 실천률이 자동으로 집계되어 작은 실천이 큰 성장이 됩니다.',
   },
   {
-    icon: '📊',
-    title: '성장 리포트',
-    desc: '선생님이 학생의 감정 흐름과 계획 달성률을 한눈에 확인하고 지원할 수 있어요.',
+    icon: '🏅',
+    title: '뱃지 & 칭호',
+    desc: '감정 기록, 계획 실천, 성찰, 편지 쓰기로 20가지 뱃지를 모아요. 뱃지가 쌓이면 칭호가 성장합니다.',
   },
   {
     icon: '💌',
@@ -22,15 +22,73 @@ const features = [
     desc: '친구에게 마음을 담은 편지를 보내요. 선생님이 학급 편지함을 안전하게 관리합니다.',
   },
   {
+    icon: '🕸️',
+    title: '교우관계 분석',
+    desc: '교우관계 설문을 마감하면 학급 관계도(소시오그램)와 고립·갈등위험·소그룹 분석이 자동 생성돼요.',
+  },
+  {
     icon: '📝',
     title: '과정중심평가 & 성찰일기',
     desc: '선생님이 과정중심평가 결과를 기록하고, 학생은 평가 후 스스로를 돌아보는 성찰일기를 써요.',
   },
+  {
+    icon: '📊',
+    title: '성장 리포트 & PDF',
+    desc: '학생별 실천률·감정 분포·평가 현황을 한눈에 확인하고, 학급 전체 리포트를 PDF로 내보낼 수 있어요.',
+  },
+  {
+    icon: '🔐',
+    title: '안전한 이용',
+    desc: '학생은 숫자 PIN으로 간편하고 안전하게 로그인해요. 비밀번호 재설정과 잠금 해제는 선생님이 관리합니다.',
+  },
+];
+
+const titleBadges = [
+  { image: '/별빛새싹.png', name: '별빛 새싹', scale: 1.22 },
+  { image: '/별빛탐험가.png', name: '별빛 탐험가', scale: 0.9 },
+  { image: '/별빛기록자.png', name: '별빛 기록자', scale: 0.98 },
+  { image: '/별빛마스터.png', name: '별빛 마스터', scale: 1.56 },
+  { image: '/별빛전설.png', name: '별빛 전설', scale: 0.94 },
+];
+
+const badgeImageBoxStyle = {
+  width: 'clamp(84px, 12vw, 124px)',
+  height: 'clamp(84px, 12vw, 124px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+} as const;
+
+const badgeImageStyle = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain',
+  display: 'block',
+  transformOrigin: 'center',
+} as const;
+
+const aiFeatures = [
+  {
+    icon: '🌱',
+    title: 'AI 성장 분석',
+    desc: '주간·월간·학기 단위로 계획 실천과 감정 흐름을 분석해 학생별 맞춤 성장 제언을 만들어요. 학급 전체 일괄 분석과 PDF 리포트도 지원합니다.',
+  },
+  {
+    icon: '🔍',
+    title: '홀란드 성향 분석',
+    desc: '쌓인 기록을 바탕으로 홀란드(RIASEC) 성향과 추천 직업군을 분석해 진로 지도의 참고 자료를 제공해요.',
+  },
+  {
+    icon: '🎓',
+    title: '교과 종합평가 분석',
+    desc: '과정중심평가 기록을 과목별로 종합해 교과발달상황 서술의 초안이 되는 분석을 생성해요.',
+  },
 ];
 
 const steps = [
-  { role: '선생님', color: '#6366f1', steps: ['회원가입 후 학급 개설', '학생 이름과 번호 등록', '학급코드를 학생들에게 전달', '대시보드에서 성장 모니터링'] },
-  { role: '학생', color: '#f59e0b', steps: ['학급코드와 이름으로 로그인', '오늘의 감정을 기록', '할 일 계획 후 하나씩 체크', '친구에게 클래스메일 보내기'] },
+  { role: '선생님', color: '#6366f1', steps: ['회원가입 후 학급 개설', '학생 이름과 번호 등록', '학급코드를 학생들에게 전달', '대시보드에서 성장 모니터링', 'AI 리포트로 학기말 정리'] },
+  { role: '학생', color: '#f59e0b', steps: ['학급코드·이름·PIN으로 로그인', '오늘의 감정을 기록', '할 일 계획 후 하나씩 체크', '친구에게 클래스메일 보내기', '뱃지 모아 칭호 올리기'] },
 ];
 
 export default function HomePage() {
@@ -149,7 +207,7 @@ export default function HomePage() {
           성장을 위한 모든 것
         </h2>
         <p style={{ color: '#64748b', fontSize: 16, maxWidth: 500, margin: '0 auto 56px', lineHeight: 1.7 }}>
-          감정 기록부터 교사 리포트까지, 학생의 하루를 완성하는 네 가지 핵심 기능
+          감정 기록부터 교우관계 분석, 교사 리포트까지 — 학생의 하루와 학급 운영을 완성하는 핵심 기능
         </p>
         <div style={{
           display: 'grid',
@@ -174,6 +232,99 @@ export default function HomePage() {
             </article>
           ))}
         </div>
+      </section>
+
+      {/* ── 뱃지 & 칭호 ── */}
+      <section style={{
+        background: '#fff', padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
+        textAlign: 'center',
+      }}>
+        <p style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, letterSpacing: 2, marginBottom: 12 }}>GROWTH</p>
+        <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, margin: '0 0 16px', color: '#1e1b4b' }}>
+          기록이 쌓일수록 칭호가 자라나요
+        </h2>
+        <p style={{ color: '#64748b', fontSize: 16, maxWidth: 520, margin: '0 auto 56px', lineHeight: 1.7 }}>
+          감정 기록, 계획 실천, 성찰일기, 클래스메일로 뱃지를 모으면
+          별빛 새싹부터 별빛 전설까지 칭호가 한 단계씩 성장합니다.
+        </p>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', justifyContent: 'center',
+          gap: 'clamp(12px, 3vw, 32px)', maxWidth: 900, margin: '0 auto',
+        }}>
+          {titleBadges.map((badge, i) => (
+            <div
+              key={badge.name}
+              style={{
+                width: 'clamp(96px, 14vw, 136px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <div style={badgeImageBoxStyle}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={badge.image}
+                  alt={badge.name}
+                  style={{
+                    ...badgeImageStyle,
+                    transform: `scale(${badge.scale})`,
+                    filter: `drop-shadow(0 6px 16px rgba(99,102,241,${0.12 + i * 0.05}))`,
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#334155' }}>{badge.name}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── AI 분석 (유료) ── */}
+      <section style={{
+        background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 60%, #24243e 100%)',
+        padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.45)',
+          borderRadius: 100, padding: '6px 18px', marginBottom: 20,
+        }}>
+          <span style={{ fontSize: 13, color: '#fcd34d', fontWeight: 700 }}>✨ 무료 월 20회 · 유료 월 100회</span>
+        </div>
+        <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, margin: '0 0 16px', color: '#fff' }}>
+          AI가 기록을 성장 이야기로 바꿔줘요
+        </h2>
+        <p style={{ color: '#c7d2fe', fontSize: 16, maxWidth: 560, margin: '0 auto 56px', lineHeight: 1.7 }}>
+          한 학기 동안 쌓인 감정·계획·평가 기록을 AI가 분석해 선생님의 학기말 업무를 덜어드립니다.
+          분석 전 학생 실명을 자동으로 비식별 처리하여 안전하게 이용할 수 있어요.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: 24, maxWidth: 900, margin: '0 auto 40px',
+        }}>
+          {aiFeatures.map((f) => (
+            <article key={f.title} style={{
+              background: 'rgba(255,255,255,0.06)', borderRadius: 20, padding: '32px 24px',
+              border: '1px solid rgba(255,255,255,0.12)', textAlign: 'left',
+            }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14,
+                background: 'rgba(99,102,241,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 26, marginBottom: 18,
+              }}>{f.icon}</div>
+              <h3 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 700, color: '#fff' }}>{f.title}</h3>
+              <p style={{ margin: 0, fontSize: 14, color: '#c7d2fe', lineHeight: 1.7 }}>{f.desc}</p>
+            </article>
+          ))}
+        </div>
+        <p style={{ margin: 0, color: 'rgba(199,210,254,0.55)', fontSize: 13, lineHeight: 1.7 }}>
+          AI 분석 결과는 참고용이며, 무료회원은 월 20회·유료회원은 월 100회 이용할 수 있습니다. 학급 전체 일괄 분석은 유료회원 전용 기능입니다.<br />
+          유료 플랜 문의는 가입 후 관리자에게 연락해주세요.
+        </p>
       </section>
 
       {/* ── 사용 방법 ── */}

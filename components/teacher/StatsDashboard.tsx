@@ -103,6 +103,9 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
 };
 
 
+// AI 분석 버튼(분석하기/재분석)을 누를 때마다 사용량 차감을 사전에 알리는 확인창
+const AI_USAGE_CONFIRM_MESSAGE = 'AI 분석을 사용합니다. AI 분석 사용횟수를 1회 차감합니다.';
+
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
   const json = await res.json();
@@ -437,13 +440,12 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
 }
 
 function AiGrowthSection({
-  result, loading, error, onAnalyze, canUseAi,
+  result, loading, error, onAnalyze,
 }: {
   result: GrowthAiResult | null;
   loading: boolean;
   error: string;
   onAnalyze: (forceRefresh: boolean) => void;
-  canUseAi: boolean;
 }) {
   return (
     <div style={{ background: '#fdf4ff', borderRadius: 12, padding: '12px 14px 10px', border: '1px solid #f0abfc' }}>
@@ -455,13 +457,7 @@ function AiGrowthSection({
         )}
       </div>
 
-      {!canUseAi && (
-        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#dc2626', textAlign: 'center', padding: '8px 0' }}>
-          유료회원만 사용가능합니다. 관리자에게 문의해주세요.
-        </p>
-      )}
-
-      {canUseAi && !result && !loading && (
+      {!result && !loading && (
         <button type="button" className="ghost" style={{ width: '100%' }} onClick={() => onAnalyze(false)}>
           ✨ 분석하기
         </button>
@@ -475,7 +471,7 @@ function AiGrowthSection({
 
       <Notice type="error" message={error} />
 
-      {canUseAi && result && !loading && (
+      {result && !loading && (
         <>
           <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
             {AI_GROWTH_SECTIONS.map(({ key, label, accent }) => (
@@ -501,13 +497,12 @@ function AiGrowthSection({
 }
 
 function HollandSection({
-  result, loading, error, onGenerate, canUseAi,
+  result, loading, error, onGenerate,
 }: {
   result: HollandAiResult | null;
   loading: boolean;
   error: string;
   onGenerate: () => void;
-  canUseAi: boolean;
 }) {
   const primaryColor = result ? (HOLLAND_TYPE_COLOR[result.primaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
   const secondaryColor = result?.secondaryType ? (HOLLAND_TYPE_COLOR[result.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
@@ -524,13 +519,7 @@ function HollandSection({
         )}
       </div>
 
-      {!canUseAi && (
-        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#dc2626', textAlign: 'center', padding: '8px 0' }}>
-          유료회원만 사용가능합니다. 관리자에게 문의해주세요.
-        </p>
-      )}
-
-      {canUseAi && !result && !loading && (
+      {!result && !loading && (
         <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
             계획·감정·평가 데이터를 바탕으로 홀란드 RIASEC 성향을 분석합니다.
@@ -549,7 +538,7 @@ function HollandSection({
 
       {error && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#ef4444' }}>{error}</p>}
 
-      {canUseAi && result && !loading && (
+      {result && !loading && (
         <>
           {/* 주된 성향 */}
           <div style={{ background: primaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
@@ -599,7 +588,7 @@ function HollandSection({
   );
 }
 
-export default function StatsDashboard({ classId, students, className, canUseAi = true, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canUseAi?: boolean; onAiUsageChanged?: () => void }) {
+export default function StatsDashboard({ classId, students, className, canBatchAnalyze = false, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canBatchAnalyze?: boolean; onAiUsageChanged?: () => void }) {
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState('');
@@ -663,6 +652,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
 
   const analyzeStudent = async (forceRefresh: boolean) => {
     if (!activeStudentId || aiLoading) return;
+    if (!window.confirm(AI_USAGE_CONFIRM_MESSAGE)) return;
     setAiLoading(true);
     setAiError('');
     try {
@@ -678,6 +668,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
 
   const analyzeHolland = async () => {
     if (!activeStudentId || hollandLoading) return;
+    if (!window.confirm(AI_USAGE_CONFIRM_MESSAGE)) return;
     setHollandLoading(true);
     setHollandError('');
     try {
@@ -800,7 +791,8 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
     if (students.length === 0 || classAiRunning) return;
     const estMinutes = Math.max(1, Math.ceil(students.length / 5) * 0.5);
     const confirmed = window.confirm(
-      `${students.length}명 학생의 AI 분석을 생성합니다. 약 ${estMinutes}분 소요됩니다.\n계속할까요?`
+      `${students.length}명 학생의 AI 분석을 생성합니다. 약 ${estMinutes}분 소요됩니다.\n`
+      + `${AI_USAGE_CONFIRM_MESSAGE} (최대 ${students.length}회 차감, 캐시된 결과는 차감되지 않습니다)\n계속할까요?`
     );
     if (!confirmed) return;
 
@@ -904,7 +896,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
           >
             {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
           </button>
-          {canUseAi ? (
+          {canBatchAnalyze ? (
             <button
               type="button"
               className="ghost"
@@ -915,7 +907,7 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
               {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
             </button>
           ) : (
-            <span style={{ fontSize: 12, color: '#dc2626', padding: '6px 2px' }}>유료회원만 사용가능합니다</span>
+            <span style={{ fontSize: 12, color: '#dc2626', padding: '6px 2px' }}>전체 분석하기는 유료회원만 사용가능합니다</span>
           )}
           {classAiResults && !classAiRunning && (
             <button
@@ -1023,8 +1015,8 @@ export default function StatsDashboard({ classId, students, className, canUseAi 
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <EvalSection reports={evalReports} loading={evalLoading} />
-                <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} canUseAi={canUseAi} />
-                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} canUseAi={canUseAi} />
+                <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
+                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} />
               </div>
             )}
           </div>

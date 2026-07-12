@@ -1161,6 +1161,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   // 종합평가: AI 분석 버튼 — 항상 새로 분석하고 기존 저장 결과를 덮어씀
   const analyzeComprehensive = async () => {
     if (!comprehensiveStudentId || comprehensiveAnalyzing) return;
+    if (!window.confirm('AI 분석을 사용합니다. AI 분석 사용횟수를 1회 차감합니다.')) return;
     setComprehensiveAnalyzing(true);
     setComprehensiveError('');
     try {

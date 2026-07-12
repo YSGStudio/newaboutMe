@@ -9,7 +9,6 @@ export type TeacherProfile = {
   name: string;
   role: TeacherRole;
   paidUntil: string | null;
-  aiMonthlyLimit: number;
 };
 
 export async function requireTeacher() {
@@ -24,7 +23,7 @@ export async function requireTeacher() {
 
   const { data: profile } = await supabaseAdmin
     .from('teacher_profiles')
-    .select('id,name,role,paid_until,ai_monthly_limit')
+    .select('id,name,role,paid_until')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -37,7 +36,6 @@ export async function requireTeacher() {
     name: profile.name,
     role: (profile.role ?? 'general') as TeacherRole,
     paidUntil: profile.paid_until ?? null,
-    aiMonthlyLimit: profile.ai_monthly_limit ?? 30,
   };
 
   return { user, teacher };
@@ -100,12 +98,5 @@ export function canUseAi(teacher: TeacherProfile): boolean {
   return false;
 }
 
-export function requireAiAccess(teacher: TeacherProfile): NextResponse | null {
-  if (!canUseAi(teacher)) {
-    return NextResponse.json(
-      { error: '유료회원만 사용 가능한 기능입니다. 관리자에게 문의해주세요.' },
-      { status: 403 }
-    );
-  }
-  return null;
-}
+/** 유효한 유료 플랜(또는 관리자) 여부 — 다중 학급, AI 월 한도 등급 결정 등에 사용 */
+export const hasActivePaidPlan = canUseAi;

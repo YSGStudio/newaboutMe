@@ -70,7 +70,7 @@ type TeacherListItem = {
   email: string;
   role: TeacherRole;
   paidUntil: string | null;
-  aiMonthlyLimit: number;
+  aiMonthlyLimit: number | null; // 등급 고정 한도(무료 20 / 유료 100), null = 무제한(관리자)
   aiUsedThisMonth: number;
   createdAt: string;
 };
@@ -117,7 +117,7 @@ export default function TeacherPage() {
   const [adminSavingId, setAdminSavingId] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [adminError, setAdminError] = useState('');
-  const adminEdits = useRef<Map<string, { role: TeacherRole; paidUntil: string; aiMonthlyLimit: number }>>(new Map());
+  const adminEdits = useRef<Map<string, { role: TeacherRole; paidUntil: string }>>(new Map());
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -169,7 +169,14 @@ export default function TeacherPage() {
     () => classes.find((item) => item.id === selectedClassId) ?? null,
     [classes, selectedClassId]
   );
-  const canCreateClass = classes.length === 0;
+  // 무료회원은 학급 1개까지, 유료·관리자는 추가 생성 가능
+  const canCreateClass = canUseAi || classes.length === 0;
+  // 유료 → 무료 전환 후 학급이 2개 이상 남은 상태: 학급 정리 전까지 다른 탭 잠금
+  const isOverClassLimit = !canUseAi && classes.length >= 2;
+
+  // 학급 생성 동의 모달
+  const [pendingClass, setPendingClass] = useState<{ className: string; grade: number; section: number; classCode: string } | null>(null);
+  const classFormRef = useRef<HTMLFormElement>(null);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
@@ -328,6 +335,13 @@ export default function TeacherPage() {
     loadAiUsage();
   }, [loadClasses, loadTeacherRole, loadAiUsage]);
 
+  // 무료 전환 후 학급 초과 상태면 학급관리 탭으로 고정
+  useEffect(() => {
+    if (isOverClassLimit && activeTab !== 'class' && activeTab !== 'admin') {
+      setActiveTab('class');
+    }
+  }, [isOverClassLimit, activeTab]);
+
   useEffect(() => {
     if (selectedClassId) {
       loadStudents(selectedClassId).catch((err: Error) => setAuthError(err.message));
@@ -388,33 +402,39 @@ export default function TeacherPage() {
     }
   };
 
-  const onCreateClass = async (event: FormEvent<HTMLFormElement>) => {
+  // 폼 제출 → 데이터 보관 후 동의 모달 표시 (실제 생성은 confirmCreateClass에서)
+  const onCreateClass = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canCreateClass) {
-      setAuthError('학급은 1개만 생성할 수 있습니다.');
+      setAuthError('무료회원은 학급을 1개까지만 만들 수 있습니다.');
       clearNoticeLater();
       return;
     }
+    const form = new FormData(event.currentTarget);
+    setPendingClass({
+      className: String(form.get('className')),
+      grade: Number(form.get('grade')),
+      section: Number(form.get('section')),
+      classCode: String(form.get('classCode')).trim(),
+    });
+  };
+
+  const confirmCreateClass = async () => {
+    if (!pendingClass || classLoading) return;
     setClassLoading(true);
     setAuthError('');
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-
     try {
       await api('/api/classes', {
         method: 'POST',
-        body: JSON.stringify({
-          className: String(form.get('className')),
-          grade: Number(form.get('grade')),
-          section: Number(form.get('section')),
-          classCode: String(form.get('classCode')).trim()
-        })
+        body: JSON.stringify(pendingClass)
       });
-      formEl.reset();
+      setPendingClass(null);
+      classFormRef.current?.reset();
       await loadClasses();
       setAuthMessage('학급이 생성되었습니다.');
       clearNoticeLater();
     } catch (error) {
+      setPendingClass(null);
       setAuthError((error as Error).message);
       clearNoticeLater();
     } finally {
@@ -598,7 +618,7 @@ export default function TeacherPage() {
       const data = await api<{ teachers: TeacherListItem[] }>('/api/admin/teachers');
       setAdminTeachers(data.teachers);
       adminEdits.current = new Map(
-        data.teachers.map((t) => [t.id, { role: t.role, paidUntil: t.paidUntil ?? '', aiMonthlyLimit: t.aiMonthlyLimit }])
+        data.teachers.map((t) => [t.id, { role: t.role, paidUntil: t.paidUntil ?? '' }])
       );
     } catch (err) {
       setAdminError((err as Error).message);
@@ -620,16 +640,10 @@ export default function TeacherPage() {
           teacherId,
           role: edit.role,
           paidUntil: edit.role === 'paid' && edit.paidUntil ? edit.paidUntil : null,
-          aiMonthlyLimit: edit.aiMonthlyLimit,
         }),
       });
-      setAdminTeachers((prev) =>
-        prev.map((t) =>
-          t.id === teacherId
-            ? { ...t, role: edit.role, paidUntil: edit.role === 'paid' ? (edit.paidUntil || null) : null, aiMonthlyLimit: edit.aiMonthlyLimit }
-            : t
-        )
-      );
+      // 등급 변경 시 AI 한도가 달라지므로 서버 계산값으로 다시 불러온다
+      await loadAdminTeachers();
       setAdminMessage('저장되었습니다.');
       setTimeout(() => setAdminMessage(''), 2000);
     } catch (err) {
@@ -707,7 +721,7 @@ export default function TeacherPage() {
         title="교사 대시보드"
         subtitle="학급과 학생을 빠르게 관리하세요"
         badge={
-          isAuthed && canUseAi && aiUsage ? (
+          isAuthed && aiUsage ? (
             <span
               title={
                 aiUsage.limit === null
@@ -836,17 +850,18 @@ export default function TeacherPage() {
             <Tabs
               items={[
                 { key: 'class', label: '학급 관리' },
-                { key: 'student', label: '학생 관리' },
-                { key: 'feed', label: '마음피드' },
-                { key: 'eval', label: '평가피드백' },
-                { key: 'letters', label: '클래스메일' },
-                { key: 'stats', label: '성장리포트' },
-                { key: 'relationship', label: '교우관계' },
-                { key: 'settings', label: '학급설정' },
+                { key: 'student', label: '학생 관리', disabled: isOverClassLimit },
+                { key: 'feed', label: '마음피드', disabled: isOverClassLimit },
+                { key: 'eval', label: '평가피드백', disabled: isOverClassLimit },
+                { key: 'letters', label: '클래스메일', disabled: isOverClassLimit },
+                { key: 'stats', label: '성장리포트', disabled: isOverClassLimit },
+                { key: 'relationship', label: '교우관계', disabled: isOverClassLimit },
+                { key: 'settings', label: '학급설정', disabled: isOverClassLimit },
                 ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }] : []),
               ]}
               value={activeTab}
               onChange={(key) => {
+                if (isOverClassLimit && key !== 'class' && key !== 'admin') return;
                 setActiveTab(key as typeof activeTab);
                 if (key === 'letters' && selectedClassId && !lettersLoaded) {
                   loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
@@ -870,13 +885,39 @@ export default function TeacherPage() {
                 <span className="badge">총 {classes.length}개 학급</span>
               </div>
 
+              {isOverClassLimit && (
+                <div style={{
+                  background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 12,
+                  padding: '14px 16px', marginBottom: 14,
+                }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#dc2626' }}>
+                    ⚠️ 무료회원은 학급을 1개까지만 이용할 수 있습니다
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#7f1d1d', lineHeight: 1.6 }}>
+                    유료 기간이 종료되어 학급이 {classes.length}개 남아 있습니다. 학급이 1개만 남을 때까지
+                    다른 메뉴는 사용할 수 없습니다. 아래 학급 목록에서 사용하지 않는 학급을 삭제해주세요.
+                  </p>
+                </div>
+              )}
+
+              <div style={{
+                background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12,
+                padding: '12px 16px', marginBottom: 14,
+              }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#92400e', lineHeight: 1.6 }}>
+                  📌 <strong>학년도 종료 데이터 삭제 안내</strong> — 매년 2월 마지막 날을 기점으로 모든 학급 데이터(학생 계정,
+                  감정 기록, 계획, 편지, 평가, 설문 등)가 자동 삭제됩니다. 보관이 필요한 자료는 그 전에
+                  성장리포트 PDF 내보내기 등으로 미리 저장해주세요.
+                </p>
+              </div>
+
               <div className="grid two" style={{ alignItems: 'start', gap: 14 }}>
                 <article className="card" style={{ padding: 12 }}>
                   <h3 style={{ marginTop: 0, marginBottom: 10 }}>새 학급 만들기</h3>
                   {!canCreateClass && (
-                    <Notice type="info" message="이미 학급이 생성되어 있어 추가 생성은 비활성화됩니다." />
+                    <Notice type="info" message="무료회원은 학급을 1개까지 만들 수 있습니다. 추가 학급이 필요하면 유료회원으로 전환해주세요." />
                   )}
-                  <form className="grid" onSubmit={onCreateClass}>
+                  <form className="grid" onSubmit={onCreateClass} ref={classFormRef}>
                     <div>
                       <label>학급명</label>
                       <input name="className" placeholder="햇살반" required disabled={!canCreateClass} />
@@ -1357,7 +1398,7 @@ export default function TeacherPage() {
             </div>
           )}
 
-          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canUseAi={canUseAi} onAiUsageChanged={loadAiUsage} />}
+          {activeTab === 'stats' && <StatsDashboard classId={selectedClassId} students={students} className={selectedClass?.class_name} canBatchAnalyze={canUseAi} onAiUsageChanged={loadAiUsage} />}
 
           {activeTab === 'relationship' && (
             <section className="card">
@@ -1405,8 +1446,8 @@ export default function TeacherPage() {
               {!adminLoading && adminTeachers.length > 0 && (
                 <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
                   {/* 헤더 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 110px 60px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    {['이름', '아이디(이메일)', '현재등급', '변경등급', '유료 만료일', 'AI 사용/월한도', ''].map((h) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 100px 60px', gap: 8, padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    {['이름', '아이디(이메일)', '현재등급', '변경등급', '유료 만료일', 'AI 사용/한도', ''].map((h) => (
                       <span key={h} style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>{h}</span>
                     ))}
                   </div>
@@ -1417,7 +1458,7 @@ export default function TeacherPage() {
                       <div
                         key={teacher.id}
                         style={{
-                          display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 110px 60px',
+                          display: 'grid', gridTemplateColumns: '90px 1fr 70px 100px 130px 100px 60px',
                           gap: 8, alignItems: 'center', padding: '10px 14px',
                           background: idx % 2 === 0 ? '#fff' : '#fafafa',
                           borderBottom: idx < adminTeachers.length - 1 ? '1px solid #f1f5f9' : 'none',
@@ -1441,7 +1482,7 @@ export default function TeacherPage() {
                         <select
                           defaultValue={teacher.role}
                           onChange={(e) => {
-                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '', aiMonthlyLimit: teacher.aiMonthlyLimit };
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '' };
                             adminEdits.current.set(teacher.id, { ...current, role: e.target.value as TeacherRole });
                           }}
                           disabled={teacher.role === 'admin'}
@@ -1454,35 +1495,21 @@ export default function TeacherPage() {
                           type="date"
                           defaultValue={teacher.paidUntil ?? ''}
                           onChange={(e) => {
-                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '', aiMonthlyLimit: teacher.aiMonthlyLimit };
+                            const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: '' };
                             adminEdits.current.set(teacher.id, { ...current, paidUntil: e.target.value });
                           }}
                           disabled={teacher.role === 'admin'}
                           style={{ fontSize: 12, padding: '6px 8px' }}
                         />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span
-                            title="이번 달 사용량"
-                            style={{ fontSize: 12, fontWeight: 700, color: teacher.aiUsedThisMonth >= teacher.aiMonthlyLimit ? '#dc2626' : '#334155', flexShrink: 0 }}
-                          >
-                            {teacher.aiUsedThisMonth}
-                          </span>
-                          <span style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>/</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={10000}
-                            defaultValue={teacher.aiMonthlyLimit}
-                            onChange={(e) => {
-                              const current = adminEdits.current.get(teacher.id) ?? { role: teacher.role, paidUntil: teacher.paidUntil ?? '', aiMonthlyLimit: teacher.aiMonthlyLimit };
-                              const parsedLimit = parseInt(e.target.value, 10);
-                              adminEdits.current.set(teacher.id, { ...current, aiMonthlyLimit: Number.isNaN(parsedLimit) ? teacher.aiMonthlyLimit : parsedLimit });
-                            }}
-                            disabled={teacher.role === 'admin'}
-                            title={teacher.role === 'admin' ? '관리자는 한도 없이 사용합니다' : '월 AI 분석 한도'}
-                            style={{ fontSize: 12, padding: '6px 6px', width: '100%', minWidth: 0 }}
-                          />
-                        </div>
+                        <span
+                          title="이번 달 AI 분석 사용량 / 월 한도 (무료 20회, 유료 100회, 관리자 무제한)"
+                          style={{
+                            fontSize: 12, fontWeight: 700,
+                            color: teacher.aiMonthlyLimit !== null && teacher.aiUsedThisMonth >= teacher.aiMonthlyLimit ? '#dc2626' : '#334155',
+                          }}
+                        >
+                          {teacher.aiUsedThisMonth}/{teacher.aiMonthlyLimit ?? '∞'}
+                        </span>
                         <button
                           type="button"
                           className="ghost"
@@ -1500,6 +1527,62 @@ export default function TeacherPage() {
             </section>
           )}
         </>
+      )}
+
+      {/* 학급 생성 동의 모달 */}
+      {pendingClass && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 440,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>학급 생성 전 확인해주세요</h3>
+            <p className="hint" style={{ margin: '0 0 16px' }}>
+              {pendingClass.className} ({pendingClass.grade}학년 {pendingClass.section}반 · 코드 {pendingClass.classCode})
+            </p>
+
+            <div style={{
+              background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12,
+              padding: '14px 16px', marginBottom: 18,
+            }}>
+              <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800, color: '#92400e' }}>
+                📌 학년도 종료 데이터 삭제 정책
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: '#78350f', lineHeight: 1.7 }}>
+                매년 <strong>2월 마지막 날</strong>을 기점으로 학급의 모든 데이터(학생 계정, 감정 기록,
+                계획, 편지, 평가, 설문 등)가 <strong>자동으로 삭제</strong>됩니다.
+                보관이 필요한 자료는 삭제 전에 PDF 내보내기 등으로 직접 저장해야 합니다.
+              </p>
+            </div>
+
+            <div className="row" style={{ gap: 8 }}>
+              <button
+                type="button"
+                className="outline"
+                style={{ flex: 1 }}
+                onClick={() => setPendingClass(null)}
+                disabled={classLoading}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                style={{ flex: 1.4 }}
+                onClick={confirmCreateClass}
+                disabled={classLoading}
+              >
+                {classLoading ? '생성 중...' : '동의하고 학급 생성'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 학생 삭제 비밀번호 확인 모달 */}

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireTeacher } from '@/lib/auth';
+import { requireTeacher, hasActivePaidPlan } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { classCreateSchema } from '@/lib/validators';
+
+// 무료회원 학급 보유 한도 (유료·관리자는 제한 없음)
+const FREE_CLASS_LIMIT = 1;
 
 export async function GET() {
   const auth = await requireTeacher();
@@ -27,8 +30,11 @@ export async function POST(req: Request) {
     .eq('teacher_id', auth.teacher.id);
 
   if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
-  if ((classCount ?? 0) >= 1) {
-    return NextResponse.json({ error: '학급은 1개만 생성할 수 있습니다.' }, { status: 400 });
+  if (!hasActivePaidPlan(auth.teacher) && (classCount ?? 0) >= FREE_CLASS_LIMIT) {
+    return NextResponse.json(
+      { error: `무료회원은 학급을 ${FREE_CLASS_LIMIT}개까지만 만들 수 있습니다. 추가 학급은 유료회원 전환 후 이용해주세요.` },
+      { status: 403 }
+    );
   }
 
   const body = await req.json();

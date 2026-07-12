@@ -1,6 +1,7 @@
 export type TabItem = {
   key: string;
   label: string;
+  disabled?: boolean;
 };
 
 type Props = {
@@ -19,6 +20,8 @@ export default function Tabs({ items, value, onChange }: Props) {
           role="tab"
           aria-selected={value === item.key}
           className={value === item.key ? 'tab active' : 'tab'}
+          disabled={item.disabled}
+          style={item.disabled ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
           onClick={() => onChange(item.key)}
         >
           {item.label}

@@ -1,3 +1,7 @@
 {
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "crons": [
+    { "path": "/api/cron/reset-classes", "schedule": "0 15 28 2 *" },
+    { "path": "/api/cron/reset-classes", "schedule": "0 15 29 2 *" }
+  ]
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireTeacher, requireAiAccess, requireTeacherClass } from '@/lib/auth';
+import { requireTeacher, requireTeacherClass, hasActivePaidPlan } from '@/lib/auth';
 import { getAiUsage, logAiUsage, quotaExceededResponse } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isPeriod } from '@/lib/stats';
@@ -39,8 +39,14 @@ async function processInChunks(
 export async function POST(req: Request) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
-  const aiBlock = requireAiAccess(auth.teacher);
-  if (aiBlock) return aiBlock;
+
+  // 학급 전체 일괄 분석은 유료회원(또는 관리자) 전용 기능
+  if (!hasActivePaidPlan(auth.teacher)) {
+    return NextResponse.json(
+      { error: '전체 분석하기는 유료회원만 사용할 수 있습니다. 학생을 개별 선택해 분석해주세요.' },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);
