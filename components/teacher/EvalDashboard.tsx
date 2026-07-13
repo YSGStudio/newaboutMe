@@ -134,8 +134,17 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
     title: '', subject: '', goal: '', task: '', linkUrl: '', criteria: []
   });
   const [savingId, setSavingId] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const clear = () => window.setTimeout(() => { setMsg(''); setError(''); }, 2500);
+
+  // 등록/수정 폼이 열리면(특히 목록 아래쪽 항목의 "수정" 클릭 시) 폼이 보이는 위치로 자동 스크롤
+  useEffect(() => {
+    if (showForm) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showForm, editingId]);
 
   useEffect(() => {
     api<{ rubrics: Rubric[] }>('/api/eval/rubrics').then((d) => setRubrics(d.rubrics)).catch(() => {});
@@ -236,7 +245,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
 
       {/* 등록 폼 */}
       {showForm ? (
-        <form onSubmit={onSave} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form ref={formRef} onSubmit={onSave} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h4 style={{ margin: 0, fontSize: 16 }}>{editingId ? '채점기준 수정' : '새 채점기준 등록'}</h4>
             <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => { setShowForm(false); resetForm(); setEditingId(''); }}>취소</button>
@@ -361,9 +370,38 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
       {/* 채점기준 목록 */}
       {rubrics.length === 0 ? (
         <EmptyState title="등록된 채점기준이 없습니다" description="위 버튼을 눌러 채점기준을 등록하세요." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {rubrics.map((r) => (
+      ) : (() => {
+        const subjects = Array.from(new Set(rubrics.map((r) => r.subject).filter(Boolean))) as string[];
+        const filteredRubrics = subjectFilter ? rubrics.filter((r) => r.subject === subjectFilter) : rubrics;
+
+        return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {subjects.length > 0 && (
+            <div style={{
+              display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
+              overflowX: 'auto', scrollbarWidth: 'thin',
+            }}>
+              {([null, ...subjects]).map((s) => (
+                <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
+                  style={{
+                    width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
+                    padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    background: subjectFilter === s ? '#fff' : 'transparent',
+                    color: subjectFilter === s ? '#0369a1' : '#64748b',
+                    boxShadow: subjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
+                  }}>
+                  {s ?? '전체'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filteredRubrics.length === 0 ? (
+            <EmptyState title="이 과목의 채점기준이 없습니다" description="다른 과목을 선택하거나 새 채점기준을 등록하세요." />
+          ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filteredRubrics.map((r) => (
             <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                 <div style={{ flex: 1 }}>
@@ -399,8 +437,11 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
               </div>
             </article>
           ))}
+          </div>
+          )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
