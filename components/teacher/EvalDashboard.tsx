@@ -841,6 +841,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   const [byRubricStudentId, setByRubricStudentId] = useState('');
   const [byRubricDraftItems, setByRubricDraftItems] = useState<DraftItem[]>([]);
   const [byRubricDone, setByRubricDone] = useState<Set<string>>(new Set());
+  const [byRubricLoadingExisting, setByRubricLoadingExisting] = useState(false);
   const [byRubricSaving, setByRubricSaving] = useState(false);
   const [byRubricLocalFiles, setByRubricLocalFiles] = useState<{ file: File; previewUrl: string }[]>([]);
   const [byRubricLocalLinks, setByRubricLocalLinks] = useState<{ url: string; label: string }[]>([]);
@@ -1011,11 +1012,26 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   };
 
   // 성취기준별 작성: 루브릭 선택 → Step 2
-  const startByRubricEval = (r: Rubric) => {
+  // 이 채점기준으로 이미 평가가 등록된 학생을 서버에서 조회해 완료 표시를 복원한다.
+  // (기존에는 byRubricDone이 세션 내 저장에서만 채워져 새로고침하면 완료 표시가 사라졌음)
+  const startByRubricEval = async (r: Rubric) => {
     setByRubricRubric(r);
     setByRubricStep(2);
+    setByRubricLoadingExisting(true);
+
+    let doneSet = new Set<string>();
+    try {
+      const d = await api<{ records: LookupRecord[] }>(`/api/eval/reports/by-rubric/${r.id}?classId=${classId}`);
+      doneSet = new Set(d.records.filter((rec) => rec.reportId !== null).map((rec) => rec.studentId));
+    } catch {
+      // 조회 실패 시 완료 표시 없이 진행 (기존 동작과 동일한 폴백)
+    }
+
+    setByRubricDone(doneSet);
+    setByRubricLoadingExisting(false);
+
     // 첫 번째 미완료 학생 자동 선택
-    const firstStudentId = students.find((s) => !byRubricDone.has(s.id))?.id ?? students[0]?.id ?? '';
+    const firstStudentId = students.find((s) => !doneSet.has(s.id))?.id ?? students[0]?.id ?? '';
     setByRubricStudentId(firstStudentId);
     buildByRubricDraft(r, firstStudentId);
   };
@@ -1677,6 +1693,14 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           }
 
           // Step 2: 학생별 순차 평가
+          if (byRubricLoadingExisting) {
+            return (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                <p style={{ margin: 0, fontSize: 14 }}>이미 평가된 학생을 확인하는 중...</p>
+              </div>
+            );
+          }
+
           const byRubricStudent = students.find((s) => s.id === byRubricStudentId);
           const remainingCount = students.filter((s) => !byRubricDone.has(s.id)).length;
 
