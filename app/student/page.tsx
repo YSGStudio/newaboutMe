@@ -1526,80 +1526,84 @@ export default function StudentPage() {
                         disabled={evalDetailLoading}
                         style={{
                           width: 112,
-                          minHeight: 158,
+                          height: 158,
                           borderRadius: 14,
                           border: 'none',
-                          background: '#fff',
+                          background: '#d7e8f7',
                           padding: 0,
-                          cursor: evalDetailLoading ? 'default' : 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
+                          position: 'relative',
                           overflow: 'hidden',
+                          cursor: evalDetailLoading ? 'default' : 'pointer',
                           boxShadow: isLoading
                             ? `0 0 0 3px ${topColor}, 0 6px 20px ${topColor}50`
-                            : '0 2px 10px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
+                            : '0 3px 12px rgba(15,15,40,0.16), 0 1px 3px rgba(15,15,40,0.08)',
                           opacity: evalDetailLoading && !isLoading ? 0.45 : 1,
                           transition: 'opacity 0.15s, box-shadow 0.15s',
                           textAlign: 'left',
                         }}
                       >
-                        {/* 카드 상단 컬러 영역 */}
-                        <div style={{
-                          height: 64,
-                          background: `linear-gradient(135deg, ${topColor}, ${topColor}aa)`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          position: 'relative',
-                        }}>
-                          {isLoading ? (
-                            <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>불러오는 중…</span>
-                          ) : (
-                            <>
-                              <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-                                <rect x="5" y="2" width="11" height="20" rx="2" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"/>
-                                <rect x="7" y="2" width="9" height="20" rx="1.5" fill="rgba(255,255,255,0.35)" stroke="rgba(255,255,255,0.85)" strokeWidth="1"/>
-                                <line x1="9" y1="7.5" x2="14" y2="7.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
-                                <line x1="9" y1="10.5" x2="14" y2="10.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
-                                <line x1="9" y1="13.5" x2="12" y2="13.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1"/>
-                              </svg>
-                              {/* 등급 뱃지들 */}
-                              <div style={{ position: 'absolute', top: 6, right: 7, display: 'flex', gap: 3 }}>
+                        {/* 책 표지 이미지가 카드 전체를 채움 */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/book3.png"
+                          alt=""
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 50%' }}
+                        />
+
+                        {isLoading ? (
+                          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.55)', zIndex: 3 }}>
+                            <span style={{ fontSize: 11, color: topColor, fontWeight: 700 }}>불러오는 중…</span>
+                          </div>
+                        ) : (
+                          /* 책 표지 안쪽 프레임(안전 영역)에만 정보 배치 */
+                          <div style={{
+                            position: 'absolute', zIndex: 2,
+                            left: '20%', right: '28%', top: '14%', bottom: '20%',
+                            display: 'flex', flexDirection: 'column',
+                          }}>
+                            {/* 등급 배지 (프레임 우상단) */}
+                            {sortedItems.length > 0 && (
+                              <div style={{ alignSelf: 'flex-end', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
                                 {sortedItems.map((it, i) => (
                                   <span key={i} style={{
-                                    fontSize: 9, fontWeight: 800,
-                                    color: '#fff',
-                                    background: 'rgba(0,0,0,0.22)',
-                                    borderRadius: 4,
-                                    padding: '1px 4px',
-                                    lineHeight: 1.4,
+                                    fontSize: 8.5, fontWeight: 800, color: '#fff', lineHeight: 1.4,
+                                    borderRadius: 5, padding: '1.5px 5px',
+                                    background: GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'],
+                                    boxShadow: '0 1px 3px rgba(20,18,40,0.35)',
                                   }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
                                 ))}
                               </div>
-                            </>
-                          )}
-                        </div>
-                        {/* 카드 하단 내용 */}
-                        {!isLoading && (
-                          <div style={{ flex: 1, padding: '9px 10px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                            {sortedItems[0]?.rubric_subject_snapshot && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '1px 6px', alignSelf: 'flex-start', marginBottom: 4 }}>
-                                {sortedItems[0].rubric_subject_snapshot}
-                              </span>
                             )}
-                            <strong style={{ fontSize: 12, wordBreak: 'keep-all', color: '#0f172a', lineHeight: 1.4 }}>
-                              {cardTitle}
-                            </strong>
-                            <div>
-                              <p className="hint" style={{ margin: '5px 0 2px', fontSize: 10 }}>
+                            {/* 과목·제목·날짜 (프레임 하단) */}
+                            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              {subjectSnapshot && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 800, color: topColor, letterSpacing: '0.01em',
+                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.9)',
+                                }}>
+                                  {subjectSnapshot}
+                                </span>
+                              )}
+                              <strong style={{
+                                fontSize: 10.5, fontWeight: 800, color: '#1c1a33', lineHeight: 1.3, wordBreak: 'keep-all',
+                                textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 7px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.95)',
+                                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                              }}>
+                                {cardTitle}
+                              </strong>
+                              <span style={{
+                                fontSize: 8.5, fontWeight: 600, color: '#4b4864', marginTop: 1,
+                                textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 5px rgba(255,255,255,0.9)',
+                              }}>
                                 {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
-                              </p>
-                              <p style={{ margin: 0, fontSize: 12, lineHeight: 1 }}>
-                                {r.eval_reflections?.length ? '✏️' : ''}
-                                {r.eval_parent_comments?.length ? '💌' : ''}
-                                {r.eval_report_images?.length ? '🖼️' : ''}
-                              </p>
+                                {(r.eval_reflections?.length || r.eval_parent_comments?.length || r.eval_report_images?.length) ? (
+                                  <span style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>
+                                    {r.eval_reflections?.length ? '✏️' : ''}
+                                    {r.eval_parent_comments?.length ? '💌' : ''}
+                                    {r.eval_report_images?.length ? '🖼️' : ''}
+                                  </span>
+                                ) : null}
+                              </span>
                             </div>
                           </div>
                         )}
