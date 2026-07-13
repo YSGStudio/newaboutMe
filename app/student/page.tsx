@@ -250,6 +250,7 @@ export default function StudentPage() {
   const [openResponseText, setOpenResponseText] = useState('');
   const [surveySubmitting, setSurveySubmitting] = useState(false);
   const [surveyError, setSurveyError] = useState('');
+  const [surveyStep, setSurveyStep] = useState(0);
 
   // 클래스메일 상태
   const [letterBox, setLetterBox] = useState<'received' | 'sent'>('received');
@@ -831,6 +832,11 @@ export default function StudentPage() {
   const togglePick = (list: string[], setList: (v: string[]) => void, id: string, max: number) => {
     setList(list.includes(id) ? list.filter((x) => x !== id) : list.length < max ? [...list, id] : list);
   };
+
+  // 설문이 바뀌면 마법사를 첫 스텝으로 되돌린다
+  useEffect(() => {
+    setSurveyStep(0);
+  }, [activeSurvey?.id]);
 
   const onSubmitRelationshipSurvey = async () => {
     if (!activeSurvey) return;
@@ -1625,116 +1631,221 @@ export default function StudentPage() {
               ) : surveyCompleted ? (
                 <EmptyState title="이미 응답했어요" description="다음 설문이 시작되면 다시 알려드릴게요." />
               ) : (
-                <form
-                  className="grid"
-                  style={{ gap: 20 }}
-                  onSubmit={(e) => { e.preventDefault(); onSubmitRelationshipSurvey(); }}
-                >
-                  <Notice type="error" message={surveyError} />
+                <form onSubmit={(e) => { e.preventDefault(); onSubmitRelationshipSurvey(); }}>
+                  {(() => {
+                    const PICK_MAX = 3;
+                    const AVA = ['#f97362', '#f6a94a', '#48c78e', '#3aa0e3', '#7c74f0', '#e372c0', '#5bc0be', '#f6688e'];
+                    type PickKey = 'positive' | 'leader' | 'isolated' | 'negative';
+                    const cfg: Record<PickKey, { list: string[]; set: (v: string[]) => void; emoji: string; color: string; bg: string; title: string; hint: string; required: boolean }> = {
+                      positive: { list: positivePicks, set: setPositivePicks, emoji: '🤝', color: '#6366f1', bg: '#eef2ff', title: '함께 놀고 싶은 친구를 골라주세요', hint: '가장 함께 지내고 싶은 친구를 최대 3명까지 골라요.', required: true },
+                      leader:   { list: leaderPicks,   set: setLeaderPicks,   emoji: '⭐', color: '#16a34a', bg: '#dcfce7', title: '리더 역할을 하는 친구가 있나요?', hint: '앞장서서 반을 잘 이끄는 친구가 있다면 골라요. 없으면 넘어가도 돼요.', required: false },
+                      isolated: { list: isolatedPicks, set: setIsolatedPicks, emoji: '🍃', color: '#0ea5e9', bg: '#e0f2fe', title: '혼자 있는 것 같은 친구가 있나요?', hint: '더 챙겨주면 좋을 친구가 있다면 살짝 알려줘요.', required: false },
+                      negative: { list: negativePicks, set: setNegativePicks, emoji: '💧', color: '#dc2626', bg: '#fee2e2', title: '요즘 함께 하기 조금 어려운 친구가 있나요?', hint: '이 답은 선생님만 봐요. 친구에게 절대 전해지지 않으니 솔직해도 괜찮아요.', required: false },
+                    };
+                    type Step = { kind: 'pick'; key: PickKey } | { kind: 'text' } | { kind: 'review' };
+                    const steps: Step[] = [
+                      { kind: 'pick', key: 'positive' },
+                      { kind: 'pick', key: 'leader' },
+                      { kind: 'pick', key: 'isolated' },
+                      ...(activeSurvey.includesNegative ? [{ kind: 'pick', key: 'negative' } as Step] : []),
+                      { kind: 'text' },
+                      { kind: 'review' },
+                    ];
+                    const stepIdx = Math.min(surveyStep, steps.length - 1);
+                    const step = steps[stepIdx];
+                    const isLast = stepIdx === steps.length - 1;
+                    const activePick = step.kind === 'pick' ? cfg[step.key] : null;
+                    const activePickKey: PickKey | null = step.kind === 'pick' ? step.key : null;
+                    const stepColor = activePick ? activePick.color : step.kind === 'text' ? '#8b5cf6' : '#6366f1';
+                    const canNext = !activePick || !activePick.required || activePick.list.length > 0;
 
-                  <div>
-                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>함께 놀고 싶은 친구를 골라주세요 (최대 3명)</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {surveyClassmates.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => togglePick(positivePicks, setPositivePicks, c.id, 3)}
-                          style={{
-                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
-                            border: positivePicks.includes(c.id) ? '1.5px solid #6366f1' : '1.5px solid #e2e8f0',
-                            background: positivePicks.includes(c.id) ? '#eef2ff' : '#fff',
-                            color: positivePicks.includes(c.id) ? '#6366f1' : '#334155',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {c.student_number}번 {c.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    const friendGrid = (key: PickKey) => {
+                      const c = cfg[key];
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
+                          {surveyClassmates.map((mate, i) => {
+                            const on = c.list.includes(mate.id);
+                            const dim = !on && c.list.length >= PICK_MAX;
+                            return (
+                              <button
+                                key={mate.id}
+                                type="button"
+                                onClick={() => togglePick(c.list, c.set, mate.id, PICK_MAX)}
+                                style={{
+                                  position: 'relative', border: on ? `1.5px solid ${c.color}` : '1.5px solid #e7e9f4',
+                                  background: on ? c.bg : '#fff', borderRadius: 14, padding: '10px 4px 8px', cursor: 'pointer',
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minHeight: 80,
+                                  justifyContent: 'center', opacity: dim ? 0.4 : 1,
+                                  boxShadow: on ? `0 4px 12px ${c.color}33` : 'none', transition: 'all 0.15s',
+                                }}
+                              >
+                                <span style={{ width: 36, height: 36, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, color: '#fff', background: AVA[i % AVA.length] }}>
+                                  {mate.student_number}
+                                </span>
+                                <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? c.color : '#334155', lineHeight: 1.2, textAlign: 'center', wordBreak: 'keep-all' }}>
+                                  {mate.name}
+                                </span>
+                                {on && (
+                                  <span style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: c.color, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 900, border: '2px solid #fff' }}>✓</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    };
 
-                  <div>
-                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>우리 반에서 리더 역할을 하는 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {surveyClassmates.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => togglePick(leaderPicks, setLeaderPicks, c.id, 3)}
-                          style={{
-                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
-                            border: leaderPicks.includes(c.id) ? '1.5px solid #16a34a' : '1.5px solid #e2e8f0',
-                            background: leaderPicks.includes(c.id) ? '#dcfce7' : '#fff',
-                            color: leaderPicks.includes(c.id) ? '#16a34a' : '#334155',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {c.student_number}번 {c.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    const tray = (key: PickKey) => {
+                      const c = cfg[key];
+                      return (
+                        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 12, background: c.bg, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minHeight: 40 }}>
+                          {c.list.length === 0 ? (
+                            <span style={{ fontSize: 12, color: '#9297ac' }}>아직 고른 친구가 없어요</span>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: 11.5, fontWeight: 800, color: c.color }}>고른 친구</span>
+                              {c.list.map((id) => {
+                                const mate = surveyClassmates.find((x) => x.id === id);
+                                if (!mate) return null;
+                                return (
+                                  <span key={id} style={{ fontSize: 12, fontWeight: 700, color: c.color, background: '#fff', border: `1px solid ${c.color}4d`, borderRadius: 99, padding: '3px 6px 3px 9px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    {mate.student_number}번 {mate.name}
+                                    <button type="button" onClick={() => togglePick(c.list, c.set, id, PICK_MAX)} style={{ border: 'none', background: 'none', color: c.color, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 2, opacity: 0.7 }}>✕</button>
+                                  </span>
+                                );
+                              })}
+                            </>
+                          )}
+                        </div>
+                      );
+                    };
 
-                  <div>
-                    <p style={{ margin: '0 0 8px', fontWeight: 700 }}>혼자 있는 것 같은 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {surveyClassmates.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => togglePick(isolatedPicks, setIsolatedPicks, c.id, 3)}
-                          style={{
-                            width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
-                            border: isolatedPicks.includes(c.id) ? '1.5px solid #0ea5e9' : '1.5px solid #e2e8f0',
-                            background: isolatedPicks.includes(c.id) ? '#e0f2fe' : '#fff',
-                            color: isolatedPicks.includes(c.id) ? '#0369a1' : '#334155',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {c.student_number}번 {c.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <Notice type="error" message={surveyError} />
 
-                  {activeSurvey.includesNegative && (
-                    <div>
-                      <p style={{ margin: '0 0 8px', fontWeight: 700 }}>요즘 함께 하기 어려운 친구가 있다면 골라주세요 (선택, 최대 3명)</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {surveyClassmates.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => togglePick(negativePicks, setNegativePicks, c.id, 3)}
-                            style={{
-                              width: 'auto', padding: '6px 14px', borderRadius: 20, fontSize: 13,
-                              border: negativePicks.includes(c.id) ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
-                              background: negativePicks.includes(c.id) ? '#fee2e2' : '#fff',
-                              color: negativePicks.includes(c.id) ? '#dc2626' : '#334155',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {c.student_number}번 {c.name}
-                          </button>
-                        ))}
+                        {/* 진행 표시 */}
+                        <div>
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                            {steps.map((_, i) => (
+                              <span key={i} style={{ flex: 1, height: 7, borderRadius: 99, background: i <= stepIdx ? stepColor : '#e7e9f4', boxShadow: i === stepIdx ? `0 0 0 3px ${stepColor}33` : 'none', transition: 'background 0.3s' }} />
+                            ))}
+                          </div>
+                          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#9297ac', textAlign: 'right' }}>
+                            <span style={{ color: stepColor }}>{stepIdx + 1}</span> / {steps.length}
+                          </p>
+                        </div>
+
+                        {/* 스테이지 */}
+                        <div style={{ background: '#fff', border: '1px solid #e7e9f4', borderRadius: 18, padding: 18, minHeight: 360 }}>
+                          {activePick && activePickKey && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 4 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 23, background: activePick.bg }}>{activePick.emoji}</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, lineHeight: 1.35 }}>{activePick.title}</h3>
+                                  <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, color: activePick.required ? '#b42318' : '#9297ac', background: activePick.required ? '#fee4e2' : '#eef0f8' }}>
+                                    {activePick.required ? '꼭 골라요' : '선택'}
+                                  </span>
+                                </div>
+                                <span style={{ alignSelf: 'center', flexShrink: 0, fontSize: 13, fontWeight: 800, color: activePick.color, background: activePick.bg, borderRadius: 99, padding: '5px 12px' }}>
+                                  {activePick.list.length}<span style={{ opacity: 0.55 }}>/{PICK_MAX}</span>
+                                </span>
+                              </div>
+                              <p style={{ margin: '4px 0 14px 56px', fontSize: 12.5, color: '#9297ac', lineHeight: 1.55 }}>{activePick.hint}</p>
+                              {friendGrid(activePickKey)}
+                              {tray(activePickKey)}
+                            </>
+                          )}
+
+                          {step.kind === 'text' && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 4 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 23, background: '#f1ebff' }}>✏️</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, lineHeight: 1.35 }}>기억에 남는 일이 있다면 적어줄래요?</h3>
+                                  <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, color: '#9297ac', background: '#eef0f8' }}>선택 · 안 써도 돼요</span>
+                                </div>
+                              </div>
+                              <textarea
+                                value={openResponseText}
+                                onChange={(e) => setOpenResponseText(e.target.value)}
+                                maxLength={300}
+                                placeholder="예: 오늘 모둠활동이 정말 재미있었어요"
+                                style={{ marginTop: 12, minHeight: 120 }}
+                              />
+                            </>
+                          )}
+
+                          {step.kind === 'review' && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 23, background: '#eef2ff' }}>🎉</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, lineHeight: 1.35 }}>고른 내용을 확인해요</h3>
+                                  <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, color: '#9297ac', background: '#eef0f8' }}>잘못된 게 있으면 이전으로 고칠 수 있어요</span>
+                                </div>
+                              </div>
+                              {(['positive', 'leader', 'isolated', ...(activeSurvey.includesNegative ? ['negative'] : [])] as PickKey[]).map((key) => {
+                                const c = cfg[key];
+                                return (
+                                  <div key={key} style={{ padding: '12px 0', borderBottom: '1px solid #eef0f8' }}>
+                                    <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: c.color }}>{c.emoji} {c.title}</p>
+                                    {c.list.length === 0 ? (
+                                      <span style={{ fontSize: 12.5, color: '#9297ac' }}>고르지 않음</span>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {c.list.map((id) => {
+                                          const mate = surveyClassmates.find((x) => x.id === id);
+                                          return mate ? <span key={id} style={{ fontSize: 12.5, fontWeight: 700, background: '#eef0f8', borderRadius: 99, padding: '3px 10px' }}>{mate.student_number}번 {mate.name}</span> : null;
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <div style={{ padding: '12px 0' }}>
+                                <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 800, color: '#8b5cf6' }}>✏️ 남긴 이야기</p>
+                                {openResponseText.trim() ? (
+                                  <span style={{ fontSize: 12.5, background: '#f1ebff', borderRadius: 10, padding: '6px 10px', display: 'inline-block', wordBreak: 'break-word' }}>{openResponseText}</span>
+                                ) : (
+                                  <span style={{ fontSize: 12.5, color: '#9297ac' }}>쓰지 않음</span>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* 하단 네비게이션 */}
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          {stepIdx > 0 && (
+                            <button type="button" onClick={() => setSurveyStep(stepIdx - 1)} style={{ flex: '0 0 auto', border: 'none', borderRadius: 15, padding: '14px 20px', fontSize: 15, fontWeight: 800, cursor: 'pointer', background: '#eef0f8', color: '#5b6178' }}>
+                              이전
+                            </button>
+                          )}
+                          {isLast ? (
+                            <div style={{ flex: 1 }}>
+                              <SubmitButton loading={surveySubmitting} idleText="제출하기 🎉" disabled={positivePicks.length === 0} />
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { if (canNext) setSurveyStep(stepIdx + 1); }}
+                              disabled={!canNext}
+                              style={{
+                                flex: 1, border: 'none', borderRadius: 15, padding: 14, fontSize: 15, fontWeight: 800,
+                                cursor: canNext ? 'pointer' : 'not-allowed',
+                                color: canNext ? '#fff' : '#9297ac',
+                                background: canNext ? 'linear-gradient(135deg,#6d6ff5,#a78bfa)' : '#e7e9f4',
+                              }}
+                            >
+                              {activePick && activePick.required && !canNext ? '친구를 골라주세요' : '다음'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="hint" style={{ marginTop: 6 }}>이 응답은 선생님만 확인하며, 친구에게 전달되지 않아요.</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label>요즘 반에서 기억에 남는 일이 있다면 적어주세요 (선택)</label>
-                    <textarea
-                      value={openResponseText}
-                      onChange={(e) => setOpenResponseText(e.target.value)}
-                      maxLength={300}
-                      placeholder="예: 오늘 모둠활동이 재미있었어요"
-                      style={{ minHeight: 70 }}
-                    />
-                  </div>
-
-                  <SubmitButton loading={surveySubmitting} idleText="제출하기" disabled={positivePicks.length === 0} />
+                    );
+                  })()}
                 </form>
               )}
             </section>
