@@ -421,9 +421,14 @@ export default function HomePage() {
         <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>
           별빛처럼 빛나는 나의 기록 &nbsp;·&nbsp; 초등학교 감정·성장 플랫폼
         </p>
-        <Link href="/privacy" style={{ textDecoration: 'none' }}>
-          <span style={{ color: '#6366f1', fontSize: 13 }}>개인정보처리방침</span>
-        </Link>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <Link href="/terms" style={{ textDecoration: 'none' }}>
+            <span style={{ color: '#6366f1', fontSize: 13 }}>서비스이용약관</span>
+          </Link>
+          <Link href="/privacy" style={{ textDecoration: 'none' }}>
+            <span style={{ color: '#6366f1', fontSize: 13 }}>개인정보처리방침</span>
+          </Link>
+        </div>
       </footer>
 
     </div>

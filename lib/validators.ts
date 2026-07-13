@@ -6,7 +6,10 @@ import { MAX_NOMINATIONS_PER_TYPE } from '@/lib/relationship';
 export const teacherSignupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().min(1).max(40)
+  name: z.string().min(1).max(40),
+  // 서버 측에서도 동의 여부를 강제 — 클라이언트 버튼 비활성화를 우회해도 가입 자체가 거부된다.
+  agreedToTerms: z.literal(true, { message: '서비스이용약관에 동의해야 회원가입할 수 있습니다.' }),
+  agreedToPrivacy: z.literal(true, { message: '개인정보처리방침에 동의해야 회원가입할 수 있습니다.' }),
 });
 
 export const teacherLoginSchema = z.object({

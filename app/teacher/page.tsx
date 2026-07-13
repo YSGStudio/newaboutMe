@@ -95,6 +95,8 @@ export default function TeacherPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
   // 비밀번호 변경 모달
   const [showChangePw, setShowChangePw] = useState(false);
@@ -152,6 +154,12 @@ export default function TeacherPage() {
   const [resetPasswordTeacherPw, setResetPasswordTeacherPw] = useState('');
   const [resetPasswordError, setResetPasswordError] = useState('');
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+
+  // 회원 탈퇴
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
   // 클래스메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
@@ -366,6 +374,13 @@ export default function TeacherPage() {
     event.preventDefault();
     setAuthError('');
     setAuthMessage('');
+
+    if (authMode === 'signup' && (!agreedToTerms || !agreedToPrivacy)) {
+      setAuthError('서비스이용약관과 개인정보처리방침에 모두 동의해야 회원가입을 진행할 수 있습니다.');
+      clearNoticeLater();
+      return;
+    }
+
     setAuthLoading(true);
 
     const form = new FormData(event.currentTarget);
@@ -377,9 +392,14 @@ export default function TeacherPage() {
 
     try {
       if (authMode === 'signup') {
-        await api('/api/auth/teacher/signup', { method: 'POST', body: JSON.stringify(payload) });
+        await api('/api/auth/teacher/signup', {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, agreedToTerms, agreedToPrivacy }),
+        });
         setAuthMessage('가입이 완료되었습니다. 로그인해주세요.');
         setAuthMode('login');
+        setAgreedToTerms(false);
+        setAgreedToPrivacy(false);
       } else if (authMode === 'forgot') {
         await api('/api/auth/teacher/reset-password/request', {
           method: 'POST',
@@ -485,6 +505,34 @@ export default function TeacherPage() {
     setTeacherPaidUntil(null);
     setAuthMessage('로그아웃 되었습니다.');
     clearNoticeLater();
+  };
+
+  const onConfirmDeleteAccount = async () => {
+    if (!deleteAccountPassword || deleteAccountLoading) return;
+    setDeleteAccountLoading(true);
+    setDeleteAccountError('');
+    try {
+      await api('/api/auth/teacher/delete-account', {
+        method: 'POST',
+        body: JSON.stringify({ password: deleteAccountPassword }),
+      });
+      setShowDeleteAccountConfirm(false);
+      setDeleteAccountPassword('');
+      setClasses([]);
+      setStudents([]);
+      setFeeds([]);
+      setSelectedClassId('');
+      setHasTeacherSession(false);
+      setAiUsage(null);
+      setTeacherRole('general');
+      setTeacherPaidUntil(null);
+      setAuthMessage('회원 탈퇴가 완료되었습니다. 그동안 이용해주셔서 감사합니다.');
+      clearNoticeLater();
+    } catch (error) {
+      setDeleteAccountError((error as Error).message);
+    } finally {
+      setDeleteAccountLoading(false);
+    }
   };
 
   const onDeleteClass = (klass: ClassItem) => {
@@ -760,6 +808,14 @@ export default function TeacherPage() {
               <button className="outline" type="button" onClick={onRefreshData} disabled={refreshLoading}>
                 {refreshLoading ? '새로고침 중...' : '새로고침'}
               </button>
+              <button
+                type="button"
+                style={{ whiteSpace: 'nowrap', width: 'auto', color: '#dc2626', borderColor: '#fca5a5', background: '#fff' }}
+                className="outline"
+                onClick={() => { setShowDeleteAccountConfirm(true); setDeleteAccountPassword(''); setDeleteAccountError(''); }}
+              >
+                회원탈퇴하기
+              </button>
               <button className="outline" type="button" style={{ whiteSpace: 'nowrap' }} onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
                 비밀번호 변경
               </button>
@@ -819,9 +875,44 @@ export default function TeacherPage() {
                 가입하신 이메일 주소를 입력하면 비밀번호 재설정 링크를 보내드립니다.
               </p>
             )}
+            {authMode === 'signup' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '4px 0 8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    style={{ width: 'auto' }}
+                  />
+                  <span>
+                    (필수)&nbsp;
+                    <a href="/terms" target="_blank" rel="noreferrer" style={{ color: '#6366f1', textDecoration: 'underline' }}>
+                      서비스이용약관
+                    </a>
+                    에 동의합니다.
+                  </span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={agreedToPrivacy}
+                    onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+                    style={{ width: 'auto' }}
+                  />
+                  <span>
+                    (필수)&nbsp;
+                    <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: '#6366f1', textDecoration: 'underline' }}>
+                      개인정보처리방침
+                    </a>
+                    에 동의합니다.
+                  </span>
+                </label>
+              </div>
+            )}
             <SubmitButton
               loading={authLoading}
               idleText={authMode === 'signup' ? '회원가입' : authMode === 'forgot' ? '재설정 링크 보내기' : '로그인'}
+              disabled={authMode === 'signup' && (!agreedToTerms || !agreedToPrivacy)}
             />
           </form>
           <Notice type="success" message={authMessage} />
@@ -1888,6 +1979,88 @@ export default function TeacherPage() {
                 }}
               >
                 {resetPasswordLoading ? '확인 중...' : '초기화'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 회원 탈퇴 확인 모달 */}
+      {showDeleteAccountConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 28px 24px',
+            width: '100%', maxWidth: 440,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
+                정말 회원을 탈퇴하시겠습니까?
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                회원탈퇴 시 아래 내용이 <strong style={{ color: '#dc2626' }}>즉시, 복구 불가능하게</strong> 처리됩니다.
+              </p>
+            </div>
+
+            <div style={{
+              background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 12,
+              padding: '14px 16px', marginBottom: 18,
+            }}>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#7f1d1d', lineHeight: 1.9 }}>
+                <li>내 교사 계정(아이디)이 삭제됩니다.</li>
+                <li>내가 만든 모든 학급이 삭제됩니다.</li>
+                <li>학급에 속한 모든 데이터(학생 계정, 감정 기록, 계획, 클래스메일, 성찰일기, 교우관계 설문, 뱃지, 평가 기록, AI 분석 결과 등)가 함께 삭제됩니다.</li>
+              </ol>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+                계속하려면 내 비밀번호를 입력하세요
+              </label>
+              <input
+                type="password"
+                value={deleteAccountPassword}
+                onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirmDeleteAccount(); }}
+                placeholder="비밀번호"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: deleteAccountError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {deleteAccountError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{deleteAccountError}</p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountPassword(''); setDeleteAccountError(''); }}
+                disabled={deleteAccountLoading}
+                style={{ fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmDeleteAccount}
+                disabled={deleteAccountLoading || !deleteAccountPassword}
+                style={{
+                  background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14,
+                  fontWeight: 600, cursor: 'pointer', opacity: (!deleteAccountPassword || deleteAccountLoading) ? 0.5 : 1,
+                }}
+              >
+                {deleteAccountLoading ? '탈퇴 처리 중...' : '탈퇴하기'}
               </button>
             </div>
           </div>
