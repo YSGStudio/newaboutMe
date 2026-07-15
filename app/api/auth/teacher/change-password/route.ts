@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { toKoreanAuthMessage } from '@/lib/auth-errors';
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -32,7 +33,10 @@ export async function POST(req: Request) {
   // 새 비밀번호로 변경
   const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    return NextResponse.json(
+      { error: toKoreanAuthMessage(updateError, '비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해주세요.') },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ ok: true });

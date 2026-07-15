@@ -3,12 +3,16 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { teacherSignupSchema } from '@/lib/validators';
 import { TERMS_VERSION, PRIVACY_VERSION } from '@/lib/legal';
+import { toKoreanAuthMessage } from '@/lib/auth-errors';
 
 export async function POST(req: Request) {
   const body = await req.json();
   const parsed = teacherSignupSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? '입력하신 정보를 확인해주세요.' },
+      { status: 400 }
+    );
   }
 
   const supabase = await createSupabaseServer();
@@ -19,7 +23,10 @@ export async function POST(req: Request) {
   });
 
   if (error || !data.user) {
-    return NextResponse.json({ error: error?.message ?? 'Signup failed' }, { status: 400 });
+    return NextResponse.json(
+      { error: toKoreanAuthMessage(error, '회원가입에 실패했습니다. 입력하신 정보를 확인해주세요.') },
+      { status: 400 }
+    );
   }
 
   const agreedAt = new Date().toISOString();

@@ -4,17 +4,17 @@ import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 import { MAX_NOMINATIONS_PER_TYPE } from '@/lib/relationship';
 
 export const teacherSignupSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(1).max(40),
+  email: z.string().email('이메일 형식이 올바르지 않습니다.'),
+  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
+  name: z.string().min(1, '이름을 입력해주세요.').max(40, '이름은 40자 이내로 입력해주세요.'),
   // 서버 측에서도 동의 여부를 강제 — 클라이언트 버튼 비활성화를 우회해도 가입 자체가 거부된다.
   agreedToTerms: z.literal(true, { message: '서비스이용약관에 동의해야 회원가입할 수 있습니다.' }),
   agreedToPrivacy: z.literal(true, { message: '개인정보처리방침에 동의해야 회원가입할 수 있습니다.' }),
 });
 
 export const teacherLoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8)
+  email: z.string().email('이메일 형식이 올바르지 않습니다.'),
+  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.')
 });
 
 export const classCreateSchema = z.object({
