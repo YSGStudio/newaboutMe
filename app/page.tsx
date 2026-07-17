@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import InteractiveStarfield from '@/components/landing/InteractiveStarfield';
 
 const features = [
   {
@@ -103,96 +104,100 @@ export default function HomePage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 clamp(16px, 5vw, 64px)', height: 60,
       }}>
-        <span style={{ fontWeight: 800, fontSize: 20, color: '#fff', letterSpacing: '-0.3px' }}>
+        <span className="landing-brand" style={{ fontWeight: 800, fontSize: 20, color: '#fff', letterSpacing: '-0.3px' }}>
           ✦ 별빛로그
         </span>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="landing-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link href="/student" style={{ textDecoration: 'none' }}>
-            <button style={{
+            <button className="landing-login-button" style={{
               background: 'transparent', border: '1px solid rgba(255,255,255,0.3)',
               color: '#e0e7ff', borderRadius: 8, padding: '8px 18px',
               cursor: 'pointer', fontSize: 14, fontFamily: 'inherit',
             }}>학생 로그인</button>
           </Link>
           <Link href="/teacher" style={{ textDecoration: 'none' }}>
-            <button style={{
+            <button className="landing-login-button" style={{
               background: '#6366f1', border: 'none',
               color: '#fff', borderRadius: 8, padding: '8px 18px',
               cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
             }}>교사 로그인</button>
           </Link>
+          <a
+            className="notion-cta"
+            href="https://sideways-hoverfly-167.notion.site/37c363cc0406805eb35dcc35ed709e30"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="더 알아보기, 새 창에서 열기"
+          >
+            <svg className="notion-cta-star" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.7l2.25 5.05 5.5.58-4.11 3.7 1.15 5.42L12 14.69l-4.79 2.76 1.15-5.42-4.11-3.7 5.5-.58L12 2.7z" />
+            </svg>
+            <span>더 알아보기</span>
+          </a>
         </div>
       </header>
 
       {/* ── 히어로 ── */}
-      <section style={{
+      <section className="landing-hero" style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         textAlign: 'center', padding: '100px clamp(16px, 5vw, 64px) 80px',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* 별 배경 */}
-        <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          {['10% 20%','80% 10%','30% 70%','70% 40%','50% 85%','20% 55%','90% 65%','45% 15%','15% 90%','65% 75%'].map((pos, i) => (
-            <span key={i} style={{
-              position: 'absolute', left: pos.split(' ')[0], top: pos.split(' ')[1],
-              width: i % 3 === 0 ? 3 : 2, height: i % 3 === 0 ? 3 : 2,
-              borderRadius: '50%', background: '#fff',
-              opacity: 0.4 + (i % 4) * 0.15,
-            }} />
-          ))}
-        </div>
+        <InteractiveStarfield />
 
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)',
-          borderRadius: 100, padding: '6px 18px', marginBottom: 28,
-        }}>
-          <span style={{ fontSize: 13, color: '#c7d2fe', fontWeight: 500 }}>✦ 초등학교 전용 감정·성장 기록 플랫폼</span>
-        </div>
+        <div className="hero-content">
+          <div className="hero-eyebrow" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)',
+            borderRadius: 100, padding: '6px 18px', marginBottom: 28,
+          }}>
+            <span style={{ fontSize: 13, color: '#c7d2fe', fontWeight: 500 }}>✦ 초등학교 전용 감정·성장 기록 플랫폼</span>
+          </div>
 
-        <h1 style={{
-          fontSize: 'clamp(48px, 10vw, 96px)', fontWeight: 900,
-          background: 'linear-gradient(90deg, #a5b4fc, #fbbf24, #a5b4fc)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-2px',
-        }}>별빛로그</h1>
-        <h2 style={{
-          fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 700,
-          color: 'rgba(255,255,255,0.85)', margin: '0 0 24px', lineHeight: 1.3, letterSpacing: '-0.5px',
-        }}>별처럼 빛나는 나의 기록</h2>
+          <h1 className="hero-title" style={{
+            fontSize: 'clamp(48px, 10vw, 96px)', fontWeight: 900,
+            background: 'linear-gradient(90deg, #a5b4fc, #fbbf24, #a5b4fc)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            margin: '0 0 20px', lineHeight: 1.1, letterSpacing: '-2px',
+          }}>별빛로그</h1>
+          <h2 style={{
+            fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 700,
+            color: 'rgba(255,255,255,0.85)', margin: '0 0 24px', lineHeight: 1.3, letterSpacing: '-0.5px',
+          }}>별처럼 빛나는 나의 기록</h2>
 
-        <p style={{
-          fontSize: 'clamp(15px, 2.5vw, 20px)', color: '#c7d2fe',
-          maxWidth: 520, lineHeight: 1.7, margin: '0 0 48px',
-        }}>
-          감정을 기록하고, 계획을 실천하고, 선생님과 함께 성장해요.<br />
-          우리 반의 소중한 이야기를 별빛로그에 담아보세요.
-        </p>
+          <p style={{
+            fontSize: 'clamp(15px, 2.5vw, 20px)', color: '#c7d2fe',
+            maxWidth: 520, lineHeight: 1.7, margin: '0 auto 48px',
+          }}>
+            감정을 기록하고, 계획을 실천하고, 선생님과 함께 성장해요.<br />
+            우리 반의 소중한 이야기를 별빛로그에 담아보세요.
+          </p>
 
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Link href="/teacher" style={{ textDecoration: 'none' }}>
-            <button style={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              border: 'none', color: '#fff', borderRadius: 12,
-              padding: '16px 36px', fontSize: 16, fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'inherit',
-              boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
-            }}>선생님으로 시작하기 →</button>
-          </Link>
-          <Link href="/student" style={{ textDecoration: 'none' }}>
-            <button style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.25)', color: '#e0e7ff',
-              borderRadius: 12, padding: '16px 36px', fontSize: 16, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}>학생 로그인</button>
-          </Link>
+          <div className="hero-actions" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link href="/teacher" style={{ textDecoration: 'none' }}>
+              <button className="hero-primary-button" style={{
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                border: 'none', color: '#fff', borderRadius: 12,
+                padding: '16px 36px', fontSize: 16, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
+              }}>선생님으로 시작하기 →</button>
+            </Link>
+            <Link href="/student" style={{ textDecoration: 'none' }}>
+              <button className="hero-secondary-button" style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.25)', color: '#e0e7ff',
+                borderRadius: 12, padding: '16px 36px', fontSize: 16, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>학생 로그인</button>
+            </Link>
+          </div>
         </div>
 
         {/* 스크롤 힌트 */}
-        <div style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+        <div className="hero-scroll-hint" style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
           ↓ 더 알아보기
         </div>
       </section>
