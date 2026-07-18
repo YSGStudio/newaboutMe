@@ -5,6 +5,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
 import SubmitButton from '@/components/ui/SubmitButton';
+import RefreshButton from '@/components/ui/RefreshButton';
 import Tabs from '@/components/ui/Tabs';
 import StatsDashboard from '@/components/teacher/StatsDashboard';
 import RelationshipDashboard from '@/components/teacher/RelationshipDashboard';
@@ -132,7 +133,7 @@ export default function TeacherPage() {
   const [classLoading, setClassLoading] = useState(false);
   const [studentLoading, setStudentLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
-  const [refreshLoading, setRefreshLoading] = useState(false);
+  const [studentListLoading, setStudentListLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState('');
   const [deleteConfirmClass, setDeleteConfirmClass] = useState<ClassItem | null>(null);
   const [deleteClassNameInput, setDeleteClassNameInput] = useState('');
@@ -748,29 +749,19 @@ export default function TeacherPage() {
     setFeedDate(nextDate);
   };
 
-  const onRefreshData = async () => {
+  const onRefreshStudents = async () => {
+    if (!selectedClassId || studentListLoading) return;
+    setStudentListLoading(true);
     try {
-      setRefreshLoading(true);
-      setAuthError('');
-      await loadClasses();
-
-      const targetClassId = selectedClassId || classes[0]?.id;
-      if (targetClassId) {
-        await loadStudents(targetClassId);
-        if (activeTab === 'feed') {
-          await loadFeeds(targetClassId, feedDate);
-        }
-      }
-
-      setAuthMessage('최신 데이터로 새로고침했습니다.');
-      clearNoticeLater();
-    } catch (error) {
-      setAuthError((error as Error).message);
+      await loadStudents(selectedClassId);
+    } catch (err) {
+      setAuthError((err as Error).message);
       clearNoticeLater();
     } finally {
-      setRefreshLoading(false);
+      setStudentListLoading(false);
     }
   };
+
 
   return (
     <main className="grid" style={{ gap: 16 }}>
@@ -805,9 +796,6 @@ export default function TeacherPage() {
         right={
           isAuthed ? (
             <div className="row" style={{ width: 'auto' }}>
-              <button className="outline" type="button" onClick={onRefreshData} disabled={refreshLoading}>
-                {refreshLoading ? '새로고침 중...' : '새로고침'}
-              </button>
               <button
                 type="button"
                 style={{ whiteSpace: 'nowrap', width: 'auto', color: '#dc2626', borderColor: '#fca5a5', background: '#fff' }}
@@ -954,8 +942,8 @@ export default function TeacherPage() {
                 { key: 'feed', label: '마음피드', disabled: isOverClassLimit },
                 { key: 'eval', label: '평가피드백', disabled: isOverClassLimit },
                 { key: 'letters', label: '클래스메일', disabled: isOverClassLimit },
-                { key: 'stats', label: '성장리포트', disabled: isOverClassLimit },
                 { key: 'relationship', label: '교우관계', disabled: isOverClassLimit },
+                { key: 'stats', label: '성장리포트', disabled: isOverClassLimit },
                 { key: 'settings', label: '학급설정', disabled: isOverClassLimit },
                 ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }] : []),
               ]}
@@ -1073,41 +1061,6 @@ export default function TeacherPage() {
                               {c.grade}학년 {c.section}반
                             </p>
                             <p className="hint">학급코드: {c.class_code}</p>
-                            <div className="row" style={{ marginTop: 4, marginBottom: 4, alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontSize: 13, color: '#64748b' }}>클래스메일</span>
-                              <button
-                                type="button"
-                                onClick={() => onToggleLetters(c.id, c.letters_enabled)}
-                                disabled={togglingLettersClassId === c.id}
-                                style={{
-                                  width: 44,
-                                  height: 24,
-                                  borderRadius: 12,
-                                  border: 'none',
-                                  cursor: togglingLettersClassId === c.id ? 'not-allowed' : 'pointer',
-                                  background: c.letters_enabled ? '#16a34a' : '#cbd5e1',
-                                  position: 'relative',
-                                  transition: 'background 0.2s',
-                                  padding: 0,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <span style={{
-                                  position: 'absolute',
-                                  top: 3,
-                                  left: c.letters_enabled ? 22 : 3,
-                                  width: 18,
-                                  height: 18,
-                                  borderRadius: '50%',
-                                  background: '#fff',
-                                  transition: 'left 0.2s',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                                }} />
-                              </button>
-                              <span style={{ fontSize: 12, color: c.letters_enabled ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
-                                {togglingLettersClassId === c.id ? '변경 중...' : c.letters_enabled ? 'ON' : 'OFF'}
-                              </span>
-                            </div>
                             <div className="row" style={{ marginTop: 8 }}>
                               <button
                                 type="button"
@@ -1140,6 +1093,7 @@ export default function TeacherPage() {
               <div className="row space-between" style={{ alignItems: 'center', marginBottom: 16 }}>
                 <h2 style={{ margin: 0 }}>학생 관리</h2>
                 <div style={{ display: 'flex', gap: 8 }}>
+                  <RefreshButton onClick={onRefreshStudents} loading={studentListLoading} disabled={!selectedClassId} />
                   <button
                     type="button"
                     style={{
@@ -1279,8 +1233,15 @@ export default function TeacherPage() {
 
           {activeTab === 'feed' && (
             <section className="card">
-              <div className="row space-between" style={{ marginBottom: 8 }}>
-                <h2 style={{ margin: 0 }}>마음피드</h2>
+              <div className="row space-between" style={{ marginBottom: 8, alignItems: 'flex-end' }}>
+                <div className="row" style={{ width: 'auto', gap: 8, alignItems: 'center' }}>
+                  <h2 style={{ margin: 0 }}>마음피드</h2>
+                  <RefreshButton
+                    onClick={() => selectedClassId && loadFeeds(selectedClassId, feedDate)}
+                    loading={feedLoading}
+                    disabled={!selectedClassId}
+                  />
+                </div>
                 <div style={{ width: 180 }}>
                   <label style={{ marginBottom: 4 }}>날짜 선택</label>
                   <input
@@ -1355,18 +1316,14 @@ export default function TeacherPage() {
                       {archivingAll ? '처리 중...' : '모두 읽음 ✓'}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="outline"
-                    style={{ width: 'auto' }}
+                  <RefreshButton
                     onClick={() => {
                       setLettersLoaded(false);
                       if (selectedClassId) loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
                     }}
-                    disabled={lettersLoading}
-                  >
-                    {lettersLoading ? '불러오는 중...' : '새로고침'}
-                  </button>
+                    loading={lettersLoading}
+                    disabled={!selectedClassId}
+                  />
                 </div>
               </div>
 
@@ -1525,6 +1482,48 @@ export default function TeacherPage() {
                 <h2 style={{ margin: '0 0 4px' }}>학급설정</h2>
                 <p className="hint" style={{ margin: 0 }}>이 학급에서 사용할 뱃지와 칭호를 맞춤 설정합니다.</p>
               </div>
+
+              {selectedClass && (
+                <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: '1.5px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 10px', fontSize: 17 }}>클래스메일</h3>
+                  <div className="row" style={{ alignItems: 'center', gap: 8, width: 'auto' }}>
+                    <span style={{ fontSize: 13, color: '#64748b' }}>클래스메일</span>
+                    <button
+                      type="button"
+                      onClick={() => onToggleLetters(selectedClass.id, selectedClass.letters_enabled)}
+                      disabled={togglingLettersClassId === selectedClass.id}
+                      style={{
+                        width: 44,
+                        height: 24,
+                        borderRadius: 12,
+                        border: 'none',
+                        cursor: togglingLettersClassId === selectedClass.id ? 'not-allowed' : 'pointer',
+                        background: selectedClass.letters_enabled ? '#16a34a' : '#cbd5e1',
+                        position: 'relative',
+                        transition: 'background 0.2s',
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute',
+                        top: 3,
+                        left: selectedClass.letters_enabled ? 22 : 3,
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        background: '#fff',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </button>
+                    <span style={{ fontSize: 12, color: selectedClass.letters_enabled ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                      {togglingLettersClassId === selectedClass.id ? '변경 중...' : selectedClass.letters_enabled ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <ClassSettings classId={selectedClassId} />
             </section>
           )}

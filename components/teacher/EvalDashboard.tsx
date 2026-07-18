@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import RefreshButton from '@/components/ui/RefreshButton';
+import { useConfirm } from '@/components/ui/useConfirm';
 import { SUBJECT_LIST } from '@/lib/subjects';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -839,6 +841,7 @@ function ReportDetailModal({ report, onClose, onUpdated }: {
 
 // ── Main: EvalDashboard ───────────────────────────────────────────
 export default function EvalDashboard({ classId, students, onAiUsageChanged }: { classId: string; students: StudentItem[]; onAiUsageChanged?: () => void }) {
+  const { confirm, confirmDialog } = useConfirm();
   const [subTab, setSubTab] = useState<'reports' | 'rubrics'>('reports');
   const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'by-rubric' | 'lookup' | 'comprehensive'>('overview');
   const [summaries, setSummaries] = useState<StudentEvalSummary[]>([]);
@@ -950,7 +953,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           rubricLevelHighSnapshot: c.level_high,
           rubricLevelMidSnapshot: c.level_mid,
           rubricLevelLowSnapshot: c.level_low,
-          grade: 'mid' as const,
+          grade: 'high' as const,
           teacherFeedback: '',
           sortOrder: i,
         }))
@@ -964,7 +967,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           rubricLevelHighSnapshot: null,
           rubricLevelMidSnapshot: null,
           rubricLevelLowSnapshot: null,
-          grade: 'mid' as const,
+          grade: 'high' as const,
           teacherFeedback: '',
           sortOrder: 0,
         }];
@@ -1090,7 +1093,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           rubricLevelHighSnapshot: c.level_high,
           rubricLevelMidSnapshot: c.level_mid,
           rubricLevelLowSnapshot: c.level_low,
-          grade: 'mid' as const,
+          grade: 'high' as const,
           teacherFeedback: '',
           sortOrder: i,
         }))
@@ -1104,7 +1107,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           rubricLevelHighSnapshot: null,
           rubricLevelMidSnapshot: null,
           rubricLevelLowSnapshot: null,
-          grade: 'mid' as const,
+          grade: 'high' as const,
           teacherFeedback: '',
           sortOrder: 0,
         }];
@@ -1218,7 +1221,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   // 종합평가: AI 분석 버튼 — 항상 새로 분석하고 기존 저장 결과를 덮어씀
   const analyzeComprehensive = async () => {
     if (!comprehensiveStudentId || comprehensiveAnalyzing) return;
-    if (!window.confirm('AI 분석을 사용합니다. AI 분석 사용횟수를 1회 차감합니다.')) return;
+    if (!(await confirm('AI 분석을 사용합니다. AI 분석 사용횟수를 1회 차감합니다.'))) return;
     setComprehensiveAnalyzing(true);
     setComprehensiveError('');
     try {
@@ -1232,6 +1235,36 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   if (!classId) return <EmptyState title="학급을 선택하세요" description="평가피드백은 학급 선택 후 확인할 수 있습니다." />;
 
   return (
+    <>
+      {confirmDialog}
+      {comprehensiveAnalyzing && (
+        <div
+          className="growth-analysis-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="comprehensive-analysis-title"
+          aria-describedby="comprehensive-analysis-description"
+        >
+          <div className="growth-analysis-modal">
+            <div className="growth-star-scene" aria-hidden="true">
+              <span className="growth-star growth-star-1">✦</span>
+              <span className="growth-star growth-star-2">✧</span>
+              <span className="growth-star growth-star-3">✦</span>
+              <span className="growth-star growth-star-4">✧</span>
+              <span className="growth-star growth-star-5">✦</span>
+              <span className="growth-shooting-star" />
+              <span className="growth-star-orbit">
+                <span className="growth-star-core">★</span>
+              </span>
+            </div>
+            <p id="comprehensive-analysis-title" className="growth-analysis-title">별빛이 평가 기록을 살펴보고 있어요</p>
+            <p id="comprehensive-analysis-description" className="growth-analysis-description">
+              종합평가를 분석하고 있어요.<br />완료될 때까지 다른 화면을 조작하지 마세요.
+            </p>
+            <div className="growth-analysis-dots" aria-hidden="true"><span /><span /><span /></div>
+          </div>
+        </div>
+      )}
     <section style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* 탭 헤더 */}
       <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: 20 }}>
@@ -1302,9 +1335,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
             ))}
           </div>
           {viewMode === 'overview' && (
-            <button type="button" className="outline" style={{ width: 'auto', padding: '5px 12px', fontSize: 12 }} onClick={loadSummaries}>
-              새로고침
-            </button>
+            <RefreshButton onClick={loadSummaries} loading={summariesLoading} />
           )}
         </div>
 
@@ -2152,5 +2183,6 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
         />
       )}
     </section>
+    </>
   );
 }

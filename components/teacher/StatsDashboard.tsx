@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import { useConfirm } from '@/components/ui/useConfirm';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 
@@ -66,7 +67,7 @@ type EvalReportSummary = {
 const getReportSubject = (r: EvalReportSummary): string | null =>
   [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order)[0]?.rubric_subject_snapshot ?? null;
 
-type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; ai: GrowthAiResult | null };
+type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; ai: GrowthAiResult | null; aiError?: string; holland?: HollandAiResult | null };
 
 type GrowthAiResult = {
   planAnalysis: string;
@@ -258,9 +259,9 @@ const buildStudentHtmlBlock = (
     </div>`;
 };
 
-const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
+const buildAiSectionHtml = (ai: GrowthAiResult | null, errorMessage?: string): string => {
   if (!ai) {
-    return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">AI 분석을 불러올 수 없습니다.</p>`;
+    return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">${escapeHtml(errorMessage || 'AI 분석을 불러올 수 없습니다.')}</p>`;
   }
 
   const aiCard = (label: string, body: string, accent: string) => `
@@ -281,6 +282,43 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null): string => {
       ${aiCard('감정 패턴 인사이트', ai.emotionInsight, '#7c3aed')}
       ${aiCard('맞춤 성장 제언', ai.growthSuggestion, '#0284c7')}
       <p style="margin:2px 0 0;font-size:11px;color:#9333ea;text-align:center">⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.</p>
+    </div>`;
+};
+
+const buildHollandSectionHtml = (holland: HollandAiResult | null): string => {
+  if (!holland) return '';
+
+  const primary = HOLLAND_TYPE_COLOR[holland.primaryType] ?? { bg: '#f1f5f9', color: '#334155' };
+  const secondary = holland.secondaryType ? (HOLLAND_TYPE_COLOR[holland.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+
+  const typeCard = (badge: string, badgeColor: string, bg: string, label: string, reason: string) => `
+    <div style="background:${bg};border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <p style="margin:0 0 6px">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${badgeColor};color:#fff">${escapeHtml(badge)}</span>
+        <span style="font-size:13px;font-weight:700;color:${badgeColor};margin-left:6px">${escapeHtml(label)}</span>
+      </p>
+      <p style="margin:0;font-size:13px;color:#1e293b;line-height:1.65">${escapeHtml(reason)}</p>
+    </div>`;
+
+  const careerChips = holland.careerSuggestions
+    .map((c) => `<span style="display:inline-block;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:#e0f2fe;color:#0c4a6e;margin:0 6px 6px 0">${escapeHtml(c)}</span>`)
+    .join('');
+
+  return `
+    <div style="background:#f0f9ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #bae6fd">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:20px">🔍</span>
+        <span style="font-size:15px;font-weight:700;color:#0c4a6e">홀란드 기반 성향 분석</span>
+      </div>
+      ${typeCard(`주된 성향 · ${holland.primaryType}형`, primary.color, primary.bg, holland.primaryLabel, holland.primaryReason)}
+      ${secondary && holland.secondaryLabel && holland.secondaryReason
+        ? typeCard(`보조 성향 · ${holland.secondaryType}형`, secondary.color, secondary.bg, holland.secondaryLabel, holland.secondaryReason)
+        : ''}
+      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#0369a1">💼 추천 직업군</p>
+        <div>${careerChips}</div>
+      </div>
+      <p style="margin:2px 0 0;font-size:11px;color:#0369a1;text-align:center">⚠ AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.</p>
     </div>`;
 };
 
@@ -589,6 +627,7 @@ function HollandSection({
 }
 
 export default function StatsDashboard({ classId, students, className, canBatchAnalyze = false, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canBatchAnalyze?: boolean; onAiUsageChanged?: () => void }) {
+  const { confirm, confirmDialog } = useConfirm();
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeStudentId, setActiveStudentId] = useState('');
@@ -611,7 +650,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
   // AI 성장 분석 (학급 전체)
   const [classAiRunning, setClassAiRunning] = useState(false);
-  const [classAiProgress, setClassAiProgress] = useState({ done: 0, total: 0 });
+  const [classAiTotal, setClassAiTotal] = useState(0);
   // 분석 완료 후 PDF 다운로드를 위해 결과를 state에 보관 (popup은 사용자 클릭 시 열어야 차단 안 됨)
   const [classAiResults, setClassAiResults] = useState<ClassAiResultItem[] | null>(null);
 
@@ -654,7 +693,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
   const analyzeStudent = async (forceRefresh: boolean) => {
     if (!activeStudentId || aiLoading) return;
-    if (!window.confirm(AI_USAGE_CONFIRM_MESSAGE)) return;
+    if (!(await confirm(AI_USAGE_CONFIRM_MESSAGE))) return;
     setAiLoading(true);
     setAiError('');
     try {
@@ -670,7 +709,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
   const analyzeHolland = async () => {
     if (!activeStudentId || hollandLoading) return;
-    if (!window.confirm(AI_USAGE_CONFIRM_MESSAGE)) return;
+    if (!(await confirm(AI_USAGE_CONFIRM_MESSAGE))) return;
     setHollandLoading(true);
     setHollandError('');
     try {
@@ -779,6 +818,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     </div>
     ${buildStudentHtmlBlock(snapshot, evalReports)}
     ${aiResult ? buildAiSectionHtml(aiResult) : ''}
+    ${buildHollandSectionHtml(hollandResult)}
   </body>
 </html>`;
 
@@ -791,45 +831,58 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
   const analyzeAllStudents = async () => {
     if (students.length === 0 || classAiRunning) return;
+    const required = students.length * 2;
     const estMinutes = Math.max(1, Math.ceil(students.length / 5) * 0.5);
-    const confirmed = window.confirm(
-      `${students.length}명 학생의 AI 분석을 생성합니다. 약 ${estMinutes}분 소요됩니다.\n`
-      + `${AI_USAGE_CONFIRM_MESSAGE} (최대 ${students.length}회 차감, 캐시된 결과는 차감되지 않습니다)\n계속할까요?`
-    );
+    const confirmed = await confirm({
+      title: '전체 분석 사용 확인',
+      message:
+        `${students.length}명 학생의 AI 분석(성장분석 + 홀란드 성향분석)을 생성합니다.\n약 ${estMinutes}분 소요됩니다.\n\n`
+        + `학생 1명당 성장분석 1회 + 홀란드분석 1회, 최대 2회씩 차감합니다.\n`
+        + `(최대 ${required}회 · 이미 분석된 결과는 차감되지 않습니다)`,
+      confirmText: '분석 시작',
+    });
     if (!confirmed) return;
 
     setClassAiRunning(true);
-    setClassAiProgress({ done: 0, total: students.length });
-
-    const aiByStudent = new Map<string, GrowthAiResult | null>();
-    const CHUNK = 5;
-    for (let i = 0; i < students.length; i += CHUNK) {
-      const chunk = students.slice(i, i + CHUNK);
-      const settled = await Promise.allSettled(
-        chunk.map((s) => apiPost<GrowthAiResult>(`/api/ai/growth-report/${s.id}`, { period }))
-      );
-      settled.forEach((r, idx) => {
-        aiByStudent.set(chunk[idx].id, r.status === 'fulfilled' ? r.value : null);
-      });
-      setClassAiProgress((prev) => ({ ...prev, done: Math.min(prev.total, i + chunk.length) }));
-    }
+    setClassAiTotal(students.length);
 
     try {
+      // 서버에서 학급 전체를 5명씩 끊어 성장·홀란드 분석을 함께 생성하고,
+      // 시작 전 최대 필요 횟수(학생 수 × 2)가 부족하면 아무것도 진행하지 않고 안내 메시지를 반환한다.
+      // 분석 결과 본문(report·holland)을 응답에 그대로 담아주므로, DB를 다시 읽지 않고 바로 사용한다.
+      const batch = await apiPost<{
+        results: {
+          studentId: string;
+          status: 'success' | 'error';
+          message?: string;
+          report?: { planAnalysis: string; emotionInsight: string; growthSuggestion: string; generatedAt: string };
+          holland?: HollandAiResult | null;
+          hollandMessage?: string;
+        }[];
+      }>('/api/ai/growth-report/class', { classId, period });
+      const resultByStudent = new Map(batch.results.map((r) => [r.studentId, r]));
+
       const results = await Promise.all(
         students.map(async (s) => {
           const [snap, evalData] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
             api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`),
           ]);
-          return { snap, reports: evalData.reports, ai: aiByStudent.get(s.id) ?? null };
+          const batchResult = resultByStudent.get(s.id);
+          const ai: GrowthAiResult | null = batchResult?.report ? { ...batchResult.report, cached: false } : null;
+          const aiError = ai ? undefined : batchResult?.message;
+          const holland = batchResult?.holland ?? null;
+          return { snap, reports: evalData.reports, ai, aiError, holland };
         })
       );
       // popup은 비동기 함수 내부에서 열면 브라우저가 차단함.
       // 결과를 state에 저장하고 사용자가 직접 버튼을 클릭할 때 열도록 분리.
       setClassAiResults(results);
+    } catch (err) {
+      window.alert((err as Error).message);
     } finally {
       setClassAiRunning(false);
-      setClassAiProgress({ done: 0, total: 0 });
+      setClassAiTotal(0);
       onAiUsageChanged?.();
     }
   };
@@ -846,14 +899,15 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
     const classTitle = className?.trim() || '우리반';
 
-    const studentSections = classAiResults.map(({ snap, reports, ai }) => `
+    const studentSections = classAiResults.map(({ snap, reports, ai, aiError, holland }) => `
       <div class="student-block">
         <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
           <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
           <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
         </div>
         ${buildStudentHtmlBlock(snap, reports)}
-        ${buildAiSectionHtml(ai)}
+        ${buildAiSectionHtml(ai, aiError)}
+        ${buildHollandSectionHtml(holland ?? null)}
       </div>`).join('');
 
     const html = `<!doctype html>
@@ -885,6 +939,36 @@ export default function StatsDashboard({ classId, students, className, canBatchA
   }
 
   return (
+    <>
+      {confirmDialog}
+      {classAiRunning && (
+        <div
+          className="growth-analysis-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="growth-analysis-title"
+          aria-describedby="growth-analysis-description"
+        >
+          <div className="growth-analysis-modal">
+            <div className="growth-star-scene" aria-hidden="true">
+              <span className="growth-star growth-star-1">✦</span>
+              <span className="growth-star growth-star-2">✧</span>
+              <span className="growth-star growth-star-3">✦</span>
+              <span className="growth-star growth-star-4">✧</span>
+              <span className="growth-star growth-star-5">✦</span>
+              <span className="growth-shooting-star" />
+              <span className="growth-star-orbit">
+                <span className="growth-star-core">★</span>
+              </span>
+            </div>
+            <p id="growth-analysis-title" className="growth-analysis-title">별빛이 성장 기록을 살펴보고 있어요</p>
+            <p id="growth-analysis-description" className="growth-analysis-description">
+              {classAiTotal}명의 학생을 분석하고 있어요.<br />완료될 때까지 다른 화면을 조작하지 마세요.
+            </p>
+            <div className="growth-analysis-dots" aria-hidden="true"><span /><span /><span /></div>
+          </div>
+        </div>
+      )}
     <section className="card">
       <div className="row space-between" style={{ marginBottom: 8, alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ marginTop: 0, marginBottom: 0 }}>성장리포트</h2>
@@ -906,7 +990,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
               onClick={analyzeAllStudents}
               disabled={students.length === 0 || classAiRunning || exportAllLoading || isLoading}
             >
-              {classAiRunning ? `분석 중... ${classAiProgress.done}/${classAiProgress.total}` : '✨ 전체 분석하기'}
+              {classAiRunning ? `분석 중... (${classAiTotal}명)` : '✨ 전체 분석하기'}
             </button>
           ) : (
             <span style={{ fontSize: 12, color: '#dc2626', padding: '6px 2px' }}>전체 분석하기는 유료회원만 사용가능합니다</span>
@@ -1025,5 +1109,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         </div>
       )}
     </section>
+    </>
   );
 }

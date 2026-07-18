@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import RefreshButton from '@/components/ui/RefreshButton';
 
 type SurveyItem = {
   id: string;
@@ -305,6 +306,30 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
+  const loadStudentGrid = async (surveyId: string) => {
+    setGridLoading(true);
+    try {
+      const d = await api<{ students: StudentGridItem[] }>(`/api/relationship/surveys/${surveyId}/students`);
+      setStudentGrid(d.students);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setGridLoading(false);
+    }
+  };
+
+  const loadReport = async (surveyId: string) => {
+    setReportLoading(true);
+    try {
+      const d = await api<ReportResponse>(`/api/relationship/surveys/${surveyId}/report`);
+      setReport(d);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   useEffect(() => {
     setDetailStudentId('');
     setDetail(null);
@@ -312,11 +337,8 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
       setStudentGrid([]);
       return;
     }
-    setGridLoading(true);
-    api<{ students: StudentGridItem[] }>(`/api/relationship/surveys/${selectedSurveyId}/students`)
-      .then((d) => setStudentGrid(d.students))
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setGridLoading(false));
+    loadStudentGrid(selectedSurveyId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSurveyId]);
 
   useEffect(() => {
@@ -324,13 +346,17 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
       setReport(null);
       return;
     }
-    setReportLoading(true);
-    api<ReportResponse>(`/api/relationship/surveys/${selectedSurveyId}/report`)
-      .then(setReport)
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setReportLoading(false));
+    loadReport(selectedSurveyId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSurveyId, selectedSurvey?.closed_at]);
+
+  const onRefreshAll = async () => {
+    await loadSurveys(true);
+    if (selectedSurveyId) {
+      await loadStudentGrid(selectedSurveyId);
+      if (selectedSurvey?.closed_at) await loadReport(selectedSurveyId);
+    }
+  };
 
   const onCreateSurvey = async () => {
     setCreating(true);
@@ -392,7 +418,10 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
       <Notice type="error" message={error} />
 
       <div className="row space-between" style={{ alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>교우관계 설문</h3>
+        <div className="row" style={{ width: 'auto', gap: 8, alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>교우관계 설문</h3>
+          <RefreshButton onClick={onRefreshAll} loading={loading || gridLoading || reportLoading} disabled={!classId} />
+        </div>
         <button
           type="button"
           style={{

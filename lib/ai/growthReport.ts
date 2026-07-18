@@ -95,7 +95,7 @@ export async function getOrGenerateGrowthReport(
 
   const result = validated.data;
 
-  await supabaseAdmin
+  const { error: saveError } = await supabaseAdmin
     .from('ai_growth_reports')
     .upsert({
       student_id: studentId,
@@ -106,6 +106,13 @@ export async function getOrGenerateGrowthReport(
       emotion_insight: result.emotionInsight,
       growth_suggestion: result.growthSuggestion,
     }, { onConflict: 'student_id,period,generated_date' });
+
+  // 저장 실패를 삼키면 "분석은 됐는데 다시 열면 사라지는" 유령 버그가 된다.
+  // 스키마 불일치 등으로 저장이 안 되면 즉시 드러나도록 에러를 던진다.
+  if (saveError) {
+    console.error('[ai/growth-report] 저장 실패:', saveError.message);
+    throw new Error(`분석 결과 저장에 실패했습니다: ${saveError.message}`);
+  }
 
   return {
     ...result,

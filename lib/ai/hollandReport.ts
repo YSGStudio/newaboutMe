@@ -81,7 +81,7 @@ export async function generateAndSaveHollandReport(
   const result = validated.data;
   const generatedAt = new Date().toISOString();
 
-  await supabaseAdmin
+  const { error: saveError } = await supabaseAdmin
     .from('ai_holland_reports')
     .upsert({
       student_id: studentId,
@@ -95,6 +95,12 @@ export async function generateAndSaveHollandReport(
       career_suggestions: result.careerSuggestions,
       generated_at: generatedAt,
     }, { onConflict: 'student_id' });
+
+  // 저장 실패를 삼키면 "분석은 됐는데 다시 열면 사라지는" 유령 버그가 된다.
+  if (saveError) {
+    console.error('[ai/holland-report] 저장 실패:', saveError.message);
+    throw new Error(`분석 결과 저장에 실패했습니다: ${saveError.message}`);
+  }
 
   return { ...result, generatedAt };
 }
