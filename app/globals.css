@@ -584,6 +584,9 @@ p.hint {
 }
 
 .tab {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   width: auto;
   padding: 9px 16px;
   background: transparent;
@@ -606,10 +609,57 @@ p.hint {
 }
 
 .tab.active {
-  background: #fff;
-  color: var(--primary);
-  box-shadow: 0 2px 8px rgba(99,102,241,0.15);
+  border: 1px solid rgba(245, 183, 46, 0.42);
+  background:
+    radial-gradient(circle at 14% 22%, rgba(255, 220, 103, 0.42) 0 2px, transparent 2.6px),
+    radial-gradient(circle at 87% 74%, rgba(129, 117, 220, 0.22) 0 2px, transparent 2.7px),
+    linear-gradient(135deg, #fffdf7, #fff 58%, #f3efff);
+  color: #4f46a5;
+  box-shadow:
+    0 5px 16px rgba(74, 63, 151, 0.16),
+    0 0 0 1px rgba(255,255,255,0.82) inset,
+    0 0 18px rgba(245, 183, 46, 0.13);
   transform: none;
+}
+
+.tab.active::before {
+  content: '✦';
+  display: inline-block;
+  margin-right: 5px;
+  color: #c98208;
+  text-shadow: 0 0 7px rgba(245, 183, 46, 0.72);
+  animation: active-tab-star 1.8s ease-in-out infinite;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -65%;
+  left: -34%;
+  width: 20px;
+  height: 230%;
+  background: linear-gradient(90deg, transparent, rgba(255, 220, 113, 0.48), transparent);
+  transform: rotate(22deg);
+  animation: active-tab-shimmer 3.4s ease-in-out infinite;
+}
+
+@keyframes active-tab-star {
+  0%, 100% { opacity: 0.72; transform: rotate(-7deg) scale(0.88); }
+  50% { opacity: 1; transform: rotate(9deg) scale(1.18); }
+}
+
+@keyframes active-tab-shimmer {
+  0%, 18% { left: -34%; opacity: 0; }
+  28% { opacity: 1; }
+  58%, 100% { left: 116%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab.active::before,
+  .tab.active::after {
+    animation: none;
+  }
 }
 
 /* ── 빈 상태 ── */
