@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, useRef } from 're
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
+import AuthIllustration from '@/components/ui/AuthIllustration';
 import SubmitButton from '@/components/ui/SubmitButton';
 import RefreshButton from '@/components/ui/RefreshButton';
 import Tabs from '@/components/ui/Tabs';
@@ -816,7 +817,9 @@ export default function TeacherPage() {
       />
 
       {!isAuthed && (
-        <section className="card">
+        <section className="card auth-login-shell">
+          <AuthIllustration role="teacher" />
+          <div className="auth-form-panel">
           <div className="row" style={{ marginBottom: 12 }}>
             <button
               className={authMode === 'login' ? 'ghost' : 'outline'}
@@ -905,6 +908,7 @@ export default function TeacherPage() {
           </form>
           <Notice type="success" message={authMessage} />
           <Notice type="error" message={authError} />
+          </div>
         </section>
       )}
 

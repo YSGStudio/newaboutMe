@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
+import AuthIllustration from '@/components/ui/AuthIllustration';
 import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
@@ -277,6 +278,7 @@ export default function StudentPage() {
   const [editingLoading, setEditingLoading] = useState(false);
   const [planHistoryMap, setPlanHistoryMap] = useState<Record<string, PlanTitleHistory[]>>({});
   const [openHistoryPlanId, setOpenHistoryPlanId] = useState('');
+  const [planCelebration, setPlanCelebration] = useState<{ planId: string; key: number; kind: 'complete' | 'encourage' } | null>(null);
 
   const [lettersEnabled, setLettersEnabled] = useState(true);
   const [studentTitle, setStudentTitle] = useState('별빛 새싹');
@@ -481,6 +483,13 @@ export default function StudentPage() {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
+      if (nextState === true || nextState === false) {
+        const celebrationKey = Date.now();
+        setPlanCelebration({ planId, key: celebrationKey, kind: nextState ? 'complete' : 'encourage' });
+        window.setTimeout(() => {
+          setPlanCelebration((current) => current?.key === celebrationKey ? null : current);
+        }, 950);
+      }
       await loadPlanAchievements();
       handleNewBadges(checkData.newBadges ?? []);
     } catch (err) {
@@ -997,8 +1006,13 @@ export default function StudentPage() {
       )}
 
       {!isLoggedIn && (
-        <section className="card">
-          <h2>학생 로그인</h2>
+        <section className="card auth-login-shell">
+          <AuthIllustration role="student" />
+          <div className="auth-form-panel">
+          <div className="auth-form-heading">
+            <span>✦</span>
+            <div><h2>학생 로그인</h2><p>오늘의 별빛 기록을 시작해요.</p></div>
+          </div>
           <form className="grid" onSubmit={onLogin}>
             <div>
               <label>학급코드</label>
@@ -1014,6 +1028,7 @@ export default function StudentPage() {
             </div>
             <SubmitButton loading={loginLoading} idleText="로그인" />
           </form>
+          </div>
         </section>
       )}
 
@@ -1250,7 +1265,7 @@ export default function StudentPage() {
                 </div>
               </form>
 
-              <div className="grid" style={{ marginTop: 12 }}>
+              <div className="grid student-plan-list" style={{ marginTop: 12 }}>
                 {plans.length === 0 ? (
                   <EmptyState
                     title="등록된 계획이 없습니다"
@@ -1262,10 +1277,33 @@ export default function StudentPage() {
                     const isHistoryOpen = openHistoryPlanId === plan.id;
                     const history = planHistoryMap[plan.id];
                     return (
-                      <div key={plan.id} className="card" style={{ padding: '10px 12px' }}>
+                      <div
+                        key={plan.id}
+                        className={`card student-plan-item${plan.isCompleted === true ? ' is-complete' : plan.isCompleted === false ? ' is-incomplete' : ''}`}
+                      >
+                        {planCelebration?.planId === plan.id && (
+                          <span
+                            key={planCelebration.key}
+                            className={`student-plan-celebration is-${planCelebration.kind}`}
+                            aria-hidden="true"
+                          >
+                            <span className="plan-celebration-ring" />
+                            <span className="plan-celebration-piece piece-1">★</span>
+                            <span className="plan-celebration-piece piece-2">✦</span>
+                            <span className="plan-celebration-piece piece-3">●</span>
+                            <span className="plan-celebration-piece piece-4">◆</span>
+                            <span className="plan-celebration-piece piece-5">✦</span>
+                            <span className="plan-celebration-piece piece-6">●</span>
+                            <span className="plan-celebration-piece piece-7">★</span>
+                            <span className="plan-celebration-piece piece-8">◆</span>
+                            <span className="plan-celebration-pop">
+                              {planCelebration.kind === 'complete' ? '참 잘했어요!' : '응원할게요!'}
+                            </span>
+                          </span>
+                        )}
                         {/* 편집 모드 */}
                         {isEditing ? (
-                          <div className="row" style={{ gap: 6 }}>
+                          <div className="row student-plan-edit" style={{ gap: 6 }}>
                             <input
                               value={editingTitle}
                               maxLength={50}
@@ -1275,81 +1313,78 @@ export default function StudentPage() {
                             />
                             <button
                               type="button"
-                              className="ghost"
-                              style={{ width: 'auto', padding: '6px 12px', flexShrink: 0 }}
+                              className="ghost student-plan-action plan-action-save"
                               disabled={editingLoading || !editingTitle.trim()}
                               onClick={() => updatePlan(plan.id)}
                             >
-                              {editingLoading ? '저장 중...' : '저장'}
+                              <span aria-hidden="true">✦</span>{editingLoading ? '저장 중...' : '저장'}
                             </button>
                             <button
                               type="button"
-                              className="outline"
-                              style={{ width: 'auto', padding: '6px 12px', flexShrink: 0 }}
+                              className="outline student-plan-action"
                               onClick={cancelEditPlan}
                             >
-                              취소
+                              <span aria-hidden="true">×</span>취소
                             </button>
                           </div>
                         ) : (
-                          /* 일반 모드: 제목 + 완료/미완료/수정/이력/삭제 한 줄 */
-                          <div className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {plan.title}
-                            </span>
+                          <div className="student-plan-row">
+                            <div className="student-plan-title-wrap">
+                              <span className="student-plan-status" aria-hidden="true">
+                                {plan.isCompleted === true ? '✓' : plan.isCompleted === false ? '–' : '✦'}
+                              </span>
+                              <span className="student-plan-title">{plan.title}</span>
+                            </div>
+                            <div className="student-plan-actions">
                             <button
                               type="button"
-                              className={plan.isCompleted === true ? 'ghost' : 'outline'}
-                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              className={`student-plan-action plan-action-complete${plan.isCompleted === true ? ' is-selected' : ''}`}
                               disabled={!isPlanEditable}
                               onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
                             >
-                              완료
+                              <span aria-hidden="true">✓</span>완료
                             </button>
                             <button
                               type="button"
-                              className={plan.isCompleted === false ? 'ghost' : 'outline'}
-                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              className={`student-plan-action plan-action-incomplete${plan.isCompleted === false ? ' is-selected' : ''}`}
                               disabled={!isPlanEditable}
                               onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
                             >
-                              미완료
+                              <span aria-hidden="true">↺</span>미완료
                             </button>
                             {isPlanEditable && (
                               <button
                                 type="button"
-                                className="outline"
-                                style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                                className="student-plan-action plan-action-edit"
                                 onClick={() => startEditPlan(plan)}
                               >
-                                수정
+                                <span aria-hidden="true">✎</span>수정
                               </button>
                             )}
                             <button
                               type="button"
-                              className="outline"
-                              style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                              className={`student-plan-action plan-action-history${isHistoryOpen ? ' is-selected' : ''}`}
                               onClick={() => toggleHistory(plan.id)}
                             >
-                              {isHistoryOpen ? '이력▲' : '이력▼'}
+                              <span aria-hidden="true">◷</span>이력 <span aria-hidden="true">{isHistoryOpen ? '▴' : '▾'}</span>
                             </button>
                             {isPlanEditable && (
                               <button
                                 type="button"
-                                className="outline"
-                                style={{ width: 'auto', padding: '6px 10px', flexShrink: 0, fontSize: 13 }}
+                                className="student-plan-action plan-action-delete"
                                 onClick={() => deletePlan(plan.id)}
                               >
-                                삭제
+                                <span aria-hidden="true">♲</span>삭제
                               </button>
                             )}
+                            </div>
                           </div>
                         )}
 
                         {/* 변경 이력 */}
                         {isHistoryOpen && (
-                          <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
-                            <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>변경 이력</p>
+                          <div className="student-plan-history">
+                            <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>◷ 변경 이력</p>
                             {!history ? (
                               <p className="hint" style={{ fontSize: 12 }}>불러오는 중...</p>
                             ) : history.length === 0 ? (
