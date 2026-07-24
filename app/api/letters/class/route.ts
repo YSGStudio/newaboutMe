@@ -10,15 +10,21 @@ export async function GET(req: Request) {
   const classId = searchParams.get('classId');
   if (!classId) return NextResponse.json({ error: 'classId required' }, { status: 400 });
 
+  // includeArchived=true면 교사가 읽음처리한 편지까지 함께 반환한다.
+  // (교사 화면에서 지난 편지까지 검색할 수 있도록 하기 위함)
+  const includeArchived = searchParams.get('includeArchived') === 'true';
+
   const forbidden = await requireTeacherClass(auth.teacher.id, classId);
   if (forbidden) return forbidden;
 
-  const { data: letters, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('letters')
-    .select('id, title, content, is_read, created_at, updated_at, sender_id, recipient_id')
-    .eq('class_id', classId)
-    .is('teacher_archived_at', null)
-    .order('created_at', { ascending: false });
+    .select('id, title, content, is_read, created_at, updated_at, sender_id, recipient_id, teacher_archived_at')
+    .eq('class_id', classId);
+
+  if (!includeArchived) query = query.is('teacher_archived_at', null);
+
+  const { data: letters, error } = await query.order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

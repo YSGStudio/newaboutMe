@@ -23,6 +23,7 @@ type LetterRow = {
   is_read: boolean;
   created_at: string;
   updated_at: string;
+  teacher_archived_at: string | null; // 교사가 읽음처리한 시각 (null이면 새 편지)
   sender: { id: string; name: string; student_number: number } | null;
   recipient: { id: string; name: string; student_number: number } | null;
 };
@@ -175,12 +176,41 @@ export default function TeacherPage() {
   const [letterError, setLetterError] = useState('');
   const [deletingLetterId, setDeletingLetterId] = useState('');
   const [archivingAll, setArchivingAll] = useState(false);
+  const [letterSearch, setLetterSearch] = useState('');
   const [showAddStudent, setShowAddStudent] = useState(false);
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
     [classes, selectedClassId]
   );
+
+  // 읽음처리하지 않은 새 편지 — 검색어가 없을 때 목록에 보여줄 대상
+  const activeLetters = useMemo(
+    () => classLetters.filter((letter) => !letter.teacher_archived_at),
+    [classLetters]
+  );
+
+  // 클래스메일 검색 — 제목·내용·보낸사람/받는사람 이름(출석번호)을 모두 훑는다.
+  // 검색어가 있으면 읽음처리한 지난 편지까지 포함해 전체에서 찾고,
+  // 검색어가 없으면 새 편지만 보여준다. (학급 단위로 한 번에 불러오므로 서버 요청 없이 즉시 필터링)
+  const filteredLetters = useMemo(() => {
+    const keyword = letterSearch.trim().toLowerCase();
+    if (!keyword) return activeLetters;
+    return classLetters.filter((letter) => {
+      const haystack = [
+        letter.title,
+        letter.content,
+        letter.sender?.name,
+        letter.recipient?.name,
+        letter.sender ? String(letter.sender.student_number) : null,
+        letter.recipient ? String(letter.recipient.student_number) : null,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [classLetters, activeLetters, letterSearch]);
   // 무료회원은 학급 1개까지, 유료·관리자는 추가 생성 가능
   const canCreateClass = canUseAi || classes.length === 0;
   // 유료 → 무료 전환 후 학급이 2개 이상 남은 상태: 학급 정리 전까지 다른 탭 잠금
@@ -243,7 +273,8 @@ export default function TeacherPage() {
     if (!classId) return;
     setLettersLoading(true);
     try {
-      const data = await api<{ letters: LetterRow[] }>(`/api/letters/class?classId=${classId}`);
+      // 읽음처리한 편지까지 함께 불러온다 — 목록에는 새 편지만 보여주되, 검색은 지난 편지까지 훑기 위함
+      const data = await api<{ letters: LetterRow[] }>(`/api/letters/class?classId=${classId}&includeArchived=true`);
       setClassLetters(data.letters);
       setLettersLoaded(true);
     } finally {
@@ -295,14 +326,19 @@ export default function TeacherPage() {
   };
 
   const onArchiveAll = async () => {
-    if (!selectedClassId || classLetters.length === 0) return;
+    if (!selectedClassId || activeLetters.length === 0) return;
     setArchivingAll(true);
     try {
       await api('/api/letters/class/archive-all', {
         method: 'PATCH',
         body: JSON.stringify({ classId: selectedClassId }),
       });
-      setClassLetters([]);
+      // 목록에서는 사라지지만 검색으로는 계속 찾을 수 있어야 하므로,
+      // 상태에서 지우지 않고 읽음처리 시각만 채운다.
+      const archivedAt = new Date().toISOString();
+      setClassLetters((prev) =>
+        prev.map((l) => (l.teacher_archived_at ? l : { ...l, teacher_archived_at: archivedAt }))
+      );
       setLetterDetail(null);
     } catch (err) {
       setAuthError((err as Error).message);
@@ -364,6 +400,7 @@ export default function TeacherPage() {
     setClassLetters([]);
     setLettersLoaded(false);
     setLetterDetail(null);
+    setLetterSearch('');
   }, [selectedClassId, loadStudents]);
 
   useEffect(() => {
@@ -1309,7 +1346,7 @@ export default function TeacherPage() {
                   <p className="hint" style={{ marginTop: 4 }}>학급 내 학생들이 주고받은 편지를 확인하고 관리할 수 있습니다.</p>
                 </div>
                 <div className="row" style={{ gap: 8, flexShrink: 0 }}>
-                  {classLetters.length > 0 && (
+                  {activeLetters.length > 0 && (
                     <button
                       type="button"
                       className="outline"
@@ -1331,12 +1368,49 @@ export default function TeacherPage() {
                 </div>
               </div>
 
+              {selectedClassId && !lettersLoading && classLetters.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#94a3b8', pointerEvents: 'none' }}
+                    >
+                      🔍
+                    </span>
+                    <input
+                      type="search"
+                      value={letterSearch}
+                      onChange={(e) => setLetterSearch(e.target.value)}
+                      placeholder="제목·내용·학생 이름으로 검색 (읽음처리한 편지 포함)"
+                      aria-label="편지 검색"
+                      style={{ paddingLeft: 36 }}
+                    />
+                  </div>
+                  {letterSearch.trim() && (
+                    <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
+                      읽음처리한 편지 포함 전체 {classLetters.length}건 중 <strong style={{ color: '#4f46e5' }}>{filteredLetters.length}건</strong> 검색됨
+                      <button
+                        type="button"
+                        onClick={() => setLetterSearch('')}
+                        style={{ width: 'auto', minHeight: 0, marginLeft: 8, padding: '2px 8px', fontSize: 12, background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', boxShadow: 'none', textDecoration: 'underline' }}
+                      >
+                        검색 초기화
+                      </button>
+                    </p>
+                  )}
+                </div>
+              )}
+
               {!selectedClassId ? (
                 <EmptyState title="학급을 먼저 선택하세요" description="상단에서 학급을 선택하면 편지 목록을 볼 수 있습니다." />
               ) : lettersLoading ? (
                 <p className="hint">편지를 불러오는 중입니다...</p>
               ) : classLetters.length === 0 ? (
                 <EmptyState title="주고받은 편지가 없습니다" description="학생들이 편지함에서 편지를 보내면 이곳에 표시됩니다." />
+              ) : letterSearch.trim() && filteredLetters.length === 0 ? (
+                <EmptyState title="검색 결과가 없습니다" description={`'${letterSearch.trim()}'와 일치하는 편지를 찾지 못했습니다. 다른 키워드로 검색해보세요.`} />
+              ) : filteredLetters.length === 0 ? (
+                <EmptyState title="새로 온 편지가 없습니다" description="읽음처리한 지난 편지는 위 검색창에서 찾아볼 수 있습니다." />
               ) : (
                 <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
                   {/* 헤더 */}
@@ -1347,23 +1421,33 @@ export default function TeacherPage() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>작성일</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>관리</span>
                   </div>
-                  {classLetters.map((letter, idx) => (
+                  {filteredLetters.map((letter, idx) => (
                     <div
                       key={letter.id}
                       style={{
                         display: 'grid', gridTemplateColumns: '1fr 120px 120px 100px 80px', gap: 8,
                         alignItems: 'center', padding: '12px 16px',
                         background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                        borderBottom: idx < classLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        borderBottom: idx < filteredLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => openLetterDetail(letter)}
-                        style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1e293b', fontSize: 14 }}
-                      >
-                        {letter.title}
-                      </button>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        {letter.teacher_archived_at && (
+                          <span
+                            title="이미 읽음처리한 편지입니다"
+                            style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20, padding: '2px 7px' }}
+                          >
+                            읽음
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openLetterDetail(letter)}
+                          style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1e293b', fontSize: 14, minWidth: 0 }}
+                        >
+                          {letter.title}
+                        </button>
+                      </span>
                       <span style={{ fontSize: 13, color: '#374151' }}>{letter.sender?.name ?? '?'}</span>
                       <span style={{ fontSize: 13, color: '#374151' }}>{letter.recipient?.name ?? '?'}</span>
                       <span style={{ fontSize: 12, color: '#94a3b8' }}>
