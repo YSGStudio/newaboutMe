@@ -1414,9 +1414,12 @@ export default function StudentPage() {
           )}
 
           {activeTab === 'letters' && (
-            <section className="card">
+            <section className="card starlight-mail-card">
               <div className="row space-between" style={{ marginBottom: 12 }}>
-                <h2 style={{ margin: 0 }}>클래스메일</h2>
+                <div>
+                  <p className="starlight-mail-kicker">✦ 나의 별빛 우체통 ✦</p>
+                  <h2 className="starlight-mail-title">클래스메일</h2>
+                </div>
                 <button
                   type="button"
                   className="ghost"
@@ -1437,7 +1440,7 @@ export default function StudentPage() {
               )}
 
               {/* 받은편지함 / 보낸편지함 전환 */}
-              <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+              <div className="row starlight-mail-tabs" style={{ gap: 8, marginBottom: 12 }}>
                 <button
                   type="button"
                   className={letterBox === 'received' ? 'ghost' : 'outline'}
@@ -1474,21 +1477,16 @@ export default function StudentPage() {
                 ) : receivedLetters.length === 0 ? (
                   <EmptyState title="받은 편지가 없습니다" description="학급 친구가 편지를 보내면 여기에 표시됩니다." />
                 ) : (
-                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-                    {receivedLetters.map((letter, idx) => (
+                  <div className="student-letter-list">
+                    {receivedLetters.map((letter) => (
                       <button
                         key={letter.id}
                         type="button"
                         onClick={() => openLetterDetail(letter.id)}
                         disabled={letterDetailLoading}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '13px 16px', width: '100%', textAlign: 'left',
-                          background: letter.is_read ? '#fff' : '#eff6ff',
-                          borderBottom: idx < receivedLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
-                          border: 'none', cursor: letterDetailLoading ? 'default' : 'pointer',
-                        }}
+                        className={`student-letter-row${letter.is_read ? ' is-read' : ' is-new'}`}
                       >
+                        <span className="letter-envelope-icon" aria-hidden="true">{letter.is_read ? '✉️' : '💌'}</span>
                         {!letter.is_read && (
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
                         )}
@@ -1514,21 +1512,16 @@ export default function StudentPage() {
                 ) : sentLetters.length === 0 ? (
                   <EmptyState title="보낸 편지가 없습니다" description="편지 쓰기를 눌러 친구에게 편지를 보내보세요." />
                 ) : (
-                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-                    {sentLetters.map((letter, idx) => (
+                  <div className="student-letter-list">
+                    {sentLetters.map((letter) => (
                       <button
                         key={letter.id}
                         type="button"
                         onClick={() => openLetterDetail(letter.id)}
                         disabled={letterDetailLoading}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '13px 16px', width: '100%', textAlign: 'left',
-                          background: '#fff',
-                          borderBottom: idx < sentLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
-                          border: 'none', cursor: letterDetailLoading ? 'default' : 'pointer',
-                        }}
+                        className="student-letter-row is-read"
                       >
+                        <span className="letter-envelope-icon" aria-hidden="true">💫</span>
                         <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0f172a' }}>
                           {letter.title}
                         </span>
@@ -2129,13 +2122,16 @@ export default function StudentPage() {
       {/* 편지 상세 모달 */}
       {letterDetail && (
         <div
+          className="starlight-letter-backdrop"
           role="dialog"
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setLetterDetail(null); }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
-          <div style={{ width: 'min(480px, 96vw)', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
-            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+          <div className="starlight-letter-modal">
+            <span className="letter-star letter-star-one" aria-hidden="true">★</span>
+            <span className="letter-star letter-star-two" aria-hidden="true">✦</span>
+            <div className="starlight-letter-header">
+              <div className="letter-washi" aria-hidden="true" />
               <div className="row space-between" style={{ alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0, flex: 1, marginRight: 12 }}>
                   <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>
@@ -2143,7 +2139,7 @@ export default function StudentPage() {
                     {' · '}
                     {new Date(letterDetail.created_at).toLocaleDateString('ko-KR')}
                   </p>
-                  <h3 style={{ margin: 0, fontSize: 17, wordBreak: 'break-all' }}>{letterDetail.title}</h3>
+                  <h3 className="starlight-letter-subject">{letterDetail.title}</h3>
                 </div>
                 <div className="row" style={{ gap: 8, flexShrink: 0 }}>
                   {letterBox === 'received' && letterDetail.sender && (
@@ -2155,8 +2151,8 @@ export default function StudentPage() {
                 </div>
               </div>
             </div>
-            <div style={{ padding: '20px 20px 24px' }}>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.9, color: '#374151', fontSize: 15 }}>{letterDetail.content}</p>
+            <div className="starlight-letter-paper">
+              <p className="starlight-letter-content">{letterDetail.content}</p>
             </div>
           </div>
         </div>

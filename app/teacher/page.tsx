@@ -1339,10 +1339,11 @@ export default function TeacherPage() {
           {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} onAiUsageChanged={loadAiUsage} />}
 
           {activeTab === 'letters' && (
-            <section className="card">
+            <section className="card starlight-mail-card">
               <div className="row space-between" style={{ marginBottom: 12 }}>
                 <div>
-                  <h2 style={{ margin: 0 }}>클래스메일</h2>
+                  <p className="starlight-mail-kicker">✦ STARLIGHT POST ✦</p>
+                  <h2 className="starlight-mail-title">클래스메일</h2>
                   <p className="hint" style={{ marginTop: 4 }}>학급 내 학생들이 주고받은 편지를 확인하고 관리할 수 있습니다.</p>
                 </div>
                 <div className="row" style={{ gap: 8, flexShrink: 0 }}>
@@ -1412,26 +1413,22 @@ export default function TeacherPage() {
               ) : filteredLetters.length === 0 ? (
                 <EmptyState title="새로 온 편지가 없습니다" description="읽음처리한 지난 편지는 위 검색창에서 찾아볼 수 있습니다." />
               ) : (
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                <div className="teacher-letter-list">
                   {/* 헤더 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 100px 80px', gap: 8, padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div className="teacher-letter-list-head">
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>제목</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>보낸 사람</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>받는 사람</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>작성일</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>관리</span>
                   </div>
-                  {filteredLetters.map((letter, idx) => (
+                  {filteredLetters.map((letter) => (
                     <div
                       key={letter.id}
-                      style={{
-                        display: 'grid', gridTemplateColumns: '1fr 120px 120px 100px 80px', gap: 8,
-                        alignItems: 'center', padding: '12px 16px',
-                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                        borderBottom: idx < filteredLetters.length - 1 ? '1px solid #f1f5f9' : 'none',
-                      }}
+                      className={`teacher-letter-row${letter.teacher_archived_at ? ' is-read' : ''}`}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span className="letter-subject-cell">
+                        <span className="letter-envelope-icon" aria-hidden="true">{letter.teacher_archived_at ? '✉' : '💌'}</span>
                         {letter.teacher_archived_at && (
                           <span
                             title="이미 읽음처리한 편지입니다"
@@ -1443,7 +1440,7 @@ export default function TeacherPage() {
                         <button
                           type="button"
                           onClick={() => openLetterDetail(letter)}
-                          style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1e293b', fontSize: 14, minWidth: 0 }}
+                          className="letter-title-button"
                         >
                           {letter.title}
                         </button>
@@ -1472,14 +1469,17 @@ export default function TeacherPage() {
           {/* 편지 상세/수정 모달 */}
           {letterDetail && (
             <div
+              className="starlight-letter-backdrop"
               role="dialog"
               aria-modal="true"
               onClick={(e) => { if (e.target === e.currentTarget) { setLetterDetail(null); setIsEditingLetter(false); } }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
             >
-              <div style={{ width: 'min(540px, 96vw)', maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+              <div className="starlight-letter-modal teacher-letter-modal">
+                <span className="letter-star letter-star-one" aria-hidden="true">★</span>
+                <span className="letter-star letter-star-two" aria-hidden="true">✦</span>
                 {/* 헤더 */}
-                <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+                <div className="starlight-letter-header">
+                  <div className="letter-washi" aria-hidden="true" />
                   <div className="row space-between" style={{ alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
                       <p style={{ margin: '0 0 4px', fontSize: 12, color: '#94a3b8' }}>
@@ -1491,7 +1491,7 @@ export default function TeacherPage() {
                         )}
                       </p>
                       {!isEditingLetter && (
-                        <h3 style={{ margin: 0, fontSize: 17, wordBreak: 'break-all' }}>{letterDetail.title}</h3>
+                        <h3 className="starlight-letter-subject">{letterDetail.title}</h3>
                       )}
                     </div>
                     <div className="row" style={{ gap: 8, flexShrink: 0 }}>
@@ -1515,7 +1515,7 @@ export default function TeacherPage() {
                   </div>
                 </div>
 
-                <div style={{ padding: '18px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="starlight-letter-paper">
                   {letterError && (
                     <p style={{ margin: 0, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>{letterError}</p>
                   )}
@@ -1543,7 +1543,7 @@ export default function TeacherPage() {
                       </div>
                     </>
                   ) : (
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.9, color: '#374151', fontSize: 15 }}>{letterDetail.content}</p>
+                    <p className="starlight-letter-content">{letterDetail.content}</p>
                   )}
                 </div>
               </div>
