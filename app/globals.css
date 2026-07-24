@@ -53,6 +53,158 @@ main {
   box-shadow: var(--shadow-sm);
 }
 
+/* ── 교사 · 학생 관리 도구 ── */
+.student-management-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.student-management-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 5px;
+  border: 1px solid #e5e7ff;
+  border-radius: 14px;
+  background: #f8f7ff;
+}
+
+button.student-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #dcdcf5;
+  border-radius: 10px;
+  background: #fff;
+  color: #4b5563;
+  box-shadow: 0 1px 2px rgba(49, 46, 129, .05);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+button.student-toolbar-button:hover:not(:disabled) {
+  border-color: #a5b4fc;
+  background: #f5f3ff;
+  color: #4f46e5;
+  box-shadow: 0 4px 10px rgba(79, 70, 229, .1);
+}
+
+button.student-toolbar-button-danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fffafa;
+}
+
+button.student-toolbar-button-danger:hover:not(:disabled) {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fff1f2;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, .08);
+}
+
+button.student-toolbar-button-primary {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, #7577f4, #5b5ee7);
+  color: #fff;
+  box-shadow: 0 3px 9px rgba(99, 102, 241, .2);
+}
+
+button.student-toolbar-button-primary:hover:not(:disabled) {
+  border-color: #4f46e5;
+  background: linear-gradient(135deg, #696cf0, #4f46e5);
+  color: #fff;
+}
+
+button.student-toolbar-button-primary.is-active {
+  border-color: #c4b5fd;
+  background: #ede9fe;
+  color: #5b21b6;
+  box-shadow: none;
+}
+
+.student-toolbar-icon {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, .09);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.student-toolbar-button-danger .student-toolbar-icon {
+  background: #fee2e2;
+  font-size: 12px;
+}
+
+.student-toolbar-button-primary .student-toolbar-icon {
+  background: rgba(255, 255, 255, .2);
+  font-size: 18px;
+}
+
+.student-toolbar-button-primary.is-active .student-toolbar-icon {
+  background: rgba(124, 58, 237, .1);
+}
+
+.student-toolbar-icon.is-spinning {
+  animation: student-toolbar-spin .8s linear infinite;
+}
+
+@keyframes student-toolbar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.student-add-form {
+  padding: 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #faf9ff, #f5f3ff);
+}
+
+@media (max-width: 720px) {
+  .student-management-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .student-management-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  button.student-toolbar-button {
+    width: 100%;
+  }
+
+  button.student-toolbar-button-primary {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  button.student-toolbar-button-danger {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .student-management-actions .refresh-button {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+  }
+}
+
 /* ── 클래스메일 · 별빛 노트 ── */
 .starlight-mail-card {
   position: relative;
@@ -436,18 +588,21 @@ button.ghost:hover:not(:disabled) {
 
 /* ── 새로고침 일러스트 버튼 ── */
 .refresh-button {
-  width: 38px;
-  height: 38px;
+  width: auto;
   min-height: 38px;
   flex-shrink: 0;
-  padding: 0;
+  gap: 7px;
+  padding: 7px 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1.5px solid #d9d2ff;
   background: linear-gradient(145deg, #ffffff 12%, #f5f1ff 100%);
   color: #6258b7;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
   box-shadow:
     0 4px 10px rgba(79, 70, 165, 0.12),
     0 1px 0 rgba(255, 255, 255, 0.9) inset;
@@ -462,44 +617,22 @@ button.ghost:hover:not(:disabled) {
     0 0 14px rgba(245, 183, 46, 0.12);
 }
 
-.refresh-illustration {
-  width: 29px;
-  height: 29px;
-  overflow: visible;
-}
-
-.refresh-orbit {
-  fill: #f0edff;
-  stroke: #ded8ff;
-  stroke-width: 1;
-}
-
-.refresh-arrow {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.15;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transform-origin: 16px 16px;
-}
-
-.refresh-star {
-  fill: #e6a51f;
-  filter: drop-shadow(0 0 2px rgba(245, 183, 46, 0.5));
-  transform-box: fill-box;
+.refresh-star-icon {
+  display: inline-grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border-radius: 7px;
+  background: #fff7d6;
+  color: #e6a51f;
+  font-size: 14px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(245, 183, 46, .25));
   transform-origin: center;
 }
 
-.refresh-star-small {
-  fill: #8b7ed8;
-}
-
-.refresh-button.is-loading .refresh-arrow {
+.refresh-button.is-loading .refresh-star-icon {
   animation: refresh-illustration-spin 0.85s linear infinite;
-}
-
-.refresh-button.is-loading .refresh-star {
-  animation: refresh-star-twinkle 0.85s ease-in-out infinite alternate;
 }
 
 @keyframes refresh-illustration-spin {
@@ -636,13 +769,8 @@ button.ghost:hover:not(:disabled) {
   .ai-confirm-spark { animation: none; }
 }
 
-@keyframes refresh-star-twinkle {
-  to { opacity: 0.45; transform: scale(0.72); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .refresh-button.is-loading .refresh-arrow,
-  .refresh-button.is-loading .refresh-star {
+  .refresh-button.is-loading .refresh-star-icon {
     animation: none;
   }
 }

@@ -418,23 +418,23 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
       <Notice type="error" message={error} />
 
       <div className="row space-between" style={{ alignItems: 'center' }}>
+        <h3 style={{ margin: 0 }}>교우관계 설문</h3>
         <div className="row" style={{ width: 'auto', gap: 8, alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>교우관계 설문</h3>
+          <button
+            type="button"
+            style={{
+              width: 'auto', fontSize: 13, fontWeight: 600, padding: '7px 14px',
+              background: showCreateForm ? '#ede9fe' : '#6366f1',
+              color: showCreateForm ? '#6366f1' : '#fff',
+              border: '1.5px solid #6366f1', borderRadius: 10, cursor: 'pointer'
+            }}
+            onClick={() => setShowCreateForm((v) => !v)}
+            disabled={!classId || hasOpenSurvey}
+          >
+            {showCreateForm ? '접기 ▲' : '+ 새 설문 시작하기'}
+          </button>
           <RefreshButton onClick={onRefreshAll} loading={loading || gridLoading || reportLoading} disabled={!classId} />
         </div>
-        <button
-          type="button"
-          style={{
-            width: 'auto', fontSize: 13, fontWeight: 600, padding: '7px 14px',
-            background: showCreateForm ? '#ede9fe' : '#6366f1',
-            color: showCreateForm ? '#6366f1' : '#fff',
-            border: '1.5px solid #6366f1', borderRadius: 10, cursor: 'pointer'
-          }}
-          onClick={() => setShowCreateForm((v) => !v)}
-          disabled={!classId || hasOpenSurvey}
-        >
-          {showCreateForm ? '접기 ▲' : '+ 새 설문 시작하기'}
-        </button>
       </div>
 
       {hasOpenSurvey && (

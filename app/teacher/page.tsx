@@ -1131,44 +1131,36 @@ export default function TeacherPage() {
 
           {activeTab === 'student' && (
             <section className="card">
-              <div className="row space-between" style={{ alignItems: 'center', marginBottom: 16 }}>
-                <h2 style={{ margin: 0 }}>학생 관리</h2>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <RefreshButton onClick={onRefreshStudents} loading={studentListLoading} disabled={!selectedClassId} />
+              <div className="student-management-header">
+                <div>
+                  <h2 style={{ margin: 0 }}>학생 관리</h2>
+                  <p className="hint" style={{ margin: '4px 0 0' }}>학생을 등록하고 로그인 비밀번호를 관리할 수 있습니다.</p>
+                </div>
+                <div className="student-management-actions" aria-label="학생 관리 도구">
                   <button
                     type="button"
-                    style={{
-                      width: 'auto', fontSize: 13, fontWeight: 600,
-                      padding: '7px 14px',
-                      background: '#fff',
-                      color: '#dc2626',
-                      border: '1.5px solid #fca5a5',
-                      borderRadius: 10, cursor: 'pointer',
-                    }}
+                    className="student-toolbar-button student-toolbar-button-danger"
                     onClick={onResetAllPasswords}
                     disabled={!selectedClassId}
                   >
-                    비밀번호 전체 초기화
+                    <span className="student-toolbar-icon" aria-hidden="true">🔑</span>
+                    비밀번호 초기화
                   </button>
                   <button
                     type="button"
-                    style={{
-                      width: 'auto', fontSize: 13, fontWeight: 600,
-                      padding: '7px 14px',
-                      background: showAddStudent ? '#ede9fe' : '#6366f1',
-                      color: showAddStudent ? '#6366f1' : '#fff',
-                      border: '1.5px solid #6366f1',
-                      borderRadius: 10, cursor: 'pointer',
-                    }}
+                    className={`student-toolbar-button student-toolbar-button-primary${showAddStudent ? ' is-active' : ''}`}
                     onClick={() => setShowAddStudent((v) => !v)}
+                    aria-expanded={showAddStudent}
                   >
-                    {showAddStudent ? '접기 ▲' : '학생 추가 ▼'}
+                    <span className="student-toolbar-icon" aria-hidden="true">{showAddStudent ? '−' : '+'}</span>
+                    {showAddStudent ? '추가 닫기' : '학생 추가'}
                   </button>
+                  <RefreshButton onClick={onRefreshStudents} loading={studentListLoading} disabled={!selectedClassId} />
                 </div>
               </div>
 
               {showAddStudent && (
-                <form onSubmit={onCreateStudent} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
+                <form className="student-add-form" onSubmit={onCreateStudent} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
                   <div style={{ flex: '2 1 160px' }}>
                     <label>학생 이름</label>
                     <input name="name" placeholder="김마음" required />
@@ -1274,8 +1266,8 @@ export default function TeacherPage() {
 
           {activeTab === 'feed' && (
             <section className="card">
-              <div className="row space-between" style={{ marginBottom: 8, alignItems: 'flex-end' }}>
-                <div className="row" style={{ width: 'auto', gap: 8, alignItems: 'center' }}>
+              <div style={{ marginBottom: 8 }}>
+                <div className="row space-between" style={{ marginBottom: 12, alignItems: 'center' }}>
                   <h2 style={{ margin: 0 }}>마음피드</h2>
                   <RefreshButton
                     onClick={() => selectedClassId && loadFeeds(selectedClassId, feedDate)}
@@ -1283,7 +1275,7 @@ export default function TeacherPage() {
                     disabled={!selectedClassId}
                   />
                 </div>
-                <div style={{ width: 180 }}>
+                <div style={{ width: 180, marginLeft: 'auto' }}>
                   <label style={{ marginBottom: 4 }}>날짜 선택</label>
                   <input
                     type="date"
@@ -1623,9 +1615,7 @@ export default function TeacherPage() {
                   <h2 style={{ margin: '0 0 4px' }}>권한설정</h2>
                   <p className="hint" style={{ margin: 0 }}>교사 회원의 등급을 일반/유료로 관리합니다. 유료회원만 AI 분석을 사용할 수 있습니다.</p>
                 </div>
-                <button type="button" className="outline" style={{ width: 'auto' }} onClick={loadAdminTeachers} disabled={adminLoading}>
-                  {adminLoading ? '로딩 중...' : '새로고침'}
-                </button>
+                <RefreshButton onClick={loadAdminTeachers} loading={adminLoading} />
               </div>
 
               {adminMessage && <p style={{ color: '#16a34a', fontSize: 13, marginBottom: 10 }}>{adminMessage}</p>}
