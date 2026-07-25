@@ -172,6 +172,239 @@ button.student-toolbar-button-primary.is-active {
   background: linear-gradient(135deg, #faf9ff, #f5f3ff);
 }
 
+/* ── 평가 · 과목 일러스트 탭 ── */
+.eval-subject-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 4px 6px;
+  border: 1px solid #e9e2ff;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 96% 18%, rgba(250, 204, 21, .2) 0 2px, transparent 3px),
+    linear-gradient(135deg, #faf8ff, #fffdf4);
+  scrollbar-width: thin;
+}
+
+button.eval-subject-tab {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  min-height: 36px;
+  padding: 3px 11px 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  color: #68637d;
+  box-shadow: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+button.eval-subject-tab:hover:not(:disabled) {
+  border-color: #ddd6fe;
+  background: rgba(255, 255, 255, .8);
+  color: #514b72;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, .08);
+}
+
+button.eval-subject-tab.is-active {
+  border-color: #c4b5fd;
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: 0 5px 14px rgba(99, 102, 241, .14);
+}
+
+button.eval-subject-tab.is-active::after {
+  content: '✦';
+  position: absolute;
+  right: 4px;
+  top: 1px;
+  color: #eab308;
+  font-size: 8px;
+}
+
+.eval-subject-icon {
+  display: inline-grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid rgba(196, 181, 253, .6);
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff, #f1edff);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform .15s ease;
+}
+
+.eval-subject-tab:hover .eval-subject-icon,
+.eval-subject-tab.is-active .eval-subject-icon {
+  transform: rotate(-5deg) scale(1.06);
+}
+
+.eval-subject-count {
+  min-width: 19px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: #ede9fe;
+  color: #6d5bc5;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* ── 평가 · 학생별 기록 선택 목록 ── */
+.eval-student-detail-layout {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.eval-student-picker {
+  position: sticky;
+  top: 16px;
+  width: max-content;
+  min-width: 108px;
+  max-width: 148px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #e8e1ff;
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(250, 204, 21, .24) 0 2px, transparent 3px),
+    linear-gradient(155deg, #fffdf6, #f7f4ff);
+  box-shadow: 0 5px 14px rgba(91, 75, 138, .07);
+}
+
+.eval-student-picker-title {
+  margin: 0 4px 8px;
+  color: #655c82;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+
+.eval-student-picker-title span {
+  color: #eab308;
+}
+
+.eval-student-picker-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+
+button.eval-student-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 35px;
+  padding: 4px 8px 4px 5px;
+  border: 1px solid #e4e1ee;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .8);
+  color: #514c61;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+button.eval-student-chip:hover:not(:disabled) {
+  border-color: #c4b5fd;
+  background: #fff;
+  color: #5b21b6;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, .09);
+}
+
+button.eval-student-chip.is-active {
+  border-color: #a78bfa;
+  background: linear-gradient(120deg, #fff, #f1edff);
+  color: #5b21b6;
+  box-shadow: 0 5px 12px rgba(124, 58, 237, .13);
+}
+
+.eval-student-number {
+  display: inline-grid;
+  min-width: 25px;
+  height: 25px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #f0edff;
+  color: #7565bd;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.eval-student-chip.is-active .eval-student-number {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.eval-student-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-student-spark {
+  margin-left: auto;
+  color: #eab308;
+  font-size: 9px;
+  filter: drop-shadow(0 1px 2px rgba(234, 179, 8, .3));
+}
+
+.eval-student-detail-content {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  min-width: 0;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (max-width: 680px) {
+  .eval-student-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .eval-student-picker {
+    position: static;
+    width: 100%;
+    max-width: none;
+    overflow-y: visible;
+  }
+
+  .eval-student-picker-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  button.eval-student-chip {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .eval-student-detail-content {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
 @media (max-width: 720px) {
   .student-management-header {
     align-items: stretch;
@@ -1972,9 +2205,177 @@ p.hint {
   gap: 6px;
 }
 
+.starlight-student-card {
+  position: relative;
+  gap: 12px;
+  overflow: hidden;
+  padding: 14px;
+  border-color: #ddd6fe;
+  background:
+    radial-gradient(circle at 88% 9%, rgba(250, 204, 21, .22) 0 2px, transparent 3px),
+    radial-gradient(circle at 93% 17%, rgba(167, 139, 250, .2) 0 3px, transparent 4px),
+    linear-gradient(145deg, #fffdf6 0%, #fff 50%, #f4f1ff 100%);
+  box-shadow: 0 7px 18px rgba(76, 63, 124, .09);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.starlight-student-card:hover {
+  border-color: #c4b5fd;
+  box-shadow: 0 11px 24px rgba(76, 63, 124, .14);
+  transform: translateY(-2px);
+}
+
+.student-card-theme-1 { background: linear-gradient(145deg, #f5fbff, #fff 52%, #f2edff); }
+.student-card-theme-2 { background: linear-gradient(145deg, #fff9ed, #fff 52%, #f8f1ff); }
+.student-card-theme-3 { background: linear-gradient(145deg, #f2fff9, #fff 52%, #eef2ff); }
+
+.student-card-heading {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.student-card-avatar {
+  position: relative;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid #d8d0ff;
+  border-radius: 16px;
+  background: radial-gradient(circle at 35% 30%, #fff 0 5%, #ede9fe 38%, #c4b5fd 100%);
+  box-shadow: 0 4px 10px rgba(99, 102, 241, .15);
+  font-size: 25px;
+  transform: rotate(-3deg);
+}
+
+.student-card-avatar span {
+  position: relative;
+  z-index: 1;
+}
+
+.student-card-avatar i {
+  position: absolute;
+  width: 58px;
+  height: 22px;
+  border: 1.5px solid rgba(124, 58, 237, .28);
+  border-radius: 50%;
+  transform: rotate(-20deg);
+}
+
+.student-card-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.student-card-identity span {
+  color: #8b7bb5;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.student-card-identity strong {
+  overflow: hidden;
+  color: #30276d;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-achievement-badge {
+  padding: 4px 8px;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  background: #fff;
+  color: #6d5bc5;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.student-card-progress-area {
+  padding: 10px 11px;
+  border: 1px solid rgba(221, 214, 254, .85);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .68);
+}
+
+.student-card-progress-area .row {
+  color: #756d8e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.student-starlight-progress {
+  position: relative;
+  height: 8px;
+  margin-top: 8px;
+  overflow: visible;
+  background: #e9e4f7;
+}
+
+.student-starlight-progress .progress-fill {
+  background: linear-gradient(90deg, #a78bfa, #6366f1, #f5c84b);
+  box-shadow: 0 0 8px rgba(99, 102, 241, .22);
+}
+
+.student-progress-star {
+  position: absolute;
+  top: 50%;
+  color: #f5b82e;
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: 0 0 5px rgba(250, 204, 21, .55);
+  transform: translate(-50%, -50%);
+}
+
+.student-card-plan-list {
+  min-width: 0; /* .student-card(grid)의 자식이 긴 계획 텍스트에 밀려 카드를 늘리지 않도록 */
+  padding: 9px 10px;
+  border: 1px dashed #ddd6fe;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .55);
+}
+
+/* 계획 목록: 각 행(그리드 아이템)이 min-content 이하로 줄어들 수 있어야 말줄임이 동작한다 */
+.student-card-plan-list .grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.student-card-plan-list .grid > .row {
+  min-width: 0;
+}
+
+.student-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.student-card-twinkle {
+  position: absolute;
+  color: #eab308;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.student-card-twinkle-one { right: 12px; top: 47px; font-size: 9px; }
+.student-card-twinkle-two { right: 35px; top: 8px; color: #a78bfa; font-size: 7px; }
+
 .student-card-complete {
   border-color: #86efac;
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(250, 204, 21, .3) 0 3px, transparent 4px),
+    linear-gradient(135deg, #f0fdf4, #fffdf2 58%, #ede9fe);
+}
+
+.student-card-complete .student-achievement-badge {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #15803d;
 }
 
 /* ── 피드 ── */
@@ -2045,7 +2446,7 @@ p.hint {
   }
 
   .student-card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   main {

@@ -1188,31 +1188,40 @@ export default function TeacherPage() {
                       const todayAchievementRate = student.todayAchievementRate ?? 0;
                       const isTodayAllChecked = Boolean(student.isTodayAllChecked);
                       const plans = student.plans ?? [];
+                      const studentMascots = ['🚀', '🪐', '🌙', '🛸'];
+                      const mascotIndex = (student.student_number - 1) % studentMascots.length;
                       return (
                         <article
                           key={student.id}
-                          className={`card student-card ${isTodayAllChecked ? 'student-card-complete' : ''}`}
-                          style={{ padding: 12 }}
+                          className={`card student-card starlight-student-card student-card-theme-${mascotIndex}${isTodayAllChecked ? ' student-card-complete' : ''}`}
                         >
-                          <div className="row space-between">
-                            <strong>
-                              {student.student_number}번 {student.name}
-                            </strong>
-                            <span className="badge">{todayAchievementRate}%</span>
+                          <span className="student-card-twinkle student-card-twinkle-one" aria-hidden="true">✦</span>
+                          <span className="student-card-twinkle student-card-twinkle-two" aria-hidden="true">★</span>
+                          <div className="student-card-heading">
+                            <div className="student-card-avatar" aria-hidden="true">
+                              <span>{studentMascots[mascotIndex]}</span>
+                              <i />
+                            </div>
+                            <div className="student-card-identity">
+                              <span>{student.student_number}번 탐험가</span>
+                              <strong>{student.name}</strong>
+                            </div>
+                            <span className="student-achievement-badge">{isTodayAllChecked ? '완료 ★' : `${todayAchievementRate}%`}</span>
                           </div>
-                          <p className="hint" style={{ marginTop: 8 }}>
-                            오늘 계획 달성률
-                          </p>
-                          <div className="progress-track" style={{ marginTop: 6 }}>
-                            <div className="progress-fill" style={{ width: `${todayAchievementRate}%` }} />
+                          <div className="student-card-progress-area">
+                            <div className="row space-between">
+                              <span>오늘의 별빛 미션</span>
+                              <strong>{todayCompleted}/{todayTotal}</strong>
+                            </div>
+                            <div className="progress-track student-starlight-progress">
+                              <div className="progress-fill" style={{ width: `${todayAchievementRate}%` }} />
+                              <span className="student-progress-star" style={{ left: `clamp(8px, ${todayAchievementRate}%, calc(100% - 8px))` }} aria-hidden="true">★</span>
+                            </div>
                           </div>
-                          <p className="hint" style={{ marginTop: 8 }}>
-                            {todayCompleted}/{todayTotal} 완료
-                          </p>
 
                           {plans.length > 0 && (
-                            <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
-                              <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>오늘 계획</p>
+                            <div className="student-card-plan-list">
+                              <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700 }}>📝 오늘 계획</p>
                               <div className="grid" style={{ gap: 4 }}>
                                 {plans.map((plan) => {
                                   const statusLabel =
@@ -1223,7 +1232,8 @@ export default function TeacherPage() {
                                     plan.isCompleted === false ? '#dc2626' : '#94a3b8';
                                   return (
                                     <div key={plan.id} className="row space-between" style={{ fontSize: 13, padding: '3px 0' }}>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{plan.title}</span>
+                                      {/* min-width:0 이 있어야 flex 안에서 말줄임(...)이 동작한다. title로 마우스 오버 시 전체 문장 노출 */}
+                                      <span title={plan.title} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{plan.title}</span>
                                       <span style={{ color: statusColor, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{statusLabel}</span>
                                     </div>
                                   );
@@ -1232,7 +1242,7 @@ export default function TeacherPage() {
                             </div>
                           )}
 
-                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                          <div className="student-card-actions">
                             <button
                               type="button"
                               className="outline"
