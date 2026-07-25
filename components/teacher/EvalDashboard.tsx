@@ -32,7 +32,7 @@ type ReportSummary = {
   id: string;
   title: string;
   created_at: string;
-  eval_report_items: { id: string; grade: string; sort_order: number }[];
+  eval_report_items: { id: string; grade: string; sort_order: number; rubric_subject_snapshot: string | null }[];
   eval_report_images: { id: string; storage_path: string; sort_order: number }[];
   eval_report_links: { id: string }[];
   eval_reflections: { id: string }[];
@@ -114,6 +114,51 @@ const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = {
   mid: '#d97706',
   low: '#dc2626'
 };
+
+// 평가보고서의 과목 — 정렬상 첫 채점기준의 과목 스냅샷을 대표 과목으로 본다.
+const NO_SUBJECT_LABEL = '과목 미지정';
+const getReportSubject = (r: ReportSummary): string =>
+  [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order)[0]?.rubric_subject_snapshot?.trim() || NO_SUBJECT_LABEL;
+
+const SUBJECT_ICON: Record<string, string> = {
+  국어: '✏️', 영어: '🔤', 수학: '📐', 사회: '🌏', 과학: '🔬', 역사: '🏺',
+  도덕: '🤝', 실과: '🧵', 정보: '💻', 음악: '🎵', 미술: '🎨', 체육: '⚽',
+  [NO_SUBJECT_LABEL]: '📎',
+};
+
+function SubjectTabs({
+  subjects,
+  value,
+  onChange,
+  counts,
+}: {
+  subjects: string[];
+  value: string | null;
+  onChange: (subject: string | null) => void;
+  counts?: Record<string, number>;
+}) {
+  return (
+    <div className="eval-subject-tabs" aria-label="과목 선택">
+      {([null, ...subjects] as (string | null)[]).map((subject) => {
+        const active = value === subject;
+        const label = subject ?? '전체';
+        return (
+          <button
+            key={label}
+            type="button"
+            className={`eval-subject-tab${active ? ' is-active' : ''}`}
+            onClick={() => onChange(subject)}
+            aria-pressed={active}
+          >
+            <span className="eval-subject-icon" aria-hidden="true">{subject ? (SUBJECT_ICON[subject] ?? '📚') : '✨'}</span>
+            <span>{label}</span>
+            {counts && <span className="eval-subject-count">{counts[label] ?? 0}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
@@ -379,24 +424,7 @@ function RubricManager({ onRubricsChange }: { onRubricsChange?: (rubrics: Rubric
         return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {subjects.length > 0 && (
-            <div style={{
-              display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
-              overflowX: 'auto', scrollbarWidth: 'thin',
-            }}>
-              {([null, ...subjects]).map((s) => (
-                <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
-                  style={{
-                    width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
-                    padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
-                    transition: 'all 0.15s',
-                    background: subjectFilter === s ? '#fff' : 'transparent',
-                    color: subjectFilter === s ? '#0369a1' : '#64748b',
-                    boxShadow: subjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
-                  }}>
-                  {s ?? '전체'}
-                </button>
-              ))}
-            </div>
+            <SubjectTabs subjects={subjects} value={subjectFilter} onChange={setSubjectFilter} />
           )}
 
           {filteredRubrics.length === 0 ? (
@@ -850,6 +878,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportSubjectFilter, setReportSubjectFilter] = useState<string | null>(null); // 학생별 평가 목록 과목 탭
   const [detailReport, setDetailReport] = useState<ReportDetail | null>(null);
   const [showRubricSelect, setShowRubricSelect] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -916,8 +945,9 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, subTab, viewMode]);
 
-  // 학생 선택 시 보고서 목록 로드
+  // 학생 선택 시 보고서 목록 로드 (과목 탭은 전체로 초기화)
   useEffect(() => {
+    setReportSubjectFilter(null);
     if (!selectedStudentId) { setReports([]); return; }
     setReportsLoading(true);
     api<{ reports: ReportSummary[] }>(`/api/eval/reports/student/${selectedStudentId}`)
@@ -1424,15 +1454,15 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
 
         {/* ── 학생별 작성 뷰 ── */}
         {viewMode === 'detail' && <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="eval-student-detail-layout">
 
           {/* 학생 목록 */}
-          <div style={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: 2 }}>
-            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
+          <div className="eval-student-picker">
+            <p className="eval-student-picker-title"><span aria-hidden="true">✦</span> 학생 선택</p>
             {students.length === 0 ? (
               <p className="hint" style={{ fontSize: 12 }}>등록된 학생이 없습니다.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="eval-student-picker-list">
                 {students.map((s) => (
                   <button
                     key={s.id}
@@ -1446,15 +1476,12 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                       setShowCreateForm(false);
                       setShowRubricSelect(false);
                     }}
-                    style={{
-                      background: selectedStudentId === s.id ? '#eff6ff' : '#fff',
-                      border: `1.5px solid ${selectedStudentId === s.id ? '#3b82f6' : '#e2e8f0'}`,
-                      borderRadius: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
-                      color: selectedStudentId === s.id ? '#1d4ed8' : '#374151',
-                      fontWeight: selectedStudentId === s.id ? 700 : 400, fontSize: 13,
-                    }}
+                    className={`eval-student-chip${selectedStudentId === s.id ? ' is-active' : ''}`}
+                    aria-pressed={selectedStudentId === s.id}
                   >
-                    {s.student_number}번 {s.name}
+                    <span className="eval-student-number">{s.student_number}</span>
+                    <span className="eval-student-name">{s.name}</span>
+                    {selectedStudentId === s.id && <span className="eval-student-spark" aria-hidden="true">★</span>}
                   </button>
                 ))}
               </div>
@@ -1462,7 +1489,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
           </div>
 
           {/* 오른쪽 영역 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+          <div className="eval-student-detail-content">
             {!selectedStudentId ? (
               <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
                 <p style={{ margin: 0, fontSize: 14 }}>왼쪽에서 학생을 선택하세요</p>
@@ -1492,24 +1519,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                       ) : (
                         <>
                           {subjects.length > 0 && (
-                            <div style={{
-                              display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
-                              overflowX: 'auto', scrollbarWidth: 'thin', marginBottom: 10,
-                            }}>
-                              {[null, ...subjects].map((s) => (
-                                <button key={s ?? '전체'} type="button" onClick={() => setSubjectFilter(s)}
-                                  style={{
-                                    width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
-                                    padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
-                                    transition: 'all 0.15s',
-                                    background: subjectFilter === s ? '#fff' : 'transparent',
-                                    color: subjectFilter === s ? '#0369a1' : '#64748b',
-                                    boxShadow: subjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
-                                  }}>
-                                  {s ?? '전체'}
-                                </button>
-                              ))}
-                            </div>
+                            <SubjectTabs subjects={subjects} value={subjectFilter} onChange={setSubjectFilter} />
                           )}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
                             {stepFiltered.map((r) => (
@@ -1670,9 +1680,26 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                     <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
                       <p style={{ margin: 0, fontSize: 14 }}>아직 작성된 평가가 없습니다</p>
                     </div>
-                  ) : (
+                  ) : (() => {
+                    // 학생의 평가 기록을 과목별로 나눠 볼 수 있는 탭 (학생 이름 아래 한 줄)
+                    const subjects = Array.from(new Set(reports.map(getReportSubject)));
+                    const activeSubject = reportSubjectFilter && subjects.includes(reportSubjectFilter) ? reportSubjectFilter : null;
+                    const filteredReports = activeSubject ? reports.filter((r) => getReportSubject(r) === activeSubject) : reports;
+                    return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {subjects.length > 1 && (
+                        <SubjectTabs
+                          subjects={subjects}
+                          value={activeSubject}
+                          onChange={setReportSubjectFilter}
+                          counts={{
+                            전체: reports.length,
+                            ...Object.fromEntries(subjects.map((subject) => [subject, reports.filter((r) => getReportSubject(r) === subject).length])),
+                          }}
+                        />
+                      )}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-                      {reports.map((r) => {
+                      {filteredReports.map((r) => {
                         const grades = [...r.eval_report_items].sort((a, b) => a.sort_order - b.sort_order);
                         return (
                           <article key={r.id} style={{ background: '#fff', border: '1.5px solid #e0e7ff', borderRadius: 12, padding: '14px', display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 2px 6px rgba(99,102,241,0.06)' }}>
@@ -1696,7 +1723,9 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                         );
                       })}
                     </div>
-                  )
+                    </div>
+                    );
+                  })()
                 )}
               </>
             )}
@@ -1722,24 +1751,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                 ) : (
                   <>
                     {bySubjects.length > 0 && (
-                      <div style={{
-                        display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
-                        overflowX: 'auto', scrollbarWidth: 'thin',
-                      }}>
-                        {([null, ...bySubjects]).map((s) => (
-                          <button key={s ?? '전체'} type="button" onClick={() => setByRubricSubjectFilter(s)}
-                            style={{
-                              width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
-                              padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              background: byRubricSubjectFilter === s ? '#fff' : 'transparent',
-                              color: byRubricSubjectFilter === s ? '#0369a1' : '#64748b',
-                              boxShadow: byRubricSubjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
-                            }}>
-                            {s ?? '전체'}
-                          </button>
-                        ))}
-                      </div>
+                      <SubjectTabs subjects={bySubjects} value={byRubricSubjectFilter} onChange={setByRubricSubjectFilter} />
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
                       {byFiltered.map((r) => (
@@ -1981,24 +1993,7 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
                 ) : (
                   <>
                     {lookupSubjects.length > 0 && (
-                      <div style={{
-                        display: 'flex', gap: 2, background: '#f0f9ff', borderRadius: 10, padding: 3,
-                        overflowX: 'auto', scrollbarWidth: 'thin',
-                      }}>
-                        {([null, ...lookupSubjects]).map((s) => (
-                          <button key={s ?? '전체'} type="button" onClick={() => setLookupSubjectFilter(s)}
-                            style={{
-                              width: 'auto', minHeight: 'unset', flexShrink: 0, whiteSpace: 'nowrap',
-                              padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              background: lookupSubjectFilter === s ? '#fff' : 'transparent',
-                              color: lookupSubjectFilter === s ? '#0369a1' : '#64748b',
-                              boxShadow: lookupSubjectFilter === s ? '0 1px 4px rgba(3,105,161,0.15)' : 'none',
-                            }}>
-                            {s ?? '전체'}
-                          </button>
-                        ))}
-                      </div>
+                      <SubjectTabs subjects={lookupSubjects} value={lookupSubjectFilter} onChange={setLookupSubjectFilter} />
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
                       {lookupFiltered.map((r) => (
@@ -2089,28 +2084,25 @@ export default function EvalDashboard({ classId, students, onAiUsageChanged }: {
 
         {/* ── 종합평가 뷰 ── */}
         {viewMode === 'comprehensive' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr', gap: 20, alignItems: 'start' }}>
+          <div className="eval-student-detail-layout">
             {/* 학생 목록 */}
-            <div style={{ position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: 2 }}>
-              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#475569' }}>학생 선택</p>
+            <div className="eval-student-picker">
+              <p className="eval-student-picker-title"><span aria-hidden="true">✦</span> 학생 선택</p>
               {students.length === 0 ? (
                 <p className="hint" style={{ fontSize: 12 }}>등록된 학생이 없습니다.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className="eval-student-picker-list">
                   {students.map((s) => (
                     <button
                       key={s.id}
                       type="button"
                       onClick={() => selectComprehensiveStudent(s.id)}
-                      style={{
-                        background: comprehensiveStudentId === s.id ? '#fdf4ff' : '#fff',
-                        border: `1.5px solid ${comprehensiveStudentId === s.id ? '#d946ef' : '#e2e8f0'}`,
-                        borderRadius: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
-                        color: comprehensiveStudentId === s.id ? '#a21caf' : '#374151',
-                        fontWeight: comprehensiveStudentId === s.id ? 700 : 400, fontSize: 13,
-                      }}
+                      className={`eval-student-chip${comprehensiveStudentId === s.id ? ' is-active' : ''}`}
+                      aria-pressed={comprehensiveStudentId === s.id}
                     >
-                      {s.student_number}번 {s.name}
+                      <span className="eval-student-number">{s.student_number}</span>
+                      <span className="eval-student-name">{s.name}</span>
+                      {comprehensiveStudentId === s.id && <span className="eval-student-spark" aria-hidden="true">★</span>}
                     </button>
                   ))}
                 </div>
