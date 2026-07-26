@@ -1740,12 +1740,12 @@ p.hint {
 
 .login-notice-card {
   position: relative;
-  width: min(470px, 96vw);
+  width: min(520px, 96vw);
   max-height: 88vh;
   overflow-x: hidden;
   overflow-y: auto;
   border: 2px solid #d8d0ff;
-  border-radius: 24px;
+  border-radius: 22px;
   background: #fffdf6;
   box-shadow: 0 28px 80px rgba(15, 12, 54, .42), 0 0 30px rgba(167, 139, 250, .16);
   animation: login-notice-arrive .24s ease-out;
@@ -1753,49 +1753,76 @@ p.hint {
 
 .login-notice-header {
   position: relative;
-  min-height: 150px;
-  padding: 26px 25px 20px 132px;
+  min-height: 190px;
+  padding: 38px 34px 25px 190px;
   border-bottom: 1px dashed #cfc5ef;
   background:
-    radial-gradient(circle at 84% 15%, rgba(255,255,255,.6) 0 3px, transparent 4px),
-    linear-gradient(145deg, #30246d, #6657ad 62%, #8a7aca);
+    radial-gradient(circle at 84% 15%, rgba(255,244,145,.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 72% 32%, rgba(255,255,255,.82) 0 1.5px, transparent 2.5px),
+    linear-gradient(145deg, #100b5f 0%, #24118e 47%, #5414c9 100%);
 }
 
 .login-notice-illustration {
   position: absolute;
-  left: 22px;
-  top: 25px;
+  left: 35px;
+  top: 31px;
   display: grid;
-  width: 88px;
-  height: 88px;
+  width: 130px;
+  height: 126px;
   place-items: center;
   border: 1px solid rgba(255,255,255,.28);
   border-radius: 30px;
-  background: radial-gradient(circle at 38% 32%, rgba(255,255,255,.3), rgba(255,255,255,.07) 58%, transparent 60%);
+  background: radial-gradient(circle at 38% 32%, rgba(255,255,255,.34), rgba(98,67,224,.18) 58%, transparent 60%);
+  box-shadow: inset 0 0 24px rgba(157, 133, 255, .2), 0 0 24px rgba(115, 87, 255, .2);
   transform: rotate(-4deg);
 }
 
 .notice-moon {
   position: absolute;
-  left: 8px;
-  top: 7px;
-  font-size: 38px;
+  left: 9px;
+  top: 10px;
+  font-size: 58px;
   filter: drop-shadow(0 5px 6px rgba(19, 12, 59, .28));
+  animation: notice-character-float 3.2s ease-in-out infinite;
 }
 
 .notice-envelope {
   position: absolute;
-  right: 4px;
-  bottom: 8px;
+  right: 2px;
+  bottom: 10px;
   z-index: 1;
-  font-size: 34px;
+  font-size: 51px;
   transform: rotate(8deg);
   filter: drop-shadow(0 5px 6px rgba(19, 12, 59, .28));
+  animation: notice-character-bob 2.8s ease-in-out infinite;
+}
+
+.notice-character-blush {
+  position: absolute;
+  right: 10px;
+  top: 33px;
+  width: 10px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(251, 113, 133, .58);
+  box-shadow: 0 0 5px rgba(251, 113, 133, .4);
+}
+
+.notice-character-wave {
+  position: absolute;
+  right: -13px;
+  top: 4px;
+  color: #ffe788;
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 900;
+  transform: rotate(-32deg);
+  text-shadow: 0 0 6px rgba(255, 231, 136, .7);
 }
 
 .notice-orbit {
-  width: 96px;
-  height: 36px;
+  width: 144px;
+  height: 48px;
   border: 1.5px solid rgba(255, 238, 166, .5);
   border-radius: 50%;
   transform: rotate(-25deg);
@@ -1806,12 +1833,12 @@ p.hint {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 13px;
 }
 
 .login-notice-kicker {
   color: #fff0a8;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: .09em;
 }
@@ -1830,38 +1857,37 @@ p.hint {
 .login-notice-title {
   margin: 0;
   color: #fff;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1.35;
   word-break: break-word;
 }
 
 .login-notice-greeting {
-  margin: 7px 0 0;
+  margin: 14px 0 0;
   color: #ddd6fe;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 
 .login-notice-paper {
   position: relative;
-  margin: 20px 22px 4px;
-  min-height: 120px;
-  padding: 26px 22px 22px 34px;
-  border: 1px solid #eadfbf;
-  border-radius: 4px 13px 13px 4px;
+  margin: 0;
+  min-height: 230px;
+  padding: 55px 40px 35px 116px;
+  border: 0;
+  border-radius: 0;
   background:
-    linear-gradient(90deg, transparent 20px, rgba(244, 114, 182, .22) 21px, transparent 22px),
-    repeating-linear-gradient(180deg, #fffdf5 0 29px, #dbeafe 30px);
-  box-shadow: 0 5px 14px rgba(94, 76, 35, .08);
-  transform: rotate(-.25deg);
+    linear-gradient(90deg, transparent 72px, rgba(244, 114, 182, .28) 73px, transparent 75px),
+    repeating-linear-gradient(180deg, #fffdf5 0 33px, #dbeafe 34px);
+  box-shadow: inset 0 5px 12px rgba(94, 76, 35, .06);
 }
 
 .login-notice-tape {
   position: absolute;
   left: 50%;
-  top: -10px;
-  width: 90px;
-  height: 19px;
+  top: -11px;
+  width: 142px;
+  height: 24px;
   transform: translateX(-50%) rotate(1deg);
   background: repeating-linear-gradient(45deg, rgba(167,139,250,.38) 0 7px, rgba(253,224,71,.34) 7px 14px);
   clip-path: polygon(2% 5%, 98% 0, 96% 94%, 0 100%);
@@ -1870,10 +1896,28 @@ p.hint {
 .login-notice-content {
   margin: 0;
   color: #3f3a5f;
-  font-size: 14.5px;
-  line-height: 30px;
+  font-size: 15px;
+  line-height: 34px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.login-notice-paper-holes {
+  position: absolute;
+  left: 18px;
+  top: 25px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.login-notice-paper-holes i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #625f78;
+  box-shadow: inset 1px 1px 2px rgba(15, 12, 54, .35), 0 1px 0 #fff;
 }
 
 .login-notice-footer {
@@ -1881,7 +1925,9 @@ p.hint {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 15px 22px 21px;
+  padding: 20px 28px 23px;
+  border-top: 1px solid #eee7d8;
+  background: #fffdf8;
 }
 
 .login-notice-dismiss {
@@ -1902,20 +1948,37 @@ p.hint {
 }
 
 button.login-notice-confirm {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) 25px;
   align-items: center;
-  gap: 7px;
+  justify-items: center;
+  gap: 8px;
   width: auto;
-  min-width: 116px;
-  padding: 10px 18px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, #6558c4, #7c3aed);
-  box-shadow: 0 7px 17px rgba(91, 33, 182, .25);
-  font-size: 13px;
+  min-width: 205px;
+  min-height: 54px;
+  padding: 13px 20px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #5b21e8, #711cff);
+  box-shadow: 0 8px 20px rgba(91, 33, 182, .32);
+  font-size: 17px;
+  font-weight: 800;
 }
 
-.login-notice-confirm span {
+.login-notice-button-star {
   color: #ffe788;
+  font-size: 22px;
+  filter: drop-shadow(0 0 5px rgba(255, 231, 136, .48));
+}
+
+.login-notice-button-label {
+  width: 100%;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.login-notice-button-spacer {
+  width: 25px;
 }
 
 .login-notice-spark {
@@ -1936,27 +1999,46 @@ button.login-notice-confirm {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes notice-character-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+
+@keyframes notice-character-bob {
+  0%, 100% { transform: translateY(0) rotate(8deg); }
+  50% { transform: translateY(-3px) rotate(3deg); }
+}
+
 @media (max-width: 520px) {
   .login-notice-header {
-    min-height: 134px;
-    padding: 23px 18px 18px 105px;
+    min-height: 154px;
+    padding: 27px 16px 19px 121px;
   }
   .login-notice-illustration {
-    left: 13px;
-    top: 23px;
-    width: 74px;
-    height: 74px;
+    left: 12px;
+    top: 25px;
+    width: 92px;
+    height: 92px;
   }
-  .notice-moon { font-size: 31px; }
-  .notice-envelope { font-size: 28px; }
-  .notice-orbit { width: 78px; }
-  .login-notice-paper { margin-inline: 14px; padding-inline: 29px 17px; }
+  .notice-moon { font-size: 40px; }
+  .notice-envelope { font-size: 36px; }
+  .notice-orbit { width: 100px; }
+  .login-notice-kicker { font-size: 10px; }
+  .login-notice-title { font-size: 20px; }
+  .login-notice-greeting { margin-top: 8px; font-size: 11px; }
+  .login-notice-paper { min-height: 190px; padding: 45px 18px 28px 62px; background:
+    linear-gradient(90deg, transparent 43px, rgba(244, 114, 182, .28) 44px, transparent 46px),
+    repeating-linear-gradient(180deg, #fffdf5 0 33px, #dbeafe 34px); }
+  .login-notice-paper-holes { left: 12px; }
+  .login-notice-paper-holes i { width: 9px; height: 9px; }
   .login-notice-footer { align-items: stretch; flex-direction: column; }
   button.login-notice-confirm { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-notice-card { animation: none; }
+  .login-notice-card,
+  .notice-moon,
+  .notice-envelope { animation: none; }
 }
 
 /* ── 행 레이아웃 ── */

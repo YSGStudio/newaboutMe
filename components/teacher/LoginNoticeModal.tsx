@@ -79,8 +79,14 @@ export default function LoginNoticeModal({ enabled }: { enabled: boolean }) {
         {/* 헤더 */}
         <div className="login-notice-header">
           <div className="login-notice-illustration" aria-hidden="true">
-            <span className="notice-moon">🌙</span>
-            <span className="notice-envelope">💌</span>
+            <span className="notice-moon">
+              🌙
+              <i className="notice-character-blush" />
+            </span>
+            <span className="notice-envelope">
+              💌
+              <i className="notice-character-wave">〰</i>
+            </span>
             <i className="notice-orbit" />
           </div>
           <div className="login-notice-meta">
@@ -98,6 +104,9 @@ export default function LoginNoticeModal({ enabled }: { enabled: boolean }) {
         {/* 본문 */}
         <div className="login-notice-paper">
           <span className="login-notice-tape" aria-hidden="true" />
+          <span className="login-notice-paper-holes" aria-hidden="true">
+            {Array.from({ length: 7 }, (_, i) => <i key={i} />)}
+          </span>
           <p className="login-notice-content">
             {current.content}
           </p>
@@ -120,8 +129,11 @@ export default function LoginNoticeModal({ enabled }: { enabled: boolean }) {
             onClick={onConfirm}
             disabled={submitting}
           >
-            <span aria-hidden="true">★</span>
-            {submitting ? '처리 중...' : remaining > 1 ? '다음 소식 보기' : '확인했어요'}
+            <span className="login-notice-button-star" aria-hidden="true">★</span>
+            <span className="login-notice-button-label">
+              {submitting ? '처리 중...' : remaining > 1 ? '다음 소식 보기' : '확인했어요'}
+            </span>
+            <span className="login-notice-button-spacer" aria-hidden="true" />
           </button>
         </div>
       </div>
