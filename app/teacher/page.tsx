@@ -804,7 +804,7 @@ export default function TeacherPage() {
 
 
   return (
-    <main className="grid" style={{ gap: 16 }}>
+    <main className={`grid${isAuthed ? ' dashboard-layout teacher-dashboard-layout' : ''}`} style={{ gap: 16 }}>
       <PageHeader
         title="교사 대시보드"
         subtitle="학급과 학생을 빠르게 관리하세요"
@@ -977,18 +977,26 @@ export default function TeacherPage() {
             <Notice type="error" message={authError} />
           </section>
 
-          <section className="card">
+          <aside className="dashboard-sidebar">
+            <div className="dashboard-sidebar-brand">
+              <span className="dashboard-brand-star" aria-hidden="true">★</span>
+              <div>
+                <strong>별빛로그</strong>
+                <small>STARLIGHT LOG</small>
+              </div>
+            </div>
+            <p className="dashboard-sidebar-mode">교사 대시보드</p>
             <Tabs
               items={[
-                { key: 'class', label: '학급 관리' },
-                { key: 'student', label: '학생 관리', disabled: isOverClassLimit },
-                { key: 'feed', label: '마음피드', disabled: isOverClassLimit },
-                { key: 'eval', label: '평가피드백', disabled: isOverClassLimit },
-                { key: 'letters', label: '클래스메일', disabled: isOverClassLimit },
-                { key: 'relationship', label: '교우관계', disabled: isOverClassLimit },
-                { key: 'stats', label: '성장리포트', disabled: isOverClassLimit },
-                { key: 'settings', label: '학급설정', disabled: isOverClassLimit },
-                ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }, { key: 'notices', label: '알림설정' }] : []),
+                { key: 'class', label: '학급 관리', icon: '🏫' },
+                { key: 'student', label: '학생 관리', icon: '🧑‍🚀', disabled: isOverClassLimit },
+                { key: 'feed', label: '마음피드', icon: '💜', disabled: isOverClassLimit },
+                { key: 'eval', label: '평가피드백', icon: '📝', disabled: isOverClassLimit },
+                { key: 'letters', label: '클래스메일', icon: '💌', disabled: isOverClassLimit },
+                { key: 'relationship', label: '교우관계', icon: '🤝', disabled: isOverClassLimit },
+                { key: 'stats', label: '성장리포트', icon: '📊', disabled: isOverClassLimit },
+                { key: 'settings', label: '학급설정', icon: '⚙️', disabled: isOverClassLimit },
+                ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정', icon: '🔐' }, { key: 'notices', label: '알림설정', icon: '🔔' }] : []),
               ]}
               value={activeTab}
               onChange={(key) => {
@@ -1002,7 +1010,14 @@ export default function TeacherPage() {
                 }
               }}
             />
-          </section>
+            <div className="dashboard-sidebar-footer">
+              <span aria-hidden="true">✦</span>
+              <div>
+                <small>현재 학급</small>
+                <strong>{selectedClass?.class_name ?? '학급을 선택하세요'}</strong>
+              </div>
+            </div>
+          </aside>
 
           {activeTab === 'class' && (
             <section className="card">

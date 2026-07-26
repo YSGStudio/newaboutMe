@@ -1,6 +1,7 @@
 export type TabItem = {
   key: string;
   label: string;
+  icon?: string;
   disabled?: boolean;
 };
 
@@ -24,7 +25,8 @@ export default function Tabs({ items, value, onChange }: Props) {
           style={item.disabled ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
           onClick={() => onChange(item.key)}
         >
-          {item.label}
+          {item.icon && <span className="tab-icon" aria-hidden="true">{item.icon}</span>}
+          <span>{item.label}</span>
         </button>
       ))}
     </div>

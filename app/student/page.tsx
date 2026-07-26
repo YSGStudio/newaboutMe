@@ -903,7 +903,7 @@ export default function StudentPage() {
   const isLoggedIn = Boolean(studentName);
 
   return (
-    <main className="grid" style={{ gap: 16 }}>
+    <main className={`grid${isLoggedIn ? ' dashboard-layout student-dashboard-layout' : ''}`} style={{ gap: 16 }}>
       <PageHeader
         title="학생 홈"
         subtitle={isLoggedIn ? `${studentName} 학생, 오늘도 화이팅!` : '학급코드와 이름으로 로그인하세요'}
@@ -1048,16 +1048,25 @@ export default function StudentPage() {
             </div>
           </section>
 
-          <section className="card">
+          <aside className="dashboard-sidebar">
+            <div className="dashboard-sidebar-brand">
+              <span className="dashboard-brand-star" aria-hidden="true">★</span>
+              <div>
+                <strong>별빛로그</strong>
+                <small>STARLIGHT LOG</small>
+              </div>
+            </div>
+            <p className="dashboard-sidebar-mode">학생 대시보드</p>
             <Tabs
               items={[
-                { key: 'emotion', label: '오늘의 감정' },
-                { key: 'plan', label: '오늘의 계획' },
-                { key: 'eval', label: '평가기록' },
-                { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}` },
+                { key: 'emotion', label: '오늘의 감정', icon: '💜' },
+                { key: 'plan', label: '오늘의 계획', icon: '⭐' },
+                { key: 'eval', label: '평가기록', icon: '📝' },
+                { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
                 ...(lettersEnabled ? [{
                   key: 'letters',
                   label: `클래스메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
+                  icon: '💌',
                 }] : []),
               ]}
               value={activeTab}
@@ -1071,7 +1080,19 @@ export default function StudentPage() {
                 }
               }}
             />
-          </section>
+            <a className="dashboard-sidebar-badge-link" href="/student/badges">
+              <span aria-hidden="true">🏅</span>
+              <span>나의 별빛 뱃지</span>
+              <strong>{studentBadgeCount}/20</strong>
+            </a>
+            <div className="dashboard-sidebar-footer">
+              <span aria-hidden="true">✦</span>
+              <div>
+                <small>오늘의 탐험가</small>
+                <strong>{studentName}</strong>
+              </div>
+            </div>
+          </aside>
 
           {activeTab === 'emotion' && (
             <section className="card">

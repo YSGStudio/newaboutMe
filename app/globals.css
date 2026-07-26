@@ -44,6 +44,295 @@ main {
   padding: 24px 16px 80px;
 }
 
+/* ── Design v2 · 별빛 사이드 내비게이션 ── */
+.dashboard-layout {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px 26px 80px 276px;
+  background:
+    radial-gradient(circle at 85% 5%, rgba(139, 92, 246, .09), transparent 24%),
+    linear-gradient(145deg, #f7f5ff, #f3f1fb 58%, #eef2ff);
+}
+
+.dashboard-layout > :not(.dashboard-sidebar) {
+  width: min(1180px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.dashboard-sidebar {
+  position: fixed;
+  z-index: 40;
+  left: 16px;
+  top: 16px;
+  display: flex;
+  width: 234px;
+  height: calc(100vh - 32px);
+  overflow: hidden;
+  flex-direction: column;
+  padding: 18px 13px 14px;
+  border: 1px solid rgba(167, 139, 250, .32);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 18% 7%, rgba(255, 230, 133, .2) 0 2px, transparent 3px),
+    radial-gradient(circle at 86% 18%, rgba(255,255,255,.24) 0 1.5px, transparent 2.5px),
+    linear-gradient(168deg, #15105f 0%, #25127e 52%, #40129b 100%);
+  box-shadow: 0 20px 48px rgba(25, 17, 87, .28);
+}
+
+.dashboard-sidebar::after {
+  content: '';
+  position: absolute;
+  right: -48px;
+  bottom: 30px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(205, 193, 255, .12);
+  border-radius: 50%;
+  box-shadow: 0 0 55px rgba(124, 58, 237, .18);
+  pointer-events: none;
+}
+
+.dashboard-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 7px 15px;
+  border-bottom: 1px solid rgba(221, 214, 254, .16);
+}
+
+.dashboard-brand-star {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255, 239, 168, .32);
+  border-radius: 13px;
+  background: rgba(255,255,255,.1);
+  color: #ffe47b;
+  font-size: 20px;
+  box-shadow: 0 0 18px rgba(255, 228, 123, .16);
+}
+
+.dashboard-sidebar-brand div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dashboard-sidebar-brand strong {
+  color: #fff;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.dashboard-sidebar-brand small {
+  color: #aaa2dc;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .13em;
+}
+
+.dashboard-sidebar-mode {
+  margin: 15px 10px 8px;
+  color: #aaa2dc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.dashboard-sidebar .tabs {
+  display: flex;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-sidebar .tab {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  overflow: visible;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #c9c4ee;
+  box-shadow: none;
+  font-size: 12.5px;
+  text-align: left;
+  transform: none;
+}
+
+.dashboard-sidebar .tab-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(255,255,255,.08);
+  font-size: 15px;
+}
+
+.dashboard-sidebar .tab:hover:not(.active) {
+  border-color: rgba(196, 181, 253, .16);
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  box-shadow: none;
+  transform: none;
+}
+
+.dashboard-sidebar .tab.active {
+  border-color: rgba(255, 229, 128, .32);
+  background:
+    radial-gradient(circle at 92% 20%, rgba(255, 231, 136, .3) 0 2px, transparent 3px),
+    linear-gradient(105deg, rgba(124, 58, 237, .85), rgba(99, 65, 196, .62));
+  color: #fff;
+  box-shadow: 0 7px 18px rgba(10, 5, 54, .23), inset 0 1px 0 rgba(255,255,255,.12);
+  transform: none;
+}
+
+.dashboard-sidebar .tab.active .tab-icon {
+  background: rgba(255,255,255,.17);
+  box-shadow: 0 0 12px rgba(255, 231, 136, .1);
+}
+
+.dashboard-sidebar .tab.active::before,
+.dashboard-sidebar .tab.active::after {
+  display: none;
+}
+
+.dashboard-sidebar-badge-link {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 229, 128, .22);
+  border-radius: 12px;
+  background: rgba(255,255,255,.08);
+  color: #f5f3ff;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.dashboard-sidebar-badge-link strong {
+  color: #ffe47b;
+  font-size: 10px;
+}
+
+.dashboard-sidebar-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 11px 10px 4px;
+  border-top: 1px solid rgba(221, 214, 254, .15);
+}
+
+.dashboard-sidebar-footer > span {
+  color: #ffe47b;
+  font-size: 15px;
+}
+
+.dashboard-sidebar-footer div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.dashboard-sidebar-footer small {
+  color: #9991ce;
+  font-size: 9px;
+}
+
+.dashboard-sidebar-footer strong {
+  overflow: hidden;
+  color: #f5f3ff;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .dashboard-layout {
+    padding: 16px 14px 64px;
+  }
+
+  .dashboard-sidebar {
+    position: static;
+    order: 2;
+    width: min(1180px, 100%);
+    height: auto;
+    margin: 0 auto;
+    padding: 8px;
+    overflow: visible;
+    border-radius: 16px;
+  }
+
+  .dashboard-layout > .sticky-header {
+    order: 1;
+  }
+
+  .dashboard-layout > :not(.dashboard-sidebar):not(.sticky-header) {
+    order: 3;
+  }
+
+  .dashboard-sidebar-brand,
+  .dashboard-sidebar-mode,
+  .dashboard-sidebar-footer,
+  .dashboard-sidebar-badge-link,
+  .dashboard-sidebar::after {
+    display: none;
+  }
+
+  .dashboard-sidebar .tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .dashboard-sidebar .tab {
+    grid-template-columns: 27px auto;
+    width: auto;
+    min-width: max-content;
+    min-height: 42px;
+    padding: 5px 11px 5px 7px;
+  }
+
+  .dashboard-sidebar .tab-icon {
+    width: 27px;
+    height: 27px;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-layout {
+    padding-inline: 10px;
+  }
+
+  .dashboard-layout .sticky-header {
+    align-items: stretch;
+  }
+}
+
 /* ── 카드 ── */
 .card {
   background: var(--surface);
