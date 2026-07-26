@@ -1323,25 +1323,33 @@ export default function TeacherPage() {
                 <div className="feed-card-grid">
                   {feeds.map((feed) => (
                     <article key={feed.id} className="card feed-post">
+                      <span className="feed-diary-tape" aria-hidden="true" />
+                      <span className="feed-diary-star feed-diary-star-one" aria-hidden="true">★</span>
+                      <span className="feed-diary-star feed-diary-star-two" aria-hidden="true">✦</span>
                       <div className="row space-between feed-post-header">
-                        <strong>
-                          {feed.students.student_number}번 {feed.students.name}
-                        </strong>
-                        <span className="hint" style={{ margin: 0 }}>
+                        <div className="feed-post-author">
+                          <span className="feed-diary-number">{feed.students.student_number}</span>
+                          <div>
+                            <small>오늘의 별빛 기록</small>
+                            <strong>{feed.students.name}의 마음일기</strong>
+                          </div>
+                        </div>
+                        <time className="feed-diary-date">
                           {new Date(feed.created_at).toLocaleString('ko-KR')}
-                        </span>
+                        </time>
                       </div>
 
                       <div className="feed-post-body">
-                        <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
-                          {EMOTION_META[feed.emotion_type].categoryLabel} / {EMOTION_META[feed.emotion_type].label}
+                        <p className="feed-diary-emotion">
+                          <span aria-hidden="true">💫</span>
+                          오늘의 마음 · {EMOTION_META[feed.emotion_type].categoryLabel} / <strong>{EMOTION_META[feed.emotion_type].label}</strong>
                         </p>
-                        <p style={{ marginTop: 0 }}>{feed.content}</p>
-                        <div className="row" style={{ flexWrap: 'wrap' }}>
+                        <p className="feed-diary-content">{feed.content}</p>
+                        <div className="row feed-diary-reactions">
                           {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
                             const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
                             return (
-                              <span key={reactionKey} className="badge">
+                              <span key={reactionKey} className="feed-diary-reaction">
                                 {REACTION_META[reactionKey].emoji} {count}
                               </span>
                             );
