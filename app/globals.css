@@ -1,4 +1,5 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@200..900&family=Do+Hyeon&family=Gowun+Dodum&family=Nanum+Gothic:wght@400;700;800&display=swap');
 
 :root {
   --bg: #f5f3ff;
@@ -49,16 +50,22 @@ main {
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 24px 26px 80px 276px;
+  padding: 24px 26px 80px 250px;
   background:
     radial-gradient(circle at 85% 5%, rgba(139, 92, 246, .09), transparent 24%),
     linear-gradient(145deg, #f7f5ff, #f3f1fb 58%, #eef2ff);
 }
 
-.dashboard-layout > :not(.dashboard-sidebar) {
+.dashboard-layout > :not(.dashboard-sidebar):not(.login-notice-backdrop) {
   width: min(1180px, 100%);
   margin-right: auto;
   margin-left: auto;
+}
+
+.dashboard-layout > .login-notice-backdrop {
+  width: 100vw;
+  max-width: none;
+  margin: 0;
 }
 
 .dashboard-sidebar {
@@ -67,11 +74,11 @@ main {
   left: 16px;
   top: 16px;
   display: flex;
-  width: 234px;
+  width: 208px;
   height: calc(100vh - 32px);
   overflow: hidden;
   flex-direction: column;
-  padding: 18px 13px 14px;
+  padding: 18px 11px 14px;
   border: 1px solid rgba(167, 139, 250, .32);
   border-radius: 22px;
   background:
@@ -163,7 +170,7 @@ main {
   align-items: center;
   width: 100%;
   min-height: 44px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   overflow: visible;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -290,7 +297,7 @@ main {
     order: 1;
   }
 
-  .dashboard-layout > :not(.dashboard-sidebar):not(.sticky-header) {
+  .dashboard-layout > :not(.dashboard-sidebar):not(.sticky-header):not(.login-notice-backdrop) {
     order: 3;
   }
 
@@ -2015,16 +2022,24 @@ p.hint {
 /* ── 로그인 · 별빛 관리자 알림장 ── */
 .login-notice-backdrop {
   position: fixed;
+  z-index: 2147483647;
   inset: 0;
-  z-index: 10000;
   display: grid;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   place-items: center;
   padding: 16px;
+  isolation: isolate;
+  overscroll-behavior: contain;
   background:
     radial-gradient(circle at 18% 18%, rgba(250, 204, 21, .13), transparent 20%),
     radial-gradient(circle at 82% 78%, rgba(167, 139, 250, .18), transparent 24%),
-    rgba(27, 24, 72, .76);
-  backdrop-filter: blur(6px);
+    rgba(16, 12, 64, .88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .login-notice-card {
@@ -2038,6 +2053,7 @@ p.hint {
   background: #fffdf6;
   box-shadow: 0 28px 80px rgba(15, 12, 54, .42), 0 0 30px rgba(167, 139, 250, .16);
   animation: login-notice-arrive .24s ease-out;
+  font-family: 'Gowun Dodum', 'Nanum Gothic', 'Chiron GoRound TC', sans-serif;
 }
 
 .login-notice-header {
@@ -2130,6 +2146,7 @@ p.hint {
   font-size: 13px;
   font-weight: 800;
   letter-spacing: .09em;
+  font-family: 'Do Hyeon', 'Gowun Dodum', 'Nanum Gothic', sans-serif;
 }
 
 .login-notice-page {
@@ -2150,6 +2167,8 @@ p.hint {
   font-weight: 800;
   line-height: 1.35;
   word-break: break-word;
+  font-family: 'Do Hyeon', 'Gowun Dodum', 'Nanum Gothic', sans-serif;
+  letter-spacing: .015em;
 }
 
 .login-notice-greeting {
@@ -2189,6 +2208,8 @@ p.hint {
   line-height: 34px;
   white-space: pre-wrap;
   word-break: break-word;
+  font-family: 'Gowun Dodum', 'Nanum Gothic', 'Chiron GoRound TC', sans-serif;
+  font-weight: 400;
 }
 
 .login-notice-paper-holes {
@@ -2227,6 +2248,7 @@ p.hint {
   color: #676080;
   font-size: 13px;
   cursor: pointer;
+  font-family: 'Gowun Dodum', 'Nanum Gothic', sans-serif;
 }
 
 .login-notice-dismiss input {
@@ -2251,6 +2273,8 @@ button.login-notice-confirm {
   box-shadow: 0 8px 20px rgba(91, 33, 182, .32);
   font-size: 17px;
   font-weight: 800;
+  font-family: 'Do Hyeon', 'Gowun Dodum', 'Nanum Gothic', sans-serif;
+  letter-spacing: .025em;
 }
 
 .login-notice-button-star {
