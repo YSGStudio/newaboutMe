@@ -12,6 +12,8 @@ import StatsDashboard from '@/components/teacher/StatsDashboard';
 import RelationshipDashboard from '@/components/teacher/RelationshipDashboard';
 import EvalDashboard from '@/components/teacher/EvalDashboard';
 import ClassSettings from '@/components/teacher/ClassSettings';
+import AdminNoticeManager from '@/components/teacher/AdminNoticeManager';
+import LoginNoticeModal from '@/components/teacher/LoginNoticeModal';
 import { formatDateInSeoul } from '@/lib/date';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 import { EMOTION_META, REACTION_META, EmotionType, ReactionType } from '@/types/domain';
@@ -106,7 +108,7 @@ export default function TeacherPage() {
   const [changePwLoading, setChangePwLoading] = useState(false);
   const [changePwMessage, setChangePwMessage] = useState('');
   const [changePwError, setChangePwError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'settings' | 'admin'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'settings' | 'admin' | 'notices'>('class');
 
   // 교사 역할 정보
   const [teacherRole, setTeacherRole] = useState<TeacherRole>('general');
@@ -385,7 +387,7 @@ export default function TeacherPage() {
 
   // 무료 전환 후 학급 초과 상태면 학급관리 탭으로 고정
   useEffect(() => {
-    if (isOverClassLimit && activeTab !== 'class' && activeTab !== 'admin') {
+    if (isOverClassLimit && activeTab !== 'class' && activeTab !== 'admin' && activeTab !== 'notices') {
       setActiveTab('class');
     }
   }, [isOverClassLimit, activeTab]);
@@ -986,11 +988,11 @@ export default function TeacherPage() {
                 { key: 'relationship', label: '교우관계', disabled: isOverClassLimit },
                 { key: 'stats', label: '성장리포트', disabled: isOverClassLimit },
                 { key: 'settings', label: '학급설정', disabled: isOverClassLimit },
-                ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }] : []),
+                ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정' }, { key: 'notices', label: '알림설정' }] : []),
               ]}
               value={activeTab}
               onChange={(key) => {
-                if (isOverClassLimit && key !== 'class' && key !== 'admin') return;
+                if (isOverClassLimit && key !== 'class' && key !== 'admin' && key !== 'notices') return;
                 setActiveTab(key as typeof activeTab);
                 if (key === 'letters' && selectedClassId && !lettersLoaded) {
                   loadClassLetters(selectedClassId).catch((err: Error) => setAuthError(err.message));
@@ -1720,8 +1722,15 @@ export default function TeacherPage() {
               )}
             </section>
           )}
+
+          {activeTab === 'notices' && teacherRole === 'admin' && (
+            <AdminNoticeManager />
+          )}
         </>
       )}
+
+      {/* 로그인 직후 관리자 알림장 */}
+      <LoginNoticeModal enabled={isAuthed} />
 
       {/* 학급 생성 동의 모달 */}
       {pendingClass && (
