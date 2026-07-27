@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { planCheckSchema } from '@/lib/validators';
 import { todayDate } from '@/lib/date';
 import { checkAndAwardBadge } from '@/lib/badges';
+import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
 
 type Params = { params: { id: string } };
 
@@ -56,5 +57,29 @@ export async function POST(req: Request, { params }: Params) {
   const newBadges = parsed.data.isCompleted === true
     ? await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'plan_complete')
     : [];
+  try {
+    if (parsed.data.isCompleted === true) {
+      const { data: activePlans } = await supabaseAdmin
+        .from('plans')
+        .select('id')
+        .eq('student_id', auth.student.id)
+        .eq('is_active', true);
+      const planIds = (activePlans ?? []).map((item) => item.id);
+      if (planIds.length > 0) {
+        const { data: checks } = await supabaseAdmin
+          .from('plan_checks')
+          .select('plan_id,is_completed')
+          .in('plan_id', planIds)
+          .eq('check_date', date);
+        const completedIds = new Set((checks ?? []).filter((item) => item.is_completed === true).map((item) => item.plan_id));
+        if (planIds.every((id) => completedIds.has(id))) {
+          await grantFuel(supabaseAdmin, auth.student.id, 'plan_check', date);
+        }
+      }
+    }
+    await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
+  } catch (fuelError) {
+    console.error('[voyage] 계획 연료 지급 실패:', fuelError);
+  }
   return NextResponse.json({ check: data, newBadges });
 }

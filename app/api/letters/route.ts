@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireStudentSession } from '@/lib/student-session';
 import { checkAndAwardBadge } from '@/lib/badges';
+import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
 
 const letterCreateSchema = z.object({
   recipientId: z.string().uuid(),
@@ -50,5 +51,13 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'mail_send');
+  try {
+    if (isQualityContent(content, FUEL_RULES.letter.minChars)) {
+      await grantFuel(supabaseAdmin, auth.student.id, 'letter', data.id);
+    }
+    await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
+  } catch (fuelError) {
+    console.error('[voyage] 편지 연료 지급 실패:', fuelError);
+  }
   return NextResponse.json({ letter: data, newBadges }, { status: 201 });
 }

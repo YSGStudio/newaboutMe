@@ -13,6 +13,7 @@ import RelationshipDashboard from '@/components/teacher/RelationshipDashboard';
 import EvalDashboard from '@/components/teacher/EvalDashboard';
 import ClassSettings from '@/components/teacher/ClassSettings';
 import AdminNoticeManager from '@/components/teacher/AdminNoticeManager';
+import VoyageDashboard from '@/components/teacher/VoyageDashboard';
 import LoginNoticeModal from '@/components/teacher/LoginNoticeModal';
 import { formatDateInSeoul } from '@/lib/date';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
@@ -108,7 +109,7 @@ export default function TeacherPage() {
   const [changePwLoading, setChangePwLoading] = useState(false);
   const [changePwMessage, setChangePwMessage] = useState('');
   const [changePwError, setChangePwError] = useState('');
-  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'settings' | 'admin' | 'notices'>('class');
+  const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'voyage' | 'settings' | 'admin' | 'notices'>('class');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // 교사 역할 정보
@@ -1009,6 +1010,7 @@ export default function TeacherPage() {
                 { key: 'letters', label: '클래스메일', icon: '💌', disabled: isOverClassLimit },
                 { key: 'relationship', label: '교우관계', icon: '🤝', disabled: isOverClassLimit },
                 { key: 'stats', label: '성장리포트', icon: '📊', disabled: isOverClassLimit },
+                { key: 'voyage', label: '우주여행', icon: '🚀', disabled: isOverClassLimit },
                 { key: 'settings', label: '학급설정', icon: '⚙️', disabled: isOverClassLimit },
                 ...(teacherRole === 'admin' ? [{ key: 'admin', label: '권한설정', icon: '🔐' }, { key: 'notices', label: '알림설정', icon: '🔔' }] : []),
               ]}
@@ -1378,6 +1380,12 @@ export default function TeacherPage() {
           )}
 
           {activeTab === 'eval' && <EvalDashboard classId={selectedClassId} students={students} onAiUsageChanged={loadAiUsage} />}
+
+          {activeTab === 'voyage' && (
+            <section className="card">
+              <VoyageDashboard classId={selectedClassId} />
+            </section>
+          )}
 
           {activeTab === 'letters' && (
             <section className="card starlight-mail-card">

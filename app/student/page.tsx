@@ -1095,6 +1095,11 @@ export default function StudentPage() {
               <span>나의 별빛 뱃지</span>
               <strong>{studentBadgeCount}/20</strong>
             </a>
+            <a className="dashboard-sidebar-badge-link voyage-link" href="/student/voyage">
+              <span aria-hidden="true">🚀</span>
+              <span>나의 우주여행</span>
+              <strong>출발</strong>
+            </a>
             <div className="dashboard-sidebar-footer">
               <span aria-hidden="true">✦</span>
               <div>

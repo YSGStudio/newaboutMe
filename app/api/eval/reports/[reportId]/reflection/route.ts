@@ -3,6 +3,7 @@ import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 import { checkAndAwardBadge } from '@/lib/badges';
+import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
 
 type Params = { params: { reportId: string } };
 
@@ -44,5 +45,13 @@ export async function POST(req: Request, { params }: Params) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'reflection_save');
+  try {
+    if (isQualityContent(parsed.data.content, FUEL_RULES.reflection.minChars)) {
+      await grantFuel(supabaseAdmin, auth.student.id, 'reflection', data.id);
+    }
+    await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
+  } catch (fuelError) {
+    console.error('[voyage] 성찰 연료 지급 실패:', fuelError);
+  }
   return NextResponse.json({ reflection: data, newBadges }, { status: 201 });
 }

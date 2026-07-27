@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
 import { feedCreateSchema } from '@/lib/validators';
 import { checkAndAwardBadge } from '@/lib/badges';
+import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
 
 export async function GET(req: Request) {
   const auth = await requireStudentSession();
@@ -67,5 +68,13 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'emotion_save');
+  try {
+    if (isQualityContent(parsed.data.content, FUEL_RULES.emotion_feed.minChars)) {
+      await grantFuel(supabaseAdmin, auth.student.id, 'emotion_feed', data.id);
+    }
+    await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
+  } catch (fuelError) {
+    console.error('[voyage] 감정 기록 연료 지급 실패:', fuelError);
+  }
   return NextResponse.json({ feed: data, newBadges }, { status: 201 });
 }
