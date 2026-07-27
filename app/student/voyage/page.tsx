@@ -92,7 +92,7 @@ export default function StudentVoyagePage() {
           <h1>{progress.next ? `${progress.next.emoji} ${progress.next.name}을 향해 항해 중!` : '⭐ 프록시마 b 도착 완료!'}</h1>
           <span>{progress.next ? `다음 기항지까지 ${progress.next.fuel_threshold - data.state.total_fuel} 연료` : '우주의 끝까지 멋지게 완주했어요'}</span>
         </div>
-        <div className="voyage-booster">🔥 {data.state.streak_days}일 연속 · ×{data.state.streak_days >= 10 ? 2 : data.state.streak_days >= 5 ? 1.5 : data.state.streak_days >= 3 ? 1.2 : 1}</div>
+        <div className="voyage-booster">🔥 감정·계획 {data.state.streak_days}일 연속 · ×{data.state.streak_days >= 10 ? 2 : data.state.streak_days >= 5 ? 1.5 : data.state.streak_days >= 3 ? 1.2 : 1}</div>
       </section>
 
       <section className="card voyage-route-card">

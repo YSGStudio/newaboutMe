@@ -13,6 +13,8 @@ export const FUEL_RULES = {
 
 export type FuelSource = keyof typeof FUEL_RULES | 'teacher_grant' | 'teacher_revoke';
 
+const BOOSTER_ELIGIBLE_SOURCES = new Set<FuelSource>(['plan_check', 'emotion_feed']);
+
 export type VoyageStar = {
   level: number;
   name: string;
@@ -103,6 +105,11 @@ export async function grantFuel(
   const rule = sourceType in FUEL_RULES ? FUEL_RULES[sourceType as keyof typeof FUEL_RULES] : null;
   const baseAmount = options?.baseAmount ?? rule?.base ?? 0;
   const isRevoke = sourceType === 'teacher_revoke' || baseAmount < 0;
+  // 매일 반복하는 감정 기록과 계획 체크만 연속 일수 및 부스터에 반영한다.
+  // 성찰일기·클래스메일·배지·교사 지급 등은 기본 연료만 지급한다.
+  const appliesBooster = !isRevoke
+    && options?.applyBooster !== false
+    && BOOSTER_ELIGIBLE_SOURCES.has(sourceType);
 
   // 현재 상태를 1회만 읽는다(없으면 기본값). 사전 중복 SELECT는 제거 —
   // fuel_ledger의 unique 제약(23505)이 중복을 판정한다.
@@ -129,8 +136,10 @@ export async function grantFuel(
     }
   }
 
-  const streakDays = isRevoke ? state.streak_days : updateStreak(state.last_active_on, state.streak_days, earnedOn);
-  const multiplier = options?.applyBooster === false || isRevoke ? 1 : multiplierFor(streakDays);
+  const streakDays = appliesBooster
+    ? updateStreak(state.last_active_on, state.streak_days, earnedOn)
+    : state.streak_days;
+  const multiplier = appliesBooster ? multiplierFor(streakDays) : 1;
   const amount = isRevoke ? -Math.abs(baseAmount) : Math.floor(baseAmount * multiplier);
 
   // 원장을 먼저 기록해 중복을 차단한다. 성공한 경우에만 실제 연료를 더한다.
@@ -157,7 +166,7 @@ export async function grantFuel(
     p_amount: amount,
     p_streak: streakDays,
     p_last_active: earnedOn,
-    p_apply_streak: !isRevoke,
+    p_apply_streak: appliesBooster,
   });
   if (rpcError) throw rpcError;
   const totalFuel = typeof newTotal === 'number' ? newTotal : Math.max(0, state.total_fuel + amount);
@@ -189,7 +198,7 @@ export async function grantBadgeFuel(
   badges: Array<{ badge: { id: string } }>,
 ) {
   for (const awarded of badges) {
-    await grantFuel(supabase, studentId, 'badge', awarded.badge.id, { applyBooster: true });
+    await grantFuel(supabase, studentId, 'badge', awarded.badge.id, { applyBooster: false });
   }
 }
 
