@@ -9,7 +9,7 @@ import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
-import { EMOTION_CATEGORIES, EMOTION_META, EmotionType } from '@/types/domain';
+import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
 import type { AwardedBadge } from '@/lib/badges';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
@@ -114,6 +114,20 @@ type EvalReportDetail = {
 
 const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 const GRADE_COLOR: Record<'high' | 'mid' | 'low', string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
+
+const EMOTION_CATEGORY_VISUAL: Record<EmotionCategoryType, {
+  friendlyLabel: string;
+  icon: string;
+  color: string;
+  softColor: string;
+}> = {
+  joy_vitality: { friendlyLabel: '기쁘고 신나요', icon: '⭐', color: '#f59e0b', softColor: '#fff7d6' },
+  affection_bond: { friendlyLabel: '따뜻하고 좋아요', icon: '💗', color: '#ec4899', softColor: '#fff0f6' },
+  anxiety_tension: { friendlyLabel: '걱정되고 떨려요', icon: '🌙', color: '#8b5cf6', softColor: '#f3efff' },
+  sadness_lethargy: { friendlyLabel: '슬프고 힘이 없어요', icon: '💧', color: '#3b82f6', softColor: '#edf6ff' },
+  anger_rejection: { friendlyLabel: '화나고 싫어요', icon: '☄️', color: '#ef4444', softColor: '#fff0ed' },
+  social_emotions: { friendlyLabel: '친구 때문에 복잡해요', icon: '🫧', color: '#14b8a6', softColor: '#eafbf7' },
+};
 
 const donutColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e', '#06b6d4', '#f97316', '#64748b'];
 const otherEmotionColor = '#94a3b8';
@@ -1345,51 +1359,94 @@ export default function StudentPage() {
                     </div>
                     <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
                   </div>
-                ) : (
+                ) : isEmotionEditable ? null : (
                   <EmptyState
                     title="저장된 감정 기록이 없습니다"
-                    description={
-                      isEmotionEditable
-                        ? '아래에서 오늘의 감정과 한 줄 기록을 작성해보세요.'
-                        : '선택한 날짜에는 저장된 감정 기록이 없습니다.'
-                    }
+                    description="선택한 날짜에는 저장된 감정 기록이 없습니다."
                   />
                 )
               )}
 
               {isEmotionEditable && !myFeed && !monthlyViewMonth && (
-                <form className="grid" onSubmit={onCreateFeed} style={{ marginTop: 16 }}>
-                  <div>
-                    <label>감정 범주</label>
-                    <select value={emotionCategory} onChange={(event) => setEmotionCategory(event.target.value as (typeof EMOTION_CATEGORIES)[number]['key'])}>
-                      {EMOTION_CATEGORIES.map((category) => (
-                        <option key={category.key} value={category.key}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </select>
+                <form className="emotion-picker" onSubmit={onCreateFeed}>
+                  <div className="emotion-picker-heading">
+                    <span aria-hidden="true">✦</span>
+                    <div>
+                      <h3>오늘 내 마음은 어떤가요?</h3>
+                      <p>먼저 지금 마음과 가장 가까운 표정을 골라보세요.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label>세부 감정</label>
-                    <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                      {emotionOptions.map((key) => (
+
+                  <div className="emotion-step-title"><b>1</b><strong>큰 마음</strong></div>
+                  <div className="emotion-category-grid">
+                    {EMOTION_CATEGORIES.map((category) => {
+                      const visual = EMOTION_CATEGORY_VISUAL[category.key];
+                      const selected = emotionCategory === category.key;
+                      return (
+                        <button
+                          key={category.key}
+                          type="button"
+                          className={`emotion-category-card${selected ? ' is-selected' : ''}`}
+                          style={{ '--emotion-accent': visual.color, '--emotion-soft': visual.softColor } as React.CSSProperties}
+                          aria-pressed={selected}
+                          onClick={() => {
+                            setEmotionCategory(category.key);
+                            setEmotionType(category.emotions[0]);
+                          }}
+                        >
+                          {selected && <span className="emotion-selected-check" aria-hidden="true">✓</span>}
+                          <span className="emotion-category-character" aria-hidden="true">{visual.icon}</span>
+                          <strong>{visual.friendlyLabel}</strong>
+                          <small>{category.label}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="emotion-step-connector" aria-hidden="true">✦</div>
+                  <div className="emotion-step-title"><b>2</b><strong>자세한 마음</strong></div>
+                  <p className="emotion-detail-guide">
+                    {EMOTION_CATEGORY_VISUAL[emotionCategory].friendlyLabel}와 가까운 마음을 하나 골라봐요.
+                  </p>
+                  <div className="emotion-detail-grid">
+                    {emotionOptions.map((key) => {
+                      const selected = emotionType === key;
+                      return (
                         <button
                           key={key}
                           type="button"
-                          className={emotionType === key ? 'ghost' : 'outline'}
-                          style={{ width: 'auto', minHeight: 36, padding: '6px 12px' }}
-                          onClick={() => setEmotionType(key as EmotionType)}
+                          className={`emotion-detail-card${selected ? ' is-selected' : ''}`}
+                          aria-pressed={selected}
+                          onClick={() => setEmotionType(key)}
                         >
-                          {EMOTION_META[key].label}
+                          {selected && <span aria-hidden="true">✓</span>}
+                          <i aria-hidden="true">{EMOTION_CATEGORY_VISUAL[emotionCategory].icon}</i>
+                          <strong>{EMOTION_META[key].label}</strong>
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <label>한 줄 기록 (100자)</label>
-                    <textarea name="content" maxLength={100} required />
+
+                  <div className="emotion-selection-summary">
+                    <span aria-hidden="true">{EMOTION_CATEGORY_VISUAL[emotionCategory].icon}</span>
+                    <small>오늘의 마음</small>
+                    <strong>{EMOTION_META[emotionType].categoryLabel} · {EMOTION_META[emotionType].label}</strong>
                   </div>
-                  <SubmitButton loading={feedLoading} idleText="피드 작성" />
+
+                  <div className="emotion-note-field">
+                    <label htmlFor="emotion-content">무슨 일이 있었나요?</label>
+                    <textarea
+                      id="emotion-content"
+                      name="content"
+                      maxLength={100}
+                      required
+                      placeholder="오늘 있었던 일을 한 줄로 적어보세요."
+                    />
+                    <small>100자까지 쓸 수 있어요.</small>
+                  </div>
+                  <div className="emotion-submit">
+                    <SubmitButton loading={feedLoading} idleText="이 마음으로 기록하기 ✦" />
+                  </div>
                 </form>
               )}
             </section>

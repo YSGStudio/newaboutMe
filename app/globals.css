@@ -321,6 +321,279 @@ main {
   color: #8cecf5;
 }
 
+/* ── 학생 감정 선택 · 처음 보는 학생을 위한 2단계 선택 ── */
+.emotion-picker {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid #ddd6fe;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 5% 6%, rgba(250, 204, 21, .16) 0 3px, transparent 4px),
+    radial-gradient(circle at 94% 8%, rgba(139, 92, 246, .12) 0 4px, transparent 5px),
+    linear-gradient(155deg, #fffef9 0%, #fff 58%, #f8f5ff 100%);
+  box-shadow: 0 12px 32px rgba(76, 50, 154, .08);
+}
+
+.emotion-picker-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.emotion-picker-heading > span {
+  margin-top: 3px;
+  color: #f5b800;
+  font-size: 20px;
+}
+
+.emotion-picker-heading h3 {
+  margin: 0;
+  color: #25155f;
+  font-size: clamp(21px, 3vw, 28px);
+}
+
+.emotion-picker-heading p {
+  margin: 5px 0 0;
+  color: #6b6490;
+  font-size: 13px;
+}
+
+.emotion-step-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #6039d7;
+}
+
+.emotion-step-title::before,
+.emotion-step-title::after {
+  width: min(180px, 18vw);
+  height: 1px;
+  content: '';
+  background: repeating-linear-gradient(90deg, #c4b5fd 0 5px, transparent 5px 9px);
+}
+
+.emotion-step-title b {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #6338e8;
+  color: #fff;
+  font-size: 13px;
+}
+
+.emotion-step-title strong { font-size: 15px; }
+
+.emotion-category-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.emotion-category-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 150px;
+  padding: 14px 8px 10px;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  border: 2px solid #ebe7e2;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff, var(--emotion-soft));
+  color: #27204f;
+  box-shadow: 0 4px 12px rgba(45, 34, 90, .05);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.emotion-category-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--emotion-accent);
+}
+
+.emotion-category-card.is-selected {
+  transform: translateY(-3px);
+  border-color: var(--emotion-accent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--emotion-accent) 25%, transparent);
+}
+
+.emotion-category-character {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--emotion-soft);
+  font-size: 38px;
+  filter: drop-shadow(0 4px 5px rgba(45, 34, 90, .12));
+}
+
+.emotion-category-card strong {
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.emotion-category-card small {
+  color: #8a84a4;
+  font-size: 10px;
+}
+
+.emotion-selected-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #6039e7;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(96, 57, 231, .28);
+  font-size: 13px;
+}
+
+.emotion-step-connector {
+  height: 8px;
+  color: #f2b90b;
+  text-align: center;
+  line-height: 8px;
+}
+
+.emotion-detail-guide {
+  margin: -6px 0 0;
+  color: #4c4177;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.emotion-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 9px;
+}
+
+.emotion-detail-card {
+  position: relative;
+  display: grid;
+  min-height: 78px;
+  padding: 10px 8px;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid #e5e0ef;
+  border-radius: 15px;
+  background: #fff;
+  color: #33295f;
+  box-shadow: 0 3px 9px rgba(42, 31, 86, .05);
+}
+
+.emotion-detail-card:hover,
+.emotion-detail-card.is-selected {
+  border: 2px solid #6c3ef0;
+  background: #faf8ff;
+  box-shadow: 0 6px 16px rgba(108, 62, 240, .15);
+}
+
+.emotion-detail-card > span {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 50%;
+  background: #6c3ef0;
+  color: #fff;
+  font-size: 10px;
+}
+
+.emotion-detail-card i {
+  font-style: normal;
+  font-size: 22px;
+}
+
+.emotion-detail-card strong { font-size: 13px; }
+
+.emotion-selection-summary {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid #f2cf70;
+  border-radius: 15px;
+  background: linear-gradient(90deg, #fffbed, #fff9e1);
+}
+
+.emotion-selection-summary > span { font-size: 24px; }
+.emotion-selection-summary small { color: #706687; font-size: 12px; }
+.emotion-selection-summary strong { color: #5630d4; font-size: 16px; }
+
+.emotion-note-field {
+  display: grid;
+  gap: 5px;
+}
+
+.emotion-note-field label {
+  color: #342866;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.emotion-note-field textarea {
+  min-height: 82px;
+  border-color: #dcd5f7;
+  background: rgba(255,255,255,.88);
+}
+
+.emotion-note-field small {
+  justify-self: end;
+  color: #918aa8;
+  font-size: 10px;
+}
+
+.emotion-submit {
+  width: min(410px, 100%);
+  margin: 0 auto;
+}
+
+.emotion-submit button {
+  min-height: 52px;
+  border-radius: 15px;
+  background: linear-gradient(105deg, #4c2bd4, #7137f4);
+  box-shadow: 0 8px 20px rgba(89, 49, 221, .25);
+  font-size: 16px;
+}
+
+@media (max-width: 900px) {
+  .emotion-category-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .emotion-picker { padding: 16px 12px; }
+  .emotion-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .emotion-category-card { min-height: 132px; }
+  .emotion-category-character { width: 52px; height: 52px; font-size: 32px; }
+  .emotion-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .emotion-selection-summary { flex-wrap: wrap; gap: 5px 8px; }
+}
+
 /* ── 스타 보이저 · 학생 우주여행 ── */
 .voyage-page {
   display: grid;
