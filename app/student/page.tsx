@@ -225,6 +225,7 @@ export default function StudentPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'eval' | 'relationship' | 'letters'>('emotion');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
@@ -903,7 +904,7 @@ export default function StudentPage() {
   const isLoggedIn = Boolean(studentName);
 
   return (
-    <main className={`grid${isLoggedIn ? ' dashboard-layout student-dashboard-layout' : ''}`} style={{ gap: 16 }}>
+    <main className={`grid${isLoggedIn ? ` dashboard-layout student-dashboard-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}` : ''}`} style={{ gap: 16 }}>
       <PageHeader
         title="학생 홈"
         subtitle={isLoggedIn ? `${studentName} 학생, 오늘도 화이팅!` : '학급코드와 이름으로 로그인하세요'}
@@ -1049,6 +1050,15 @@ export default function StudentPage() {
           </section>
 
           <aside className="dashboard-sidebar">
+            <button
+              type="button"
+              className="dashboard-sidebar-toggle"
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              aria-label={sidebarCollapsed ? '내비게이션 펼치기' : '내비게이션 접기'}
+              title={sidebarCollapsed ? '내비게이션 펼치기' : '내비게이션 접기'}
+            >
+              {sidebarCollapsed ? '›' : '‹'}
+            </button>
             <div className="dashboard-sidebar-brand">
               <span className="dashboard-brand-star" aria-hidden="true">★</span>
               <div>

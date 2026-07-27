@@ -109,6 +109,7 @@ export default function TeacherPage() {
   const [changePwMessage, setChangePwMessage] = useState('');
   const [changePwError, setChangePwError] = useState('');
   const [activeTab, setActiveTab] = useState<'class' | 'student' | 'feed' | 'eval' | 'stats' | 'relationship' | 'letters' | 'settings' | 'admin' | 'notices'>('class');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // 교사 역할 정보
   const [teacherRole, setTeacherRole] = useState<TeacherRole>('general');
@@ -804,7 +805,7 @@ export default function TeacherPage() {
 
 
   return (
-    <main className={`grid${isAuthed ? ' dashboard-layout teacher-dashboard-layout' : ''}`} style={{ gap: 16 }}>
+    <main className={`grid${isAuthed ? ` dashboard-layout teacher-dashboard-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}` : ''}`} style={{ gap: 16 }}>
       <PageHeader
         title="교사 대시보드"
         subtitle="학급과 학생을 빠르게 관리하세요"
@@ -835,25 +836,53 @@ export default function TeacherPage() {
         }
         right={
           isAuthed ? (
-            <div className="row" style={{ width: 'auto' }}>
-              <button
-                type="button"
-                style={{ whiteSpace: 'nowrap', width: 'auto', color: '#dc2626', borderColor: '#fca5a5', background: '#fff' }}
-                className="outline"
-                onClick={() => { setShowDeleteAccountConfirm(true); setDeleteAccountPassword(''); setDeleteAccountError(''); }}
-              >
-                회원탈퇴하기
-              </button>
-              <button className="outline" type="button" style={{ whiteSpace: 'nowrap' }} onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
-                비밀번호 변경
-              </button>
-              <button className="outline" type="button" onClick={onLogout}>
-                로그아웃
-              </button>
+            <div className="teacher-header-controls">
+              <div className="teacher-header-class-select">
+                <span aria-hidden="true">🏫</span>
+                <div>
+                  <label htmlFor="teacher-header-class">학급 선택</label>
+                  <select id="teacher-header-class" value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
+                    <option value="">학급을 선택하세요</option>
+                    {classes.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.class_name} ({item.grade}학년 {item.section}반)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="teacher-header-class-code" title="학생 로그인에 사용하는 학급코드">
+                <span>학급코드</span>
+                <strong>{selectedClass?.class_code ?? '—'}</strong>
+              </div>
+              <div className="teacher-header-account-actions">
+                <button
+                  type="button"
+                  title="회원탈퇴"
+                  aria-label="회원탈퇴"
+                  className="outline teacher-header-icon-button danger"
+                  onClick={() => { setShowDeleteAccountConfirm(true); setDeleteAccountPassword(''); setDeleteAccountError(''); }}
+                >
+                  탈퇴
+                </button>
+                <button className="outline teacher-header-icon-button" type="button" onClick={() => { setShowChangePw(true); setChangePwError(''); setChangePwMessage(''); }}>
+                  비밀번호
+                </button>
+                <button className="outline teacher-header-icon-button" type="button" onClick={onLogout}>
+                  로그아웃
+                </button>
+              </div>
             </div>
           ) : null
         }
       />
+
+      {isAuthed && (
+        <div className="teacher-dashboard-notices">
+          <Notice type="success" message={authMessage} />
+          <Notice type="error" message={authError} />
+        </div>
+      )}
 
       {!isAuthed && (
         <section className="card auth-login-shell">
@@ -953,31 +982,16 @@ export default function TeacherPage() {
 
       {isAuthed && (
         <>
-          <section className="card">
-            <div className="grid two">
-              <div>
-                <label>학급 선택</label>
-                <select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
-                  <option value="">학급을 선택하세요</option>
-                  {classes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.class_name} ({item.grade}학년 {item.section}반)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>학급코드</label>
-                <div className="card" style={{ padding: 10 }}>
-                  {selectedClass ? <span className="badge">{selectedClass.class_code}</span> : '선택된 학급 없음'}
-                </div>
-              </div>
-            </div>
-            <Notice type="success" message={authMessage} />
-            <Notice type="error" message={authError} />
-          </section>
-
           <aside className="dashboard-sidebar">
+            <button
+              type="button"
+              className="dashboard-sidebar-toggle"
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              aria-label={sidebarCollapsed ? '내비게이션 펼치기' : '내비게이션 접기'}
+              title={sidebarCollapsed ? '내비게이션 펼치기' : '내비게이션 접기'}
+            >
+              {sidebarCollapsed ? '›' : '‹'}
+            </button>
             <div className="dashboard-sidebar-brand">
               <span className="dashboard-brand-star" aria-hidden="true">★</span>
               <div>

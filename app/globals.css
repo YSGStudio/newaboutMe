@@ -76,7 +76,7 @@ main {
   display: flex;
   width: 208px;
   height: calc(100vh - 32px);
-  overflow: hidden;
+  overflow: visible;
   flex-direction: column;
   padding: 18px 11px 14px;
   border: 1px solid rgba(167, 139, 250, .32);
@@ -86,6 +86,76 @@ main {
     radial-gradient(circle at 86% 18%, rgba(255,255,255,.24) 0 1.5px, transparent 2.5px),
     linear-gradient(168deg, #15105f 0%, #25127e 52%, #40129b 100%);
   box-shadow: 0 20px 48px rgba(25, 17, 87, .28);
+  transition: width .22s ease, padding .22s ease;
+}
+
+.dashboard-sidebar-toggle {
+  position: absolute;
+  z-index: 3;
+  right: -12px;
+  top: 62px;
+  display: grid;
+  width: 27px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(196, 181, 253, .5);
+  border-radius: 10px;
+  background: #33218d;
+  color: #fff1a8;
+  box-shadow: 0 5px 14px rgba(25, 17, 87, .3);
+  font-size: 23px;
+  line-height: 1;
+}
+
+.dashboard-sidebar-toggle:hover:not(:disabled) {
+  opacity: 1;
+  background: #5129bf;
+  box-shadow: 0 7px 18px rgba(25, 17, 87, .38);
+}
+
+.dashboard-layout.sidebar-collapsed {
+  padding-left: 112px;
+}
+
+.sidebar-collapsed .dashboard-sidebar {
+  width: 72px;
+  padding-inline: 8px;
+}
+
+.sidebar-collapsed .dashboard-sidebar-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-collapsed .dashboard-sidebar-brand > div,
+.sidebar-collapsed .dashboard-sidebar-mode,
+.sidebar-collapsed .dashboard-sidebar-footer,
+.sidebar-collapsed .dashboard-sidebar-badge-link span:nth-child(2),
+.sidebar-collapsed .dashboard-sidebar-badge-link strong,
+.sidebar-collapsed .dashboard-sidebar .tab > span:last-child {
+  display: none;
+}
+
+.sidebar-collapsed .dashboard-sidebar .tab {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+  padding-inline: 5px;
+  place-items: center;
+}
+
+.sidebar-collapsed .dashboard-sidebar .tab-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.sidebar-collapsed .dashboard-sidebar-badge-link {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding-inline: 5px;
+  place-items: center;
 }
 
 .dashboard-sidebar::after {
@@ -277,6 +347,114 @@ main {
   white-space: nowrap;
 }
 
+/* ── 교사 헤더 · 학급 선택 ── */
+.teacher-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.teacher-header-class-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 1px solid #ddd6fe;
+  border-radius: 11px;
+  background: #faf9ff;
+}
+
+.teacher-header-class-select > span {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 9px;
+  background: #ede9fe;
+  font-size: 14px;
+}
+
+.teacher-header-class-select > div {
+  width: 174px;
+}
+
+.teacher-header-class-select label {
+  margin: 0 0 1px;
+  color: #8b7eaf;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.teacher-header-class-select select {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 22px 0 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  color: #3f3780;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.teacher-header-class-code {
+  display: flex;
+  min-width: 74px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 9px;
+  border: 1px solid #f4d887;
+  border-radius: 11px;
+  background: #fffaf0;
+}
+
+.teacher-header-class-code span {
+  color: #a8863b;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.teacher-header-class-code strong {
+  color: #795b17;
+  font-size: 13px;
+  letter-spacing: .06em;
+}
+
+.teacher-header-account-actions {
+  display: flex;
+  gap: 5px;
+}
+
+button.teacher-header-icon-button {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 9px;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+button.teacher-header-icon-button.danger {
+  border-color: #fecaca;
+  background: #fff;
+  color: #dc2626;
+}
+
+.teacher-dashboard-notices:empty {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .teacher-header-controls {
+    flex-wrap: wrap;
+  }
+  .teacher-header-class-select > div {
+    width: 145px;
+  }
+}
+
 @media (max-width: 960px) {
   .dashboard-layout {
     padding: 16px 14px 64px;
@@ -291,6 +469,14 @@ main {
     padding: 8px;
     overflow: visible;
     border-radius: 16px;
+  }
+
+  .dashboard-sidebar-toggle {
+    display: none;
+  }
+
+  .dashboard-layout.sidebar-collapsed {
+    padding: 16px 14px 64px;
   }
 
   .dashboard-layout > .sticky-header {
