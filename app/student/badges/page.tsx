@@ -45,7 +45,7 @@ export default function BadgesPage() {
 
 
   return (
-    <main style={{ fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif", maxWidth: 680, margin: '0 auto', padding: '80px 16px 40px' }}>
+    <main style={{ fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif", maxWidth: 1080, margin: '0 auto', padding: '24px 16px 80px' }}>
 
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
@@ -123,8 +123,8 @@ export default function BadgesPage() {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: 14,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: 16,
         }}>
           {enabledBadges.map((badge) => (
             <div

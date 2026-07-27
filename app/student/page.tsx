@@ -5,7 +5,6 @@ import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
 import AuthIllustration from '@/components/ui/AuthIllustration';
-import ProgressBar from '@/components/ui/ProgressBar';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import { formatDateInSeoul } from '@/lib/date';
@@ -20,6 +19,11 @@ type PlanAchievementRow = {
   completed: number;
   totalPossible: number;
   achievementRate: number;
+};
+
+type VoyageSummary = {
+  totalFuel: number;
+  destination: { name: string; emoji: string; remainingFuel: number } | null;
 };
 
 type MyFeedRow = {
@@ -217,6 +221,7 @@ const getTodayInSeoul = () => formatDateInSeoul(new Date());
 
 export default function StudentPage() {
   const [studentName, setStudentName] = useState('');
+  const [sessionChecking, setSessionChecking] = useState(true);
   const [planDate, setPlanDate] = useState(getTodayInSeoul);
   const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
@@ -284,6 +289,7 @@ export default function StudentPage() {
   const [lettersEnabled, setLettersEnabled] = useState(true);
   const [studentTitle, setStudentTitle] = useState('별빛 새싹');
   const [studentBadgeCount, setStudentBadgeCount] = useState(0);
+  const [voyageSummary, setVoyageSummary] = useState<VoyageSummary | null>(null);
   const [badgeStats, setBadgeStats] = useState({ emotionCount: 0, perfectPlanDays: 0, reflectionCount: 0, letterSentCount: 0 });
   const [badgePopupQueue, setBadgePopupQueue] = useState<AwardedBadge[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -301,12 +307,13 @@ export default function StudentPage() {
   const isPlanEditable = planDate === today;
   const isEmotionEditable = emotionDate === today;
 
-  const summary = useMemo(() => {
+  const todaySummary = useMemo(() => {
     const completed = plans.filter((plan) => plan.isCompleted === true).length;
-    const total = plans.length;
-    const rate = total ? Math.round((completed / total) * 100) : 0;
-    return { completed, total, rate };
-  }, [plans]);
+    return {
+      emotion: myFeed ? EMOTION_META[myFeed.emotion_type].label : '기록 전',
+      practiceRate: plans.length > 0 ? Math.round((completed / plans.length) * 100) : 0,
+    };
+  }, [myFeed, plans]);
 
   const emotionOptions = useMemo(
     () => EMOTION_CATEGORIES.find((category) => category.key === emotionCategory)?.emotions ?? [],
@@ -433,7 +440,7 @@ export default function StudentPage() {
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadVoyageSummary(), loadRelationshipStatus()]);
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -492,6 +499,7 @@ export default function StudentPage() {
         }, 950);
       }
       await loadPlanAchievements();
+      void loadVoyageSummary();
       handleNewBadges(checkData.newBadges ?? []);
     } catch (err) {
       setPlans(before);
@@ -591,6 +599,7 @@ export default function StudentPage() {
       });
       formEl.reset();
       setMyFeed(data.feed);
+      void loadVoyageSummary();
       handleNewBadges(data.newBadges ?? []);
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
@@ -672,6 +681,7 @@ export default function StudentPage() {
         }),
       });
       closeCompose();
+      void loadVoyageSummary();
       handleNewBadges(letterData.newBadges ?? []);
       setLetterMsg('편지를 보냈습니다.');
       setSentLoaded(false);
@@ -745,6 +755,7 @@ export default function StudentPage() {
       );
       setEvalDetail((prev) => prev ? { ...prev, eval_reflections: [d.reflection] } : prev);
       setReflectionText('');
+      void loadVoyageSummary();
       handleNewBadges(d.newBadges ?? []);
       setEvalModalMsg('성찰일기를 저장했습니다.');
       clearEvalModalNotice();
@@ -802,6 +813,7 @@ export default function StudentPage() {
     setComposeContent('');
     setStudentTitle('별빛 새싹');
     setStudentBadgeCount(0);
+    setVoyageSummary(null);
     setBadgePopupQueue([]);
     setMessage('로그아웃 되었습니다.');
     clearNoticeLater();
@@ -822,6 +834,25 @@ export default function StudentPage() {
     }
   };
 
+  const loadVoyageSummary = async () => {
+    try {
+      const d = await api<{
+        state: { total_fuel: number };
+        stars: { name: string; emoji: string; fuel_threshold: number }[];
+      }>('/api/voyage/me');
+      const totalFuel = d.state.total_fuel;
+      const nextStar = d.stars.find((star) => star.fuel_threshold > totalFuel) ?? null;
+      setVoyageSummary({
+        totalFuel,
+        destination: nextStar
+          ? { name: nextStar.name, emoji: nextStar.emoji, remainingFuel: nextStar.fuel_threshold - totalFuel }
+          : null,
+      });
+    } catch {
+      setVoyageSummary(null);
+    }
+  };
+
   const loadRelationshipStatus = async () => {
     try {
       const d = await api<{
@@ -838,6 +869,43 @@ export default function StudentPage() {
       setRelationshipLoaded(true);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        const data = await api<{
+          student: { id: string; name: string; studentNumber: number };
+          class: { id: string; lettersEnabled: boolean };
+        }>('/api/auth/student/me');
+        if (cancelled) return;
+
+        setStudentName(data.student.name);
+        setLettersEnabled(data.class.lettersEnabled ?? true);
+        const loginToday = getTodayInSeoul();
+        setPlanDate(loginToday);
+        setEmotionDate(loginToday);
+        await Promise.all([
+          loadPlans(loginToday),
+          loadPlanAchievements(),
+          loadMyFeed(loginToday),
+          loadBadgeProfile(),
+          loadVoyageSummary(),
+          loadRelationshipStatus(),
+        ]);
+      } catch {
+        // 유효한 세션이 없으면 로그인 화면을 표시한다.
+      } finally {
+        if (!cancelled) setSessionChecking(false);
+      }
+    };
+
+    void restoreSession();
+    return () => { cancelled = true; };
+    // 최초 진입 시 한 번만 저장된 세션을 복원한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const togglePick = (list: string[], setList: (v: string[]) => void, id: string, max: number) => {
     setList(list.includes(id) ? list.filter((x) => x !== id) : list.length < max ? [...list, id] : list);
@@ -960,7 +1028,23 @@ export default function StudentPage() {
           display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto',
         }}>
           {/* 칭호 */}
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a
+            href="/student/badges"
+            aria-label={`${studentTitle} 칭호와 배지 보러 가기`}
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '5px 8px',
+              borderRadius: 12,
+              color: 'inherit',
+              textDecoration: 'none',
+              background: 'rgba(255,255,255,0.68)',
+              border: '1px solid rgba(196,181,253,0.72)',
+              boxShadow: '0 3px 10px rgba(99,102,241,0.08)',
+            }}
+          >
             <img
               src={`/${studentTitle.replace(/ /g, '')}.png`}
               alt={studentTitle}
@@ -969,6 +1053,68 @@ export default function StudentPage() {
             <div>
               <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 칭호</p>
               <p style={{ margin: '1px 0 0', fontSize: 15, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>{studentTitle}</p>
+            </div>
+          </a>
+
+          <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />
+
+          {voyageSummary && (
+            <>
+              <a
+                href="/student/voyage"
+                style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '5px 10px',
+                  borderRadius: 12,
+                  color: '#312e81',
+                  textDecoration: 'none',
+                  background: 'rgba(255,255,255,0.62)',
+                  border: '1px solid rgba(165,180,252,0.7)',
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: 25 }}>
+                  {voyageSummary.destination?.emoji ?? '🌟'}
+                </span>
+                <div>
+                  <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {voyageSummary.destination ? '현재 향하는 곳' : '우주여행 완주'}
+                  </p>
+                  <p style={{ margin: '1px 0 0', fontSize: 13, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>
+                    {voyageSummary.destination
+                      ? `${voyageSummary.destination.name} · ⛽ ${voyageSummary.destination.remainingFuel} 필요`
+                      : `모든 별 도착 · ⛽ ${voyageSummary.totalFuel}`}
+                  </p>
+                </div>
+              </a>
+              <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />
+            </>
+          )}
+
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              minWidth: 70,
+              padding: '5px 9px',
+              borderRadius: 10,
+              textAlign: 'center',
+              background: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(196,181,253,0.65)',
+            }}>
+              <p style={{ margin: 0, fontSize: 9, color: '#7c3aed', fontWeight: 700, whiteSpace: 'nowrap' }}>💜 오늘 감정</p>
+              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#1e1b4b', fontWeight: 800, whiteSpace: 'nowrap' }}>{todaySummary.emotion}</p>
+            </div>
+            <div style={{
+              minWidth: 70,
+              padding: '5px 9px',
+              borderRadius: 10,
+              textAlign: 'center',
+              background: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(165,180,252,0.65)',
+            }}>
+              <p style={{ margin: 0, fontSize: 9, color: '#4f46e5', fontWeight: 700, whiteSpace: 'nowrap' }}>⭐ 실천률</p>
+              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#1e1b4b', fontWeight: 800 }}>{todaySummary.practiceRate}%</p>
             </div>
           </div>
 
@@ -1006,7 +1152,13 @@ export default function StudentPage() {
         </section>
       )}
 
-      {!isLoggedIn && (
+      {sessionChecking && (
+        <section className="card" style={{ textAlign: 'center', padding: 32 }}>
+          <p style={{ margin: 0, color: '#6366f1', fontWeight: 700 }}>✦ 학생 정보를 불러오는 중이에요...</p>
+        </section>
+      )}
+
+      {!isLoggedIn && !sessionChecking && (
         <section className="card auth-login-shell">
           <AuthIllustration role="student" />
           <div className="auth-form-panel">
@@ -1035,20 +1187,6 @@ export default function StudentPage() {
 
       {isLoggedIn && (
         <>
-          <section className="card">
-            <h3 style={{ marginTop: 0 }}>오늘 요약</h3>
-            <div className="grid two">
-              <div className="card" style={{ padding: 12 }}>
-                <strong>감정 작성</strong>
-                <p className="hint">{myFeed ? '오늘 감정 기록 완료' : '오늘 아직 기록 없음'}</p>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <strong>계획 달성률</strong>
-                <ProgressBar value={summary.rate} label={`${summary.completed}/${summary.total} 완료 (${summary.rate}%)`} />
-              </div>
-            </div>
-          </section>
-
           <aside className="dashboard-sidebar">
             <button
               type="button"

@@ -31,7 +31,7 @@ type VoyageData = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  plan_check: '오늘 계획 전체 완료',
+  plan_check: '오늘 계획 전체 체크',
   emotion_feed: '감정 기록',
   reflection: '성찰일기',
   letter: '클래스메일',
@@ -73,7 +73,7 @@ export default function StudentVoyagePage() {
     { icon: '✅', name: '오늘 계획', fuel: 5, done: data.missions.plan },
     { icon: '💜', name: '감정 기록', fuel: 8, done: data.missions.emotion },
     { icon: '📖', name: '성찰일기', fuel: 10, done: data.missions.reflection },
-    { icon: '💌', name: '클래스메일', fuel: 12, done: data.missions.letterCount > 0 },
+    { icon: '💌', name: '클래스메일', fuel: 5, done: data.missions.letterCount > 0 },
   ];
 
   return (
@@ -147,4 +147,3 @@ export default function StudentVoyagePage() {
     </main>
   );
 }
-
