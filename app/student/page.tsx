@@ -1243,11 +1243,6 @@ export default function StudentPage() {
                 }
               }}
             />
-            <a className="dashboard-sidebar-badge-link" href="/student/badges">
-              <span aria-hidden="true">🏅</span>
-              <span>별빛 퀘스트</span>
-              <strong>{studentBadgeCount}/20</strong>
-            </a>
             <div className="dashboard-sidebar-footer">
               <span aria-hidden="true">✦</span>
               <div>
