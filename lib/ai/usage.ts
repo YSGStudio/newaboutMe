@@ -9,7 +9,7 @@ export type AiFeature = 'growth_report' | 'holland_report' | 'subject_report';
 
 // 등급별 월 고정 한도. 사용량은 이번 달 로그 개수를 그때그때 세는 방식이라
 // 저장된 잔여치가 없고, 매월 1일(서울 기준) 자동으로 이 값 기준 재계산된다 — 이월/차감 없음.
-export const FREE_MONTHLY_AI_LIMIT = 20;
+export const FREE_MONTHLY_AI_LIMIT = 10;
 export const PAID_MONTHLY_AI_LIMIT = 100;
 
 export type AiUsage = {

@@ -76,7 +76,7 @@ type TeacherListItem = {
   email: string;
   role: TeacherRole;
   paidUntil: string | null;
-  aiMonthlyLimit: number | null; // 등급 고정 한도(무료 20 / 유료 100), null = 무제한(관리자)
+  aiMonthlyLimit: number | null; // 등급 고정 한도(무료 10 / 유료 100), null = 무제한(관리자)
   aiUsedThisMonth: number;
   createdAt: string;
 };
@@ -1745,7 +1745,7 @@ export default function TeacherPage() {
                           style={{ fontSize: 12, padding: '6px 8px' }}
                         />
                         <span
-                          title="이번 달 AI 분석 사용량 / 월 한도 (무료 20회, 유료 100회, 관리자 무제한)"
+                          title="이번 달 AI 분석 사용량 / 월 한도 (무료 10회, 유료 100회, 관리자 무제한)"
                           style={{
                             fontSize: 12, fontWeight: 700,
                             color: teacher.aiMonthlyLimit !== null && teacher.aiUsedThisMonth >= teacher.aiMonthlyLimit ? '#dc2626' : '#334155',

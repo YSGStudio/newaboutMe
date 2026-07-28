@@ -362,7 +362,7 @@ export default function HomePage() {
           background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.45)',
           borderRadius: 100, padding: '6px 18px', marginBottom: 20,
         }}>
-          <span style={{ fontSize: 13, color: '#fcd34d', fontWeight: 700 }}>✨ 무료 월 20회 · 유료 월 100회</span>
+          <span style={{ fontSize: 13, color: '#fcd34d', fontWeight: 700 }}>✨ 무료 월 10회 · 유료 월 100회</span>
         </div>
         <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, margin: '0 0 16px', color: '#fff' }}>
           AI가 기록을 성장 이야기로 바꿔줘요
@@ -393,7 +393,7 @@ export default function HomePage() {
           ))}
         </div>
         <p style={{ margin: 0, color: 'rgba(199,210,254,0.55)', fontSize: 13, lineHeight: 1.7 }}>
-          AI 분석 결과는 참고용이며, 무료회원은 월 20회·유료회원은 월 100회 이용할 수 있습니다. 학급 전체 일괄 분석은 유료회원 전용 기능입니다.<br />
+          AI 분석 결과는 참고용이며, 무료회원은 월 10회·유료회원은 월 100회 이용할 수 있습니다. 학급 전체 일괄 분석은 유료회원 전용 기능입니다.<br />
           유료 플랜 문의는 가입 후 관리자에게 연락해주세요.
         </p>
       </section>
