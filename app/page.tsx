@@ -3,9 +3,14 @@ import InteractiveStarfield from '@/components/landing/InteractiveStarfield';
 
 const features = [
   {
+    icon: '🚀',
+    title: '나의 우주여행',
+    desc: '학생은 로그인하면 우주여행에서 하루를 시작해요. 감정 기록과 계획 체크로 연료를 모으고 새로운 별을 향해 나아갑니다.',
+  },
+  {
     icon: '✨',
-    title: '감정 기록 & 통계',
-    desc: '오늘의 감정을 선택하고 짧은 글로 남겨요. 월별 모아보기와 감정통계 그래프로 나만의 감정 지도를 확인해요.',
+    title: '쉬운 감정 기록',
+    desc: '큰 마음을 먼저 고르고 자세한 감정을 선택해요. 표정 중심의 2단계 UI로 처음 쓰는 학생도 쉽게 마음을 기록합니다.',
   },
   {
     icon: '📋',
@@ -14,8 +19,8 @@ const features = [
   },
   {
     icon: '🏅',
-    title: '뱃지 & 칭호',
-    desc: '감정 기록, 계획 실천, 성찰, 편지 쓰기로 20가지 뱃지를 모아요. 뱃지가 쌓이면 칭호가 성장합니다.',
+    title: '별빛 퀘스트',
+    desc: '활동을 이어가며 뱃지를 수집하고 별빛칭호를 성장시켜요. 우주여행 화면에서 현재 수집 현황을 바로 확인합니다.',
   },
   {
     icon: '💌',
@@ -88,8 +93,8 @@ const aiFeatures = [
 ];
 
 const steps = [
-  { role: '선생님', color: '#6366f1', steps: ['회원가입 후 학급 개설', '학생 이름과 번호 등록', '학급코드를 학생들에게 전달', '대시보드에서 성장 모니터링', 'AI 리포트로 학기말 정리'] },
-  { role: '학생', color: '#f59e0b', steps: ['학급코드·이름·PIN으로 로그인', '오늘의 감정을 기록', '할 일 계획 후 하나씩 체크', '친구에게 클래스메일 보내기', '뱃지 모아 칭호 올리기'] },
+  { role: '선생님', color: '#6366f1', steps: ['회원가입 후 학급 개설', '학생 이름과 번호 등록', '학급코드를 학생들에게 전달', '왼쪽 대시보드에서 학급 운영', '우주여행 현황과 성장 리포트 확인'] },
+  { role: '학생', color: '#f59e0b', steps: ['학급코드·이름·PIN으로 로그인', '나의 여행에서 오늘 목적지 확인', '감정 기록과 계획 체크로 연료 충전', '별빛 퀘스트에서 뱃지와 칭호 확인', '친구·선생님과 기록을 나누며 성장'] },
 ];
 
 export default function HomePage() {
@@ -153,7 +158,7 @@ export default function HomePage() {
             background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)',
             borderRadius: 100, padding: '6px 18px', marginBottom: 28,
           }}>
-            <span style={{ fontSize: 13, color: '#c7d2fe', fontWeight: 500 }}>✦ 초등학교 전용 감정·성장 기록 플랫폼</span>
+            <span style={{ fontSize: 13, color: '#c7d2fe', fontWeight: 500 }}>✦ 기록으로 연료를 모으는 초등 성장 우주여행</span>
           </div>
 
           <h1 className="hero-title" style={{
@@ -165,14 +170,14 @@ export default function HomePage() {
           <h2 style={{
             fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 700,
             color: 'rgba(255,255,255,0.85)', margin: '0 0 24px', lineHeight: 1.3, letterSpacing: '-0.5px',
-          }}>별처럼 빛나는 나의 기록</h2>
+          }}>오늘의 기록으로, 나만의 별을 향해</h2>
 
           <p style={{
             fontSize: 'clamp(15px, 2.5vw, 20px)', color: '#c7d2fe',
             maxWidth: 520, lineHeight: 1.7, margin: '0 auto 48px',
           }}>
-            감정을 기록하고, 계획을 실천하고, 선생님과 함께 성장해요.<br />
-            우리 반의 소중한 이야기를 별빛로그에 담아보세요.
+            감정을 기록하고 계획을 실천하면 우주선의 연료가 채워져요.<br />
+            별빛 퀘스트와 함께 우리 반의 성장 여행을 시작해보세요.
           </p>
 
           <div className="hero-actions" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -202,6 +207,67 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── 업데이트된 학생 여정 ── */}
+      <section style={{
+        background: 'linear-gradient(155deg, #f7f5ff 0%, #fffdf5 50%, #eefcff 100%)',
+        padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
+      }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p style={{ color: '#6d4be0', fontWeight: 800, fontSize: 13, letterSpacing: 2, margin: '0 0 10px' }}>MY STAR VOYAGE</p>
+            <h2 style={{ fontSize: 'clamp(26px, 4vw, 42px)', fontWeight: 900, margin: '0 0 14px', color: '#24165f' }}>
+              학생의 하루는 우주여행에서 시작해요
+            </h2>
+            <p style={{ color: '#70688a', fontSize: 16, maxWidth: 610, margin: '0 auto', lineHeight: 1.7 }}>
+              오늘 할 일을 확인하고 기록을 남길 때마다 연료가 쌓여요.
+              작은 습관이 매일의 항해가 되고, 새로운 별을 만나는 성장 경험이 됩니다.
+            </p>
+          </div>
+
+          <div style={{
+            position: 'relative',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: 16,
+            padding: 'clamp(22px, 4vw, 36px)',
+            overflow: 'hidden',
+            border: '1px solid rgba(139,92,246,.32)',
+            borderRadius: 28,
+            background:
+              'radial-gradient(circle at 16% 18%, rgba(79,209,229,.18), transparent 22%), linear-gradient(140deg, #12104e, #281075 56%, #481499)',
+            boxShadow: '0 24px 60px rgba(36,22,105,.22)',
+          }}>
+            <span aria-hidden="true" style={{ position: 'absolute', top: 18, left: 24, color: '#fff1a6', letterSpacing: 28, opacity: .65 }}>✦ · ★ · ✧</span>
+            {[
+              { step: '01', icon: '🚀', title: '나의 여행', desc: '로그인하면 현재 목적지와 필요한 연료를 가장 먼저 확인해요.' },
+              { step: '02', icon: '💜', title: '오늘의 기록', desc: '감정을 기록하고 계획을 체크해 매일의 연료를 충전해요.' },
+              { step: '03', icon: '🔥', title: '연속 부스터', desc: '감정과 계획을 꾸준히 이어가면 우주선의 부스터가 강해져요.' },
+              { step: '04', icon: '🏅', title: '별빛 퀘스트', desc: '뱃지를 모으고 별빛칭호를 키우며 나만의 성장을 확인해요.' },
+            ].map((item) => (
+              <article key={item.step} style={{
+                position: 'relative',
+                zIndex: 1,
+                minHeight: 205,
+                padding: '22px 20px',
+                border: '1px solid rgba(255,255,255,.14)',
+                borderRadius: 20,
+                background: 'rgba(255,255,255,.08)',
+                backdropFilter: 'blur(8px)',
+              }}>
+                <span style={{ color: '#72e2ee', fontSize: 10, fontWeight: 900, letterSpacing: 2 }}>STEP {item.step}</span>
+                <div style={{
+                  display: 'grid', width: 54, height: 54, placeItems: 'center',
+                  margin: '18px 0 14px', borderRadius: 17,
+                  background: 'rgba(255,255,255,.12)', fontSize: 29,
+                }}>{item.icon}</div>
+                <h3 style={{ margin: '0 0 8px', color: '#fff', fontSize: 18 }}>{item.title}</h3>
+                <p style={{ margin: 0, color: '#d1cbea', fontSize: 13, lineHeight: 1.65 }}>{item.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 기능 소개 ── */}
       <section style={{
         background: '#fafafa', padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
@@ -212,7 +278,7 @@ export default function HomePage() {
           성장을 위한 모든 것
         </h2>
         <p style={{ color: '#64748b', fontSize: 16, maxWidth: 500, margin: '0 auto 56px', lineHeight: 1.7 }}>
-          감정 기록부터 교우관계 분석, 교사 리포트까지 — 학생의 하루와 학급 운영을 완성하는 핵심 기능
+          우주여행과 별빛 퀘스트부터 교우관계 분석, 교사 리포트까지 — 학생의 하루와 학급 운영을 잇는 핵심 기능
         </p>
         <div style={{
           display: 'grid',
@@ -239,18 +305,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 뱃지 & 칭호 ── */}
+      {/* ── 별빛 퀘스트 & 칭호 ── */}
       <section style={{
         background: '#fff', padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
         textAlign: 'center',
       }}>
-        <p style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, letterSpacing: 2, marginBottom: 12 }}>GROWTH</p>
+        <p style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, letterSpacing: 2, marginBottom: 12 }}>STARLIGHT QUEST</p>
         <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, margin: '0 0 16px', color: '#1e1b4b' }}>
-          기록이 쌓일수록 칭호가 자라나요
+          별빛 퀘스트로 칭호를 키워요
         </h2>
         <p style={{ color: '#64748b', fontSize: 16, maxWidth: 520, margin: '0 auto 56px', lineHeight: 1.7 }}>
-          감정 기록, 계획 실천, 성찰일기, 클래스메일로 뱃지를 모으면
-          별빛 새싹부터 별빛 전설까지 칭호가 한 단계씩 성장합니다.
+          다양한 활동으로 뱃지를 모으면 별빛 새싹부터 별빛 전설까지
+          나의 별빛칭호가 한 단계씩 성장합니다.
         </p>
         <div style={{
           display: 'flex', flexWrap: 'wrap', justifyContent: 'center',
