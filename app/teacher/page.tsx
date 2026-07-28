@@ -1110,7 +1110,18 @@ export default function TeacherPage() {
                 </article>
 
                 <article className="card" style={{ padding: 12 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>학급 목록</h3>
+                  <div className="row space-between" style={{ alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0 }}>학급 목록</h3>
+                    <button
+                      type="button"
+                      className="student-toolbar-button student-toolbar-button-danger"
+                      onClick={onResetAllPasswords}
+                      disabled={!selectedClassId}
+                    >
+                      <span className="student-toolbar-icon" aria-hidden="true">🔑</span>
+                      비밀번호 초기화
+                    </button>
+                  </div>
                   {classes.length === 0 ? (
                     <EmptyState title="학급이 없습니다" description="먼저 학급을 1개 생성하세요." />
                   ) : (
@@ -1170,15 +1181,6 @@ export default function TeacherPage() {
                   <p className="hint" style={{ margin: '4px 0 0' }}>학생을 등록하고 로그인 비밀번호를 관리할 수 있습니다.</p>
                 </div>
                 <div className="student-management-actions" aria-label="학생 관리 도구">
-                  <button
-                    type="button"
-                    className="student-toolbar-button student-toolbar-button-danger"
-                    onClick={onResetAllPasswords}
-                    disabled={!selectedClassId}
-                  >
-                    <span className="student-toolbar-icon" aria-hidden="true">🔑</span>
-                    비밀번호 초기화
-                  </button>
                   <button
                     type="button"
                     className={`student-toolbar-button student-toolbar-button-primary${showAddStudent ? ' is-active' : ''}`}
