@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import AuthIllustration from '@/components/ui/AuthIllustration';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
+import VoyageContent from '@/components/student/VoyageContent';
 import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
@@ -243,7 +244,7 @@ export default function StudentPage() {
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'emotion' | 'plan' | 'eval' | 'relationship' | 'letters'>('emotion');
+  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters'>('voyage');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
@@ -450,11 +451,13 @@ export default function StudentPage() {
       });
 
       setStudentName(data.student.name);
+      setActiveTab('voyage');
       setLettersEnabled(data.class.lettersEnabled ?? true);
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadVoyageSummary(), loadRelationshipStatus()]);
+      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
+      void loadVoyageSummary(); // 배너용 — 로그인 완료를 막지 않도록 기다리지 않는다
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -803,6 +806,7 @@ export default function StudentPage() {
   const onLogout = async () => {
     await api('/api/auth/student/logout', { method: 'POST' });
     setStudentName('');
+    setActiveTab('voyage');
     setPlanDate(getTodayInSeoul());
     setEmotionDate(getTodayInSeoul());
     setPlans([]);
@@ -850,18 +854,8 @@ export default function StudentPage() {
 
   const loadVoyageSummary = async () => {
     try {
-      const d = await api<{
-        state: { total_fuel: number };
-        stars: { name: string; emoji: string; fuel_threshold: number }[];
-      }>('/api/voyage/me');
-      const totalFuel = d.state.total_fuel;
-      const nextStar = d.stars.find((star) => star.fuel_threshold > totalFuel) ?? null;
-      setVoyageSummary({
-        totalFuel,
-        destination: nextStar
-          ? { name: nextStar.name, emoji: nextStar.emoji, remainingFuel: nextStar.fuel_threshold - totalFuel }
-          : null,
-      });
+      const d = await api<VoyageSummary>('/api/voyage/summary');
+      setVoyageSummary({ totalFuel: d.totalFuel, destination: d.destination });
     } catch {
       setVoyageSummary(null);
     }
@@ -905,9 +899,9 @@ export default function StudentPage() {
           loadPlanAchievements(),
           loadMyFeed(loginToday),
           loadBadgeProfile(),
-          loadVoyageSummary(),
           loadRelationshipStatus(),
         ]);
+        void loadVoyageSummary(); // 배너용 — 세션 복원 완료를 막지 않도록 기다리지 않는다
       } catch {
         // 유효한 세션이 없으면 로그인 화면을 표시한다.
       } finally {
@@ -1074,9 +1068,13 @@ export default function StudentPage() {
 
           {voyageSummary && (
             <>
-              <a
-                href="/student/voyage"
+              <button
+                type="button"
+                aria-label="나의 여행 탭 열기"
+                onClick={() => setActiveTab('voyage')}
                 style={{
+                  width: 'auto',
+                  minHeight: 0,
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -1087,6 +1085,8 @@ export default function StudentPage() {
                   textDecoration: 'none',
                   background: 'rgba(255,255,255,0.62)',
                   border: '1px solid rgba(165,180,252,0.7)',
+                  boxShadow: 'none',
+                  textAlign: 'left',
                 }}
               >
                 <span aria-hidden="true" style={{ fontSize: 25 }}>
@@ -1102,7 +1102,7 @@ export default function StudentPage() {
                       : `모든 별 도착 · ⛽ ${voyageSummary.totalFuel}`}
                   </p>
                 </div>
-              </a>
+              </button>
               <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />
             </>
           )}
@@ -1221,6 +1221,7 @@ export default function StudentPage() {
             <p className="dashboard-sidebar-mode">학생 대시보드</p>
             <Tabs
               items={[
+                { key: 'voyage', label: '나의 여행', icon: '🚀' },
                 { key: 'emotion', label: '오늘의 감정', icon: '💜' },
                 { key: 'plan', label: '오늘의 계획', icon: '⭐' },
                 { key: 'eval', label: '평가기록', icon: '📝' },
@@ -1233,7 +1234,7 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters');
+                setActiveTab(key as 'voyage' | 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters');
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
                 if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
@@ -1244,13 +1245,8 @@ export default function StudentPage() {
             />
             <a className="dashboard-sidebar-badge-link" href="/student/badges">
               <span aria-hidden="true">🏅</span>
-              <span>나의 별빛 뱃지</span>
+              <span>별빛 퀘스트</span>
               <strong>{studentBadgeCount}/20</strong>
-            </a>
-            <a className="dashboard-sidebar-badge-link voyage-link" href="/student/voyage">
-              <span aria-hidden="true">🚀</span>
-              <span>나의 우주여행</span>
-              <strong>출발</strong>
             </a>
             <div className="dashboard-sidebar-footer">
               <span aria-hidden="true">✦</span>
@@ -1260,6 +1256,8 @@ export default function StudentPage() {
               </div>
             </div>
           </aside>
+
+          {activeTab === 'voyage' && <VoyageContent />}
 
           {activeTab === 'emotion' && (
             <section className="card">

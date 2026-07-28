@@ -597,6 +597,7 @@ main {
 /* ── 스타 보이저 · 학생 우주여행 ── */
 .voyage-page {
   display: grid;
+  width: 100%;
   max-width: 1080px;
   gap: 16px;
 }
@@ -613,6 +614,7 @@ main {
 }
 
 .voyage-topbar a { color: #6258a7; font-size: 12px; font-weight: 700; text-decoration: none; }
+.voyage-topbar-kicker { color: #7667b0; font-size: 9px; font-weight: 900; letter-spacing: .12em; }
 .voyage-topbar > div { display: flex; align-items: center; gap: 7px; color: #30276d; }
 .voyage-topbar > div span { color: #eab308; }
 .voyage-fuel-pill { justify-self: end; padding: 5px 10px; border-radius: 999px; background: #e7fbff; color: #087d91; font-size: 12px; font-weight: 800; }
@@ -667,6 +669,78 @@ main {
 .voyage-mission.done { border-style: solid; border-color: #9ee4ec; background: linear-gradient(145deg, #f0fdff, #f6f4ff); color: #337784; box-shadow: 0 5px 13px rgba(79,209,229,.09); }
 .voyage-mission.done > span { filter: none; }
 
+.voyage-quest-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr) minmax(220px, .8fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  overflow: hidden;
+  border: 1px solid #d9d1ff;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 94% 18%, rgba(250, 204, 21, .2) 0 3px, transparent 4px),
+    linear-gradient(130deg, #fffdf4, #fff 42%, #f2efff);
+  box-shadow: 0 8px 22px rgba(74, 54, 145, .1);
+  color: inherit;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.voyage-quest-card:hover {
+  transform: translateY(-2px);
+  border-color: #a995fb;
+  box-shadow: 0 13px 28px rgba(74, 54, 145, .16);
+}
+
+.voyage-quest-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid #ead27f;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff8ce, #f2eaff);
+  box-shadow: 0 5px 13px rgba(119, 86, 198, .12);
+  font-size: 30px;
+}
+
+.voyage-quest-copy h2 {
+  margin: 0 0 4px;
+  color: #30276d;
+  font-size: 18px;
+}
+
+.voyage-quest-copy > span {
+  color: #857a9f;
+  font-size: 11px;
+}
+
+.voyage-quest-copy > span strong {
+  margin-left: 4px;
+  color: #6d38dc;
+  font-size: 13px;
+}
+
+.voyage-quest-progress {
+  display: grid;
+  gap: 7px;
+}
+
+.voyage-quest-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #80769b;
+  font-size: 10px;
+}
+
+.voyage-quest-progress strong { color: #43358c; font-size: 13px; }
+.voyage-quest-gauge { height: 9px; overflow: hidden; border-radius: 999px; background: #e9e4f5; }
+.voyage-quest-gauge i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6c48e8, #b46cec, #f1c84f); }
+.voyage-quest-arrow { color: #7354d9; font-size: 30px; font-weight: 300; }
+
 .voyage-log-list { display: grid; gap: 7px; margin-top: 14px; }
 .voyage-log-list > div { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #ebe7f6; border-radius: 12px; background: #fcfbff; }
 .voyage-log-list > div > span { color: #eab308; text-align: center; }
@@ -688,6 +762,9 @@ main {
   .voyage-ship { font-size: 82px; }
   .voyage-booster { position: static; z-index: 1; justify-self: center; margin-top: 18px; }
   .voyage-mission-grid { grid-template-columns: 1fr 1fr; }
+  .voyage-quest-card { grid-template-columns: auto 1fr auto; gap: 11px; padding: 15px; }
+  .voyage-quest-progress { grid-column: 1 / -1; }
+  .voyage-quest-arrow { grid-column: 3; grid-row: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

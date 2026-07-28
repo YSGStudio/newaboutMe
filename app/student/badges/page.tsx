@@ -50,7 +50,7 @@ export default function BadgesPage() {
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <Link href="/student" style={{ textDecoration: 'none', color: '#6366f1', fontSize: 14, fontWeight: 600 }}>← 돌아가기</Link>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1e1b4b' }}>내 뱃지 모음판</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1e1b4b' }}>별빛 퀘스트</h1>
       </div>
 
       {/* 칭호 카드 */}
