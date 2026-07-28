@@ -626,6 +626,21 @@ function HollandSection({
   );
 }
 
+// 유료 전용 기능임을 알리는 PRO 배지
+function ProBadge() {
+  return (
+    <span
+      style={{
+        display: 'inline-block', marginLeft: 6, fontSize: 9, fontWeight: 800,
+        letterSpacing: '0.04em', color: '#fff', borderRadius: 6, padding: '1px 5px',
+        background: 'linear-gradient(135deg, #f59e0b, #f43f5e)', verticalAlign: 'middle',
+      }}
+    >
+      PRO
+    </span>
+  );
+}
+
 export default function StatsDashboard({ classId, students, className, canBatchAnalyze = false, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canBatchAnalyze?: boolean; onAiUsageChanged?: () => void }) {
   const { confirm, confirmDialog } = useConfirm();
   const [period, setPeriod] = useState<Period>('month');
@@ -741,7 +756,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
   };
 
   const exportAllReportsPdf = async () => {
-    if (students.length === 0 || exportAllLoading) return;
+    if (!canBatchAnalyze || students.length === 0 || exportAllLoading) return;
     setExportAllLoading(true);
     try {
       const results = await Promise.all(
@@ -978,23 +993,23 @@ export default function StatsDashboard({ classId, students, className, canBatchA
             className="outline"
             style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
             onClick={exportAllReportsPdf}
-            disabled={students.length === 0 || exportAllLoading || isLoading || classAiRunning}
+            disabled={!canBatchAnalyze || students.length === 0 || exportAllLoading || isLoading || classAiRunning}
+            title={!canBatchAnalyze ? '유료회원 전용 기능입니다' : undefined}
           >
             {exportAllLoading ? '생성 중...' : '전체 리포트 내보내기'}
+            <ProBadge />
           </button>
-          {canBatchAnalyze ? (
-            <button
-              type="button"
-              className="ghost"
-              style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
-              onClick={analyzeAllStudents}
-              disabled={students.length === 0 || classAiRunning || exportAllLoading || isLoading}
-            >
-              {classAiRunning ? `분석 중... (${classAiTotal}명)` : '✨ 전체 분석하기'}
-            </button>
-          ) : (
-            <span style={{ fontSize: 12, color: '#dc2626', padding: '6px 2px' }}>전체 분석하기는 유료회원만 사용가능합니다</span>
-          )}
+          <button
+            type="button"
+            className="ghost"
+            style={{ width: 'auto', fontSize: 13, padding: '6px 14px' }}
+            onClick={analyzeAllStudents}
+            disabled={!canBatchAnalyze || students.length === 0 || classAiRunning || exportAllLoading || isLoading}
+            title={!canBatchAnalyze ? '유료회원 전용 기능입니다' : undefined}
+          >
+            {classAiRunning ? `분석 중... (${classAiTotal}명)` : '✨ 전체 분석하기'}
+            <ProBadge />
+          </button>
           {classAiResults && !classAiRunning && (
             <button
               type="button"
@@ -1007,6 +1022,11 @@ export default function StatsDashboard({ classId, students, className, canBatchA
           )}
         </div>
       </div>
+      {!canBatchAnalyze && (
+        <p style={{ margin: '0 0 8px', fontSize: 12, color: '#94a3b8' }}>
+          <b style={{ color: '#f43f5e' }}>PRO</b> 표시된 전체 리포트 내보내기·전체 분석하기는 유료회원 전용 기능입니다.
+        </p>
+      )}
       <p className="hint" style={{ marginTop: 0 }}>
         등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
       </p>
