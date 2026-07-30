@@ -195,6 +195,13 @@ export default function TeacherPage() {
     [classes, selectedClassId]
   );
 
+  // 마음피드 — 선택 날짜에 학생이 남긴 피드를 학생 id로 빠르게 찾기 위한 맵.
+  // 등록된 학생 전체 카드를 렌더링할 때 각자 피드가 있는지 이걸로 조회한다.
+  const feedByStudentId = useMemo(
+    () => new Map(feeds.map((feed) => [feed.students.id, feed])),
+    [feeds]
+  );
+
   // 읽음처리하지 않은 새 편지 — 검색어가 없을 때 목록에 보여줄 대상
   const activeLetters = useMemo(
     () => classLetters.filter((letter) => !letter.teacher_archived_at),
@@ -1342,47 +1349,62 @@ export default function TeacherPage() {
                 <EmptyState title="학급을 먼저 선택하세요" description="상단에서 학급을 선택하면 날짜별 피드를 볼 수 있습니다." />
               ) : feedLoading ? (
                 <p className="hint">피드를 불러오는 중입니다...</p>
-              ) : feeds.length === 0 ? (
-                <EmptyState title="해당 날짜 피드가 없습니다" description="다른 날짜를 선택해보세요." />
+              ) : students.length === 0 ? (
+                <EmptyState title="등록된 학생이 없습니다" description="학생 관리 탭에서 학생을 먼저 등록해주세요." />
               ) : (
+                // 등록된 학생 전체를 출석번호 순으로 카드로 렌더링한다.
+                // 해당 날짜에 피드가 있으면 그 내용을, 없으면 "등록된 내용이 없습니다."를 채운다.
                 <div className="feed-card-grid">
-                  {feeds.map((feed) => (
-                    <article key={feed.id} className="card feed-post">
-                      <span className="feed-diary-tape" aria-hidden="true" />
-                      <span className="feed-diary-star feed-diary-star-one" aria-hidden="true">★</span>
-                      <span className="feed-diary-star feed-diary-star-two" aria-hidden="true">✦</span>
-                      <div className="row space-between feed-post-header">
-                        <div className="feed-post-author">
-                          <span className="feed-diary-number">{feed.students.student_number}</span>
-                          <div>
-                            <small>오늘의 별빛 기록</small>
-                            <strong>{feed.students.name}의 마음일기</strong>
+                  {[...students].sort((a, b) => a.student_number - b.student_number).map((student) => {
+                    const feed = feedByStudentId.get(student.id);
+                    return (
+                      <article key={student.id} className={`card feed-post${feed ? '' : ' feed-post-empty'}`}>
+                        <span className="feed-diary-tape" aria-hidden="true" />
+                        <span className="feed-diary-star feed-diary-star-one" aria-hidden="true">★</span>
+                        <span className="feed-diary-star feed-diary-star-two" aria-hidden="true">✦</span>
+                        <div className="row space-between feed-post-header">
+                          <div className="feed-post-author">
+                            <span className="feed-diary-number">{student.student_number}</span>
+                            <div>
+                              <small>오늘의 별빛 기록</small>
+                              <strong>{student.name}의 마음일기</strong>
+                            </div>
                           </div>
+                          {feed && (
+                            <time className="feed-diary-date">
+                              {new Date(feed.created_at).toLocaleString('ko-KR')}
+                            </time>
+                          )}
                         </div>
-                        <time className="feed-diary-date">
-                          {new Date(feed.created_at).toLocaleString('ko-KR')}
-                        </time>
-                      </div>
 
-                      <div className="feed-post-body">
-                        <p className="feed-diary-emotion">
-                          <span aria-hidden="true">💫</span>
-                          오늘의 마음 · {EMOTION_META[feed.emotion_type].categoryLabel} / <strong>{EMOTION_META[feed.emotion_type].label}</strong>
-                        </p>
-                        <p className="feed-diary-content">{feed.content}</p>
-                        <div className="row feed-diary-reactions">
-                          {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
-                            const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
-                            return (
-                              <span key={reactionKey} className="feed-diary-reaction">
-                                {REACTION_META[reactionKey].emoji} {count}
-                              </span>
-                            );
-                          })}
+                        <div className="feed-post-body">
+                          {feed ? (
+                            <>
+                              <p className="feed-diary-emotion">
+                                <span aria-hidden="true">💫</span>
+                                오늘의 마음 · {EMOTION_META[feed.emotion_type].categoryLabel} / <strong>{EMOTION_META[feed.emotion_type].label}</strong>
+                              </p>
+                              <p className="feed-diary-content">{feed.content}</p>
+                              <div className="row feed-diary-reactions">
+                                {(Object.keys(REACTION_META) as ReactionType[]).map((reactionKey) => {
+                                  const count = feed.feed_reactions.filter((item) => item.reaction_type === reactionKey).length;
+                                  return (
+                                    <span key={reactionKey} className="feed-diary-reaction">
+                                      {REACTION_META[reactionKey].emoji} {count}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="feed-diary-content" style={{ color: '#94a3b8', textAlign: 'center', padding: '10px 0' }}>
+                              등록된 내용이 없습니다.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
