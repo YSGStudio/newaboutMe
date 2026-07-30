@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * useConfirm — 예쁜 확인 모달 훅
+ * 브라우저 기본 window.confirm 대신 화면 가운데 커스텀 모달을 띄웁니다.
+ * 사용법: const { confirm, confirmDialog } = useConfirm();
+ *   const ok = await confirm({ message: '...' });  // 사용자가 확인/취소를 누를 때까지 기다림(Promise)
+ *   return <>{confirmDialog} ...</>;                 // 모달 자체는 이걸 화면에 그려야 보임
+ * 주로 "AI 분석 사용횟수 차감" 같은 되돌리기 어려운 동작 전에 씁니다.
+ */
 import { useCallback, useRef, useState } from 'react';
 
 type ConfirmOptions = {

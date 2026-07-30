@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * LoginNoticeModal — 교사 로그인 직후 뜨는 관리자 알림장 모달
+ * enabled(로그인 상태)가 true가 되면 지금 표시할 알림(/api/notices/active)을 불러와
+ * 하나씩 순서대로 보여줍니다. "다시 보지 않기"를 체크하면 그 알림은 이 교사에게 다시 안 뜹니다.
+ * (알림을 만드는 쪽은 AdminNoticeManager, 여기서는 보여주고 닫는 역할만 합니다.)
+ */
 import { useEffect, useState } from 'react';
 
 type Notice = { id: string; title: string; content: string };

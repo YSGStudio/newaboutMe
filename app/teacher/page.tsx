@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * 교사 대시보드 — 경로 "/teacher"
+ * 교사가 로그인(이메일+비밀번호)해 학급을 운영하는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
+ * 상단 탭으로 기능을 전환합니다: 학급관리 · 학생관리 · 마음피드 · 평가피드백 · 교우관계 ·
+ * 성장리포트 · 클래스메일 · 학급설정, 그리고 관리자 전용 권한설정 · 알림설정.
+ * 각 탭의 실제 내용은 components/teacher/*의 대시보드 컴포넌트들이 담당합니다.
+ */
 import { FormEvent, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';

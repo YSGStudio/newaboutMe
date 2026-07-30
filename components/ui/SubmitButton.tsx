@@ -1,3 +1,8 @@
+/**
+ * SubmitButton — 폼 제출 버튼
+ * loading=true면 스피너 + loadingText("처리 중...")를 보여주고 버튼을 비활성화해
+ * 중복 제출을 막습니다. 평소엔 idleText를 표시합니다.
+ */
 import { CSSProperties } from 'react';
 
 type Props = {

@@ -1,3 +1,9 @@
+/**
+ * Tabs — 탭 메뉴
+ * items(탭 목록) 중 value에 해당하는 탭을 활성 표시하고, 클릭 시 onChange(key)로 알립니다.
+ * 실제로 어떤 화면을 보여줄지는 부모(예: 교사 대시보드)가 value로 판단해 결정합니다.
+ * disabled=true인 탭은 흐리게 표시되고 클릭이 막힙니다.
+ */
 export type TabItem = {
   key: string;
   label: string;

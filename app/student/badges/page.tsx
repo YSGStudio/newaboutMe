@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * 학생 뱃지 도감 페이지 — 경로 "/student/badges"
+ * 학생이 지금까지 모은 뱃지와 아직 못 모은 뱃지를 도감처럼 보여주고,
+ * 현재 칭호와 진행 상황을 확인하는 화면입니다. (뱃지 획득 규칙은 lib/badges 참고)
+ */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BADGES } from '@/lib/badges';

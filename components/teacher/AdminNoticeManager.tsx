@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * AdminNoticeManager — 관리자 전용 "알림설정" 탭
+ * 교사가 로그인할 때 뜨는 공지(알림장)를 관리합니다.
+ * - 새 알림 등록: 제목·내용·표시 기간(시작~종료)·즉시 활성화 여부
+ * - 목록: 상태 배지(표시 중/예약/종료/비활성), 활성 토글, 수정, 삭제, "다시 보지 않기" 누른 교사 수
+ * 서버 API: /api/admin/notices (관리자 role만 접근 가능)
+ */
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import RefreshButton from '@/components/ui/RefreshButton';

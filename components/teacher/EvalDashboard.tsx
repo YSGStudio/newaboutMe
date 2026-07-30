@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * EvalDashboard — "평가피드백" 탭 (과정중심평가)
+ * 이 앱에서 가장 큰 화면 중 하나로, 크게 두 갈래입니다.
+ * 1) 채점기준(루브릭) 관리 — 과목·성취기준·평가 척도(잘함/보통/노력)를 등록
+ * 2) 평가 작성 — 학생별/성취기준별로 평가를 입력하고, 과목 탭으로 필터하며,
+ *    "종합평가"는 AI로 과목별 발달 서술 초안을 생성(사용 시 2회 차감)
+ * classId·students를 prop으로 받아 동작하며, 학생은 평가 후 성찰일기를 남길 수 있습니다.
+ */
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';

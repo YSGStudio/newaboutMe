@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * VoyageContent — 학생용 스타 보이저(우주여행) 대시보드 본문
+ * 학생이 로그인 후 보는 화면으로, 연료 게이지와 별 지도(항로), 다음 기항지까지 남은 연료,
+ * 오늘의 활동(감정·계획·성찰·편지) 완료 상태, 최근 항해일지를 보여줍니다.
+ * 연료는 감정 기록·계획 체크 등 활동으로 쌓이며(lib/voyage의 grantFuel), 여기서는 그 결과를 보여줍니다.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 

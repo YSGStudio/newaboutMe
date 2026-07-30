@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * VoyageDashboard — 교사용 "항해"(스타 보이저) 관리 화면
+ * 학급 전체 학생의 연료·현재 기항지·연속일 현황을 표로 보여주고,
+ * 교사가 특정 학생에게 연료를 수동으로 지급/회수(사유 필수)할 수 있습니다.
+ * 서버 API: /api/teacher/voyage (담임교사가 자기 학급에 대해서만 접근).
+ * (학생이 실제로 연료를 모으고 항해하는 화면은 components/student/VoyageContent.)
+ */
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';

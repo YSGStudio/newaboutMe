@@ -1,3 +1,8 @@
+/**
+ * PageHeader — 페이지 상단 고정 헤더
+ * "✦ 별빛로그" 로고(홈 링크) + 현재 페이지 제목/부제를 보여줍니다.
+ * badge(제목 옆 배지)와 right(오른쪽 액션 영역)에 원하는 요소를 끼워 넣을 수 있습니다.
+ */
 import Link from 'next/link';
 import { ReactNode } from 'react';
 

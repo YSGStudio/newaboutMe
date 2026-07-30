@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * 비밀번호 재설정 페이지 — 경로 "/reset-password"
+ * 교사가 "비밀번호 찾기" 이메일 속 링크로 들어오는 화면입니다.
+ * URL의 토큰으로 세션을 확인한 뒤 새 비밀번호를 입력받아 변경합니다.
+ * (학생 비밀번호가 아니라 교사 계정 비밀번호용입니다.)
+ */
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createSupabaseBrowser } from '@/lib/supabase/browser';

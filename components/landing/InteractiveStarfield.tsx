@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * InteractiveStarfield — 랜딩 페이지 히어로 배경의 인터랙티브 별 배경
+ * 마우스/터치 움직임에 반응해 별들이 살짝 따라 움직이는 장식용 효과입니다.
+ * 기능(데이터·로그인 등)과는 무관하며, 첫인상을 위한 시각 연출 전용 컴포넌트입니다.
+ */
 import { useEffect, useRef, type CSSProperties } from 'react';
 
 const stars = Array.from({ length: 42 }, (_, index) => ({

@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * RelationshipDashboard — "교우관계" 탭 (소시오메트리)
+ * 교사가 교우관계 설문을 만들고(친한 친구/같이 하기 싫은 친구 등 지명), 마감하면
+ * 학급 관계도(소시오그램)와 고립 학생·갈등 위험·소그룹 분석 리포트를 자동 생성해 보여줍니다.
+ * 설문은 한 번에 하나만 진행되며, 응답 지명 데이터를 lib/relationship의 buildSociogram이 집계합니다.
+ */
 import { useEffect, useState, type ReactNode } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';

@@ -1,3 +1,9 @@
+/**
+ * 랜딩(홈) 페이지 — 경로 "/"
+ * 로그인하지 않은 방문자가 처음 보는 소개 화면입니다.
+ * 서비스 소개(히어로), 기능 목록, AI 기능 안내, 이용 흐름, 교사/학생 로그인 버튼으로 구성됩니다.
+ * 실제 기능은 없고 홍보·안내 + 로그인 화면으로 이동시키는 역할입니다.
+ */
 import Link from 'next/link';
 import InteractiveStarfield from '@/components/landing/InteractiveStarfield';
 
@@ -170,7 +176,7 @@ export default function HomePage() {
           <h2 style={{
             fontSize: 'clamp(20px, 4vw, 36px)', fontWeight: 700,
             color: 'rgba(255,255,255,0.85)', margin: '0 0 24px', lineHeight: 1.3, letterSpacing: '-0.5px',
-          }}>오늘의 기록으로, 나만의 별을 향해</h2>
+          }}>별처럼 빛나는 나의 기록</h2>
 
           <p style={{
             fontSize: 'clamp(15px, 2.5vw, 20px)', color: '#c7d2fe',

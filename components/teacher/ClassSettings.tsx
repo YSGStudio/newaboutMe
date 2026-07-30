@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * ClassSettings — "학급설정" 탭 내용
+ * 선택한 학급의 규칙을 교사가 직접 조정합니다.
+ * - 뱃지: 어떤 뱃지를 학급에서 사용할지 on/off
+ * - 칭호: 5단계 칭호(예: 별빛 새싹~전설)의 이름과 달성 기준(필요 뱃지 개수) 편집
+ * classId를 prop으로 받아 해당 학급의 설정을 불러오고 저장합니다.
+ */
 import { useEffect, useState } from 'react';
 import { BADGES } from '@/lib/badges';
 import Notice from '@/components/ui/Notice';

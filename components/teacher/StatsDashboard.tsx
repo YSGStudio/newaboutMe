@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * StatsDashboard — "성장리포트" 탭
+ * 학생별 통계(오늘/기간 실천률, 감정 분포, 평가 현황)를 카드로 보여주고,
+ * AI 성장 분석·홀란드 성향 분석을 개별 학생에 대해 실행하며, 개별/전체 PDF로 내보냅니다.
+ * "전체 리포트 내보내기"와 "전체 분석하기"는 유료(PRO) 전용 — canBatchAnalyze prop으로 잠급니다.
+ */
 import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
