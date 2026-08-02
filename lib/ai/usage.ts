@@ -4,11 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate, getSeoulDayRange } from '@/lib/date';
 import { hasActivePaidPlan } from '@/lib/auth';
 import type { TeacherProfile } from '@/lib/auth';
+import { getAppSettings } from '@/lib/adminSettings';
 
 export type AiFeature = 'growth_report' | 'holland_report' | 'subject_report';
 
-// 등급별 월 고정 한도. 사용량은 이번 달 로그 개수를 그때그때 세는 방식이라
-// 저장된 잔여치가 없고, 매월 1일(서울 기준) 자동으로 이 값 기준 재계산된다 — 이월/차감 없음.
+// 등급별 월 한도의 기본값. 실제 값은 app_settings(운영관리 > 설정)에서 조정하며,
+// 사용량은 이번 달 로그 개수를 그때그때 세는 방식이라 이월/차감이 없다.
 export const FREE_MONTHLY_AI_LIMIT = 10;
 export const PAID_MONTHLY_AI_LIMIT = 100;
 
@@ -22,20 +23,24 @@ export type AiUsage = {
 const seoulMonthStartIso = () =>
   getSeoulDayRange(`${todayDate().slice(0, 7)}-01`).startIso;
 
-export function monthlyAiLimit(teacher: TeacherProfile): number | null {
+// 등급별 월 한도 — app_settings의 값을 읽어 결정(관리자는 무제한).
+export async function monthlyAiLimit(teacher: TeacherProfile): Promise<number | null> {
   if (teacher.role === 'admin') return null; // 무제한
-  return hasActivePaidPlan(teacher) ? PAID_MONTHLY_AI_LIMIT : FREE_MONTHLY_AI_LIMIT;
+  const settings = await getAppSettings();
+  return hasActivePaidPlan(teacher) ? settings.paidAiLimit : settings.freeAiLimit;
 }
 
 export async function getAiUsage(teacher: TeacherProfile): Promise<AiUsage> {
-  const { count } = await supabaseAdmin
-    .from('ai_usage_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('teacher_id', teacher.id)
-    .gte('created_at', seoulMonthStartIso());
+  const [{ count }, limit] = await Promise.all([
+    supabaseAdmin
+      .from('ai_usage_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('teacher_id', teacher.id)
+      .gte('created_at', seoulMonthStartIso()),
+    monthlyAiLimit(teacher),
+  ]);
 
   const used = count ?? 0;
-  const limit = monthlyAiLimit(teacher);
   if (limit === null) {
     return { used, limit: null, remaining: null };
   }

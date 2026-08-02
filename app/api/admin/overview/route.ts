@@ -26,9 +26,14 @@ export async function GET() {
 
   const today = todayDate();
   const monthStartIso = getSeoulDayRange(`${today.slice(0, 7)}-01`).startIso;
+  const todayStartIso = getSeoulDayRange(today).startIso;
   const weekStartIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const weekStartDate = weekStartIso.slice(0, 10);
   const soonDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  // 다음 자동 학년말 초기화일(서울 3/1). 오늘이 3/1 이후면 내년.
+  const y = Number(today.slice(0, 4));
+  const nextYearResetDate = today >= `${y}-03-01` ? `${y + 1}-03-01` : `${y}-03-01`;
 
   const [
     profilesRes,
@@ -42,10 +47,10 @@ export async function GET() {
     reflectionRes,
   ] = await Promise.all([
     supabaseAdmin.from('teacher_profiles').select('id, name, role, paid_until'),
-    supabaseAdmin.from('classes').select('id', { count: 'exact', head: true }),
+    supabaseAdmin.from('classes').select('id, class_name').order('created_at', { ascending: true }),
     supabaseAdmin.from('students').select('id', { count: 'exact', head: true }),
     supabaseAdmin.from('ai_usage_logs').select('feature, teacher_id').gte('created_at', monthStartIso),
-    supabaseAdmin.from('emotion_feeds').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
+    supabaseAdmin.from('emotion_feeds').select('student_id, created_at').gte('created_at', weekStartIso),
     supabaseAdmin.from('plan_checks').select('id', { count: 'exact', head: true }).eq('is_completed', true).gte('check_date', weekStartDate),
     supabaseAdmin.from('letters').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
     supabaseAdmin.from('eval_reports').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
@@ -82,14 +87,22 @@ export async function GET() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
+  // 활동 학생 수(감정 기록 기준) — 오늘(DAU)·최근 7일(WAU)
+  const emotionRows = (emotionRes.data ?? []) as { student_id: string; created_at: string }[];
+  const wau = new Set(emotionRows.map((r) => r.student_id)).size;
+  const dau = new Set(emotionRows.filter((r) => r.created_at >= todayStartIso).map((r) => r.student_id)).size;
+
+  const classList = (classCountRes.data ?? []) as { id: string; class_name: string }[];
+
   return NextResponse.json({
     counts: {
       teacherTotal: profiles.length,
       teacherPaid,
       teacherAdmin,
-      classCount: classCountRes.count ?? 0,
+      classCount: classList.length,
       studentCount: studentCountRes.count ?? 0,
     },
+    classes: classList,
     ai: {
       thisMonthTotal: aiTotal,
       byFeature,
@@ -97,12 +110,14 @@ export async function GET() {
       topTeachers: topAiTeachers,
     },
     activityLast7Days: {
-      emotion: emotionRes.count ?? 0,
+      emotion: emotionRows.length,
       planCompleted: planRes.count ?? 0,
       letter: letterRes.count ?? 0,
       evalReport: evalRes.count ?? 0,
       reflection: reflectionRes.count ?? 0,
     },
+    activeStudents: { dau, wau },
+    nextYearResetDate,
     expiringSoon,
   });
 }

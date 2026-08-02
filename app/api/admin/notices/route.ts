@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { logAdminAction } from '@/lib/adminSettings';
 
 function requireAdmin(role: string) {
   if (role !== 'admin') {
@@ -86,5 +87,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logAdminAction({ id: auth.teacher.id, name: auth.teacher.name }, 'notice_create', `알림 등록: ${title}`);
   return NextResponse.json({ id: data.id });
 }

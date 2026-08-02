@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import MaintenanceBanner from '@/components/MaintenanceBanner';
 
 export const metadata: Metadata = {
   title: '별빛로그 — 별빛처럼 빛나는 나의 기록',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <MaintenanceBanner />
+        {children}
+      </body>
     </html>
   );
 }

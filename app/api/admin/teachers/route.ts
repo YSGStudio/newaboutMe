@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
-import { getMonthlyUsageByTeacher, FREE_MONTHLY_AI_LIMIT, PAID_MONTHLY_AI_LIMIT } from '@/lib/ai/usage';
+import { getMonthlyUsageByTeacher } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate } from '@/lib/date';
+import { getAppSettings, logAdminAction } from '@/lib/adminSettings';
 
 function requireAdmin(role: string) {
   if (role !== 'admin') {
@@ -26,10 +27,11 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // auth.users에서 이메일 일괄 조회 + 이번 달 AI 사용량 집계
-  const [{ data: usersData }, usageByTeacher] = await Promise.all([
+  // auth.users에서 이메일 일괄 조회 + 이번 달 AI 사용량 집계 + 등급별 한도 설정
+  const [{ data: usersData }, usageByTeacher, settings] = await Promise.all([
     supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
     getMonthlyUsageByTeacher(),
+    getAppSettings(),
   ]);
   const emailMap = new Map((usersData?.users ?? []).map((u) => [u.id, u.email ?? '']));
 
@@ -43,8 +45,8 @@ export async function GET() {
       email: emailMap.get(t.id) ?? '',
       role,
       paidUntil: t.paid_until ?? null,
-      // 관리자는 무제한(null), 그 외는 등급 고정 한도
-      aiMonthlyLimit: role === 'admin' ? null : (paidActive ? PAID_MONTHLY_AI_LIMIT : FREE_MONTHLY_AI_LIMIT),
+      // 관리자는 무제한(null), 그 외는 설정된 등급 한도
+      aiMonthlyLimit: role === 'admin' ? null : (paidActive ? settings.paidAiLimit : settings.freeAiLimit),
       aiUsedThisMonth: usageByTeacher.get(t.id) ?? 0,
       createdAt: t.created_at,
     };
@@ -85,6 +87,12 @@ export async function PATCH(req: Request) {
     .eq('id', teacherId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logAdminAction(
+    { id: auth.teacher.id, name: auth.teacher.name },
+    'teacher_role_change',
+    `교사 ${teacherId} 등급 → ${role}${role === 'paid' && paidUntil ? ` (만료 ${paidUntil})` : ''}`,
+  );
 
   return NextResponse.json({ ok: true });
 }

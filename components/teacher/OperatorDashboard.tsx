@@ -26,6 +26,7 @@ type TeacherRow = {
 
 type Overview = {
   counts: { teacherTotal: number; teacherPaid: number; teacherAdmin: number; classCount: number; studentCount: number };
+  classes: { id: string; class_name: string }[];
   ai: {
     thisMonthTotal: number;
     byFeature: Record<string, number>;
@@ -33,7 +34,29 @@ type Overview = {
     topTeachers: { id: string; name: string; count: number }[];
   };
   activityLast7Days: { emotion: number; planCompleted: number; letter: number; evalReport: number; reflection: number };
+  activeStudents: { dau: number; wau: number };
+  nextYearResetDate: string;
   expiringSoon: { id: string; name: string; paidUntil: string | null }[];
+};
+
+type AppSettings = {
+  freeAiLimit: number;
+  paidAiLimit: number;
+  freeClassLimit: number;
+  maintenanceOn: boolean;
+  maintenanceMessage: string;
+};
+
+type AuditLog = { id: string; actorName: string; action: string; detail: string | null; createdAt: string };
+
+const AUDIT_LABEL: Record<string, string> = {
+  teacher_role_change: '등급 변경',
+  notice_create: '알림 등록',
+  notice_update: '알림 수정',
+  notice_delete: '알림 삭제',
+  settings_update: '설정 변경',
+  year_reset_manual: '학년말 초기화',
+  data_export: '데이터 내보내기',
 };
 
 const ROLE_LABEL: Record<Role, string> = { general: '일반', paid: '유료', admin: '관리자' };
@@ -54,7 +77,7 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 type SortKey = 'name' | 'createdAt' | 'aiUsedThisMonth' | 'role';
 
 export default function OperatorDashboard() {
-  const [section, setSection] = useState<'members' | 'usage' | 'notices'>('members');
+  const [section, setSection] = useState<'members' | 'usage' | 'notices' | 'settings' | 'audit' | 'ops'>('members');
   const [overview, setOverview] = useState<Overview | null>(null);
 
   const [teachers, setTeachers] = useState<TeacherRow[]>([]);
@@ -66,6 +89,17 @@ export default function OperatorDashboard() {
 
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+
+  // 설정 섹션
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settingsForm, setSettingsForm] = useState<AppSettings | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  // 감사 로그 섹션
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoaded, setAuditLoaded] = useState(false);
+  // 데이터·운영 섹션
+  const [exportClassId, setExportClassId] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
@@ -115,6 +149,68 @@ export default function OperatorDashboard() {
     }
   };
 
+  // 섹션 열릴 때 필요한 데이터 지연 로드 (설정·감사로그)
+  useEffect(() => {
+    if (section === 'settings' && !settings) {
+      api<{ settings: AppSettings }>('/api/admin/settings')
+        .then((d) => { setSettings(d.settings); setSettingsForm(d.settings); })
+        .catch((e) => setError((e as Error).message));
+    }
+    if (section === 'audit' && !auditLoaded) {
+      api<{ logs: AuditLog[] }>('/api/admin/audit')
+        .then((d) => { setAuditLogs(d.logs); setAuditLoaded(true); })
+        .catch((e) => setError((e as Error).message));
+    }
+  }, [section, settings, auditLoaded]);
+
+  const saveSettings = async () => {
+    if (!settingsForm) return;
+    setSettingsSaving(true);
+    setError('');
+    try {
+      const d = await api<{ settings: AppSettings }>('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settingsForm),
+      });
+      setSettings(d.settings);
+      setSettingsForm(d.settings);
+      setMessage('설정을 저장했습니다.');
+      setTimeout(() => setMessage(''), 2000);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const runYearReset = async () => {
+    const input = window.prompt('학년말 데이터 초기화를 실행하면 모든 학급·학생·기록이 영구 삭제됩니다.\n계속하려면 "초기화"를 입력하세요.');
+    if (input === null) return;
+    if (input !== '초기화') { window.alert('확인 문구가 일치하지 않아 취소되었습니다.'); return; }
+    setResetting(true);
+    setError('');
+    try {
+      const d = await api<{ deletedClasses: number }>('/api/admin/reset-year', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: '초기화' }),
+      });
+      setMessage(`학년말 초기화 완료 — 학급 ${d.deletedClasses}개 삭제`);
+      await load();
+      setAuditLoaded(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const exportClass = () => {
+    if (!exportClassId) { window.alert('내보낼 학급을 선택하세요.'); return; }
+    window.open(`/api/admin/export?classId=${exportClassId}`, '_blank');
+  };
+
   // 검색 + 정렬된 교사 목록
   const displayed = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -159,13 +255,14 @@ export default function OperatorDashboard() {
           {kpi('학급', overview.counts.classCount)}
           {kpi('학생', overview.counts.studentCount)}
           {kpi('이번 달 AI', `${overview.ai.thisMonthTotal}회`, `추정 $${overview.ai.estimatedCostUsd.toFixed(2)}`, '#0891b2')}
+          {kpi('활동 학생', `${overview.activeStudents.dau}명`, `주간 ${overview.activeStudents.wau}명`, '#0d9488')}
           {kpi('유료 만료 임박', `${overview.expiringSoon.length}명`, '7일 이내', overview.expiringSoon.length > 0 ? '#dc2626' : '#16a34a')}
         </div>
       )}
 
       {/* 하위 섹션 탭 */}
       <div style={{ display: 'flex', gap: 2, background: '#f1f5f9', borderRadius: 10, padding: 3, marginBottom: 16, flexWrap: 'wrap' }}>
-        {([['members', '회원관리'], ['usage', '사용량·비용'], ['notices', '공지']] as const).map(([key, label]) => (
+        {([['members', '회원관리'], ['usage', '사용량·비용'], ['notices', '공지'], ['settings', '설정'], ['audit', '감사로그'], ['ops', '데이터·운영']] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -362,6 +459,103 @@ export default function OperatorDashboard() {
 
       {/* ── 공지(알림장) ── */}
       {section === 'notices' && <AdminNoticeManager />}
+
+      {/* ── 설정 ── */}
+      {section === 'settings' && (
+        settingsForm ? (
+          <div style={{ display: 'grid', gap: 16, maxWidth: 460 }}>
+            {message && <p style={{ color: '#16a34a', fontSize: 13, margin: 0 }}>{message}</p>}
+            <p className="hint" style={{ margin: 0 }}>여기서 바꾼 값은 코드 배포 없이 바로 적용됩니다. (최대 1분 캐시)</p>
+            <div>
+              <label>무료회원 월 AI 분석 한도</label>
+              <input type="number" min={0} value={settingsForm.freeAiLimit}
+                onChange={(e) => setSettingsForm((f) => f && ({ ...f, freeAiLimit: Math.max(0, Number(e.target.value) || 0) }))} />
+            </div>
+            <div>
+              <label>유료회원 월 AI 분석 한도</label>
+              <input type="number" min={0} value={settingsForm.paidAiLimit}
+                onChange={(e) => setSettingsForm((f) => f && ({ ...f, paidAiLimit: Math.max(0, Number(e.target.value) || 0) }))} />
+            </div>
+            <div>
+              <label>무료회원 학급 생성 한도</label>
+              <input type="number" min={0} value={settingsForm.freeClassLimit}
+                onChange={(e) => setSettingsForm((f) => f && ({ ...f, freeClassLimit: Math.max(0, Number(e.target.value) || 0) }))} />
+            </div>
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={settingsForm.maintenanceOn}
+                  onChange={(e) => setSettingsForm((f) => f && ({ ...f, maintenanceOn: e.target.checked }))}
+                  style={{ width: 16, height: 16 }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>점검 배너 표시</span>
+              </label>
+              <input style={{ marginTop: 8 }} placeholder="점검 안내 문구 (예: 오늘 22시~24시 서비스 점검 예정)"
+                value={settingsForm.maintenanceMessage} maxLength={500}
+                onChange={(e) => setSettingsForm((f) => f && ({ ...f, maintenanceMessage: e.target.value }))} />
+              <p className="hint" style={{ margin: '6px 0 0' }}>켜면 모든 사용자 화면 상단에 안내 배너가 노출됩니다.</p>
+            </div>
+            <button type="button" className="ghost" onClick={saveSettings} disabled={settingsSaving}>
+              {settingsSaving ? '저장 중...' : '설정 저장'}
+            </button>
+          </div>
+        ) : <p className="hint">불러오는 중...</p>
+      )}
+
+      {/* ── 감사로그 ── */}
+      {section === 'audit' && (
+        !auditLoaded ? <p className="hint">불러오는 중...</p>
+        : auditLogs.length === 0 ? <p className="hint">기록된 관리자 활동이 없습니다.</p>
+        : (
+          <div style={{ display: 'grid', gap: 6 }}>
+            <p className="hint" style={{ margin: '0 0 4px' }}>관리자의 등급 변경·공지·설정·초기화 등 주요 행위 기록(최근 50건)</p>
+            {auditLogs.map((log) => (
+              <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '150px 90px 1fr', gap: 8, alignItems: 'baseline', fontSize: 12.5, padding: '8px 10px', background: '#f8fafc', borderRadius: 8 }}>
+                <span style={{ color: '#94a3b8' }}>{new Date(log.createdAt).toLocaleString('ko-KR')}</span>
+                <span style={{ fontWeight: 700, color: '#4338ca' }}>{AUDIT_LABEL[log.action] ?? log.action}</span>
+                <span style={{ color: '#334155' }}>{log.actorName} · {log.detail ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ── 데이터·운영 ── */}
+      {section === 'ops' && overview && (
+        <div style={{ display: 'grid', gap: 20 }}>
+          {message && <p style={{ color: '#16a34a', fontSize: 13, margin: 0 }}>{message}</p>}
+
+          <div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>학급 데이터 내보내기</h3>
+            <p className="hint" style={{ margin: '0 0 8px' }}>선택한 학급의 학생·감정기록·평가를 JSON 파일로 백업합니다.</p>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <select value={exportClassId} onChange={(e) => setExportClassId(e.target.value)} style={{ flex: '1 1 200px' }}>
+                <option value="">학급 선택…</option>
+                {overview.classes.map((c) => <option key={c.id} value={c.id}>{c.class_name}</option>)}
+              </select>
+              <button type="button" className="outline" style={{ width: 'auto' }} onClick={exportClass} disabled={!exportClassId}>
+                JSON 내보내기
+              </button>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>학년말 데이터 초기화</h3>
+            <p className="hint" style={{ margin: '0 0 4px' }}>
+              자동 초기화 예정일: <b>{overview.nextYearResetDate}</b> (매년 3월 1일, 서울 기준)
+            </p>
+            <p style={{ margin: '0 0 10px', fontSize: 13, color: '#b91c1c' }}>
+              ⚠ 수동 실행 시 <b>모든 학급·학생·기록이 즉시 영구 삭제</b>됩니다. 되돌릴 수 없습니다.
+            </p>
+            <button
+              type="button"
+              onClick={runYearReset}
+              disabled={resetting}
+              style={{ width: 'auto', fontSize: 13, fontWeight: 700, padding: '8px 16px', borderRadius: 10, cursor: 'pointer', border: '1.5px solid #fca5a5', background: '#fff', color: '#dc2626' }}
+            >
+              {resetting ? '초기화 중...' : '지금 학년말 초기화 실행'}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
