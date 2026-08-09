@@ -510,23 +510,28 @@ export default function StudentPage() {
 
     const before = plans;
     setPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, isCompleted: nextState } : plan)));
+
+    // 축하 애니메이션은 서버 응답을 기다리지 않고 체크와 동시에 즉시 재생(낙관적 UI).
+    // (계획 체크 API는 배지·연료 지급까지 처리하느라 응답이 느려서, 기다리면 딜레이가 체감된다)
+    const celebrationKey = Date.now();
+    if (nextState === true || nextState === false) {
+      setPlanCelebration({ planId, key: celebrationKey, kind: nextState ? 'complete' : 'encourage' });
+      window.setTimeout(() => {
+        setPlanCelebration((current) => current?.key === celebrationKey ? null : current);
+      }, 950);
+    }
+
     try {
       const checkData = await api<{ newBadges: AwardedBadge[] }>(`/api/plans/${planId}/check?date=${planDate}`, {
         method: 'POST',
         body: JSON.stringify({ isCompleted: nextState })
       });
-      if (nextState === true || nextState === false) {
-        const celebrationKey = Date.now();
-        setPlanCelebration({ planId, key: celebrationKey, kind: nextState ? 'complete' : 'encourage' });
-        window.setTimeout(() => {
-          setPlanCelebration((current) => current?.key === celebrationKey ? null : current);
-        }, 950);
-      }
       await loadPlanAchievements();
       void loadVoyageSummary();
       handleNewBadges(checkData.newBadges ?? []);
     } catch (err) {
       setPlans(before);
+      setPlanCelebration((current) => (current?.key === celebrationKey ? null : current)); // 실패 시 축하도 취소
       setError((err as Error).message);
       clearNoticeLater();
     }
