@@ -244,6 +244,7 @@ const getTodayInSeoul = () => formatDateInSeoul(new Date());
 export default function StudentPage() {
   const [studentName, setStudentName] = useState('');
   const [sessionChecking, setSessionChecking] = useState(true);
+  const [bootLoading, setBootLoading] = useState(false); // 로그인 후 초기 데이터 로딩 중(우주선 로딩 화면)
   const [planDate, setPlanDate] = useState(getTodayInSeoul);
   const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
   const [plans, setPlans] = useState<PlanRow[]>([]);
@@ -457,14 +458,17 @@ export default function StudentPage() {
         })
       });
 
-      setStudentName(data.student.name);
-      setActiveTab('voyage');
+      // 로그인 성공 후 곧바로 대시보드로 넘기지 않고, 우주선 로딩 화면을 띄운 채
+      // 초기 데이터를 모두 불러온 뒤에야 대시보드를 보여준다(빈 화면으로 진입하지 않도록).
+      setBootLoading(true);
       setLettersEnabled(data.class.lettersEnabled ?? true);
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
       await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
       void loadVoyageSummary(); // 배너용 — 로그인 완료를 막지 않도록 기다리지 않는다
+      setActiveTab('voyage');
+      setStudentName(data.student.name); // 데이터가 준비된 뒤 대시보드 노출
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -472,6 +476,7 @@ export default function StudentPage() {
       clearNoticeLater();
     } finally {
       setLoginLoading(false);
+      setBootLoading(false);
     }
   };
 
@@ -901,7 +906,6 @@ export default function StudentPage() {
         }>('/api/auth/student/me');
         if (cancelled) return;
 
-        setStudentName(data.student.name);
         setLettersEnabled(data.class.lettersEnabled ?? true);
         const loginToday = getTodayInSeoul();
         setPlanDate(loginToday);
@@ -913,7 +917,9 @@ export default function StudentPage() {
           loadBadgeProfile(),
           loadRelationshipStatus(),
         ]);
+        if (cancelled) return;
         void loadVoyageSummary(); // 배너용 — 세션 복원 완료를 막지 않도록 기다리지 않는다
+        setStudentName(data.student.name); // 데이터가 준비된 뒤 대시보드 노출
       } catch {
         // 유효한 세션이 없으면 로그인 화면을 표시한다.
       } finally {
@@ -990,6 +996,24 @@ export default function StudentPage() {
   };
 
   const isLoggedIn = Boolean(studentName);
+
+  // 우주선 로딩 표시 — 새로고침 세션복원 화면과 로그인 카드 안에서 재사용
+  const rocketLoading = (
+    <>
+      <div style={{ position: 'relative', height: 72, marginBottom: 8 }}>
+        <div style={{ fontSize: 52, lineHeight: 1, display: 'inline-block', animation: 'voyage-boot-float 1.2s ease-in-out infinite' }}>
+          🚀
+          <span aria-hidden="true" style={{ position: 'absolute', left: '50%', bottom: -4, transform: 'translateX(-50%)', fontSize: 20, animation: 'voyage-boot-exhaust 0.6s ease-in-out infinite' }}>✨</span>
+        </div>
+      </div>
+      <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#4f46e5' }}>별빛 여행권 확인 중…</p>
+      <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>잠시만 기다려 주세요, 곧 출발해요!</p>
+      <style>{`
+        @keyframes voyage-boot-float { 0%,100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-10px) rotate(-8deg); } }
+        @keyframes voyage-boot-exhaust { 0%,100% { opacity: 0.4; transform: translateX(-50%) scale(0.8); } 50% { opacity: 1; transform: translateX(-50%) scale(1.15); } }
+      `}</style>
+    </>
+  );
 
   return (
     <main className={`grid${isLoggedIn ? ` dashboard-layout student-dashboard-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}` : ''}`} style={{ gap: 16 }}>
@@ -1178,9 +1202,10 @@ export default function StudentPage() {
         </section>
       )}
 
+      {/* 새로고침 세션복원 중(로그인 카드가 없는 상태) — 단독 로딩 카드 */}
       {sessionChecking && (
-        <section className="card" style={{ textAlign: 'center', padding: 32 }}>
-          <p style={{ margin: 0, color: '#6366f1', fontWeight: 700 }}>✦ 학생 정보를 불러오는 중이에요...</p>
+        <section className="card" style={{ textAlign: 'center', padding: '44px 24px' }}>
+          {rocketLoading}
         </section>
       )}
 
@@ -1188,25 +1213,34 @@ export default function StudentPage() {
         <section className="card auth-login-shell">
           <AuthIllustration role="student" />
           <div className="auth-form-panel">
-          <div className="auth-form-heading">
-            <span>✦</span>
-            <div><h2>학생 로그인</h2><p>오늘의 별빛 기록을 시작해요.</p></div>
-          </div>
-          <form className="grid" onSubmit={onLogin}>
-            <div>
-              <label>학급코드</label>
-              <input name="classCode" placeholder="예: 1234" required maxLength={6} inputMode="numeric" pattern="[0-9]{1,6}" />
+          {bootLoading ? (
+            /* 로그인 중 데이터 로딩 — 다음 페이지로 넘어가지 않고 로그인 카드 안에서 표시 */
+            <div style={{ textAlign: 'center', padding: '28px 0' }}>
+              {rocketLoading}
             </div>
-            <div>
-              <label>이름</label>
-              <input name="name" placeholder="김마음" required />
-            </div>
-            <div>
-              <label>비밀번호</label>
-              <input name="password" type="password" placeholder="••••" required maxLength={4} inputMode="numeric" pattern="[0-9]{4}" />
-            </div>
-            <SubmitButton loading={loginLoading} idleText="로그인" />
-          </form>
+          ) : (
+            <>
+              <div className="auth-form-heading">
+                <span>✦</span>
+                <div><h2>학생 로그인</h2><p>오늘의 별빛 기록을 시작해요.</p></div>
+              </div>
+              <form className="grid" onSubmit={onLogin}>
+                <div>
+                  <label>학급코드</label>
+                  <input name="classCode" placeholder="예: 1234" required maxLength={6} inputMode="numeric" pattern="[0-9]{1,6}" />
+                </div>
+                <div>
+                  <label>이름</label>
+                  <input name="name" placeholder="김마음" required />
+                </div>
+                <div>
+                  <label>비밀번호</label>
+                  <input name="password" type="password" placeholder="••••" required maxLength={4} inputMode="numeric" pattern="[0-9]{4}" />
+                </div>
+                <SubmitButton loading={loginLoading} idleText="로그인" />
+              </form>
+            </>
+          )}
           </div>
         </section>
       )}
