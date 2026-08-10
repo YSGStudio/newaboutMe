@@ -3,7 +3,7 @@
 /**
  * 학생 뱃지 도감 페이지 — 경로 "/student/badges"
  * 학생이 지금까지 모은 뱃지와 아직 못 모은 뱃지를 도감처럼 보여주고,
- * 현재 칭호와 진행 상황을 확인하는 화면입니다. (뱃지 획득 규칙은 lib/badges 참고)
+ * 현재 별빛 캐릭터와 진행 상황을 확인하는 화면입니다. (뱃지 획득 규칙은 lib/badges 참고)
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -58,13 +58,13 @@ export default function BadgesPage() {
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1e1b4b' }}>별빛 퀘스트</h1>
       </div>
 
-      {/* 칭호 카드 */}
+      {/* 별빛 캐릭터 카드 */}
       <div style={{
         background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
         borderRadius: 20, padding: '28px 28px 24px',
         color: '#fff', marginBottom: 24,
       }}>
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a5b4fc' }}>현재 칭호</p>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a5b4fc' }}>현재 별빛 캐릭터</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
           {titleMeta && <img src={titleMeta.image} alt={title} style={{ width: 80, height: 80, borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} />}
           <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: titleMeta?.color ?? '#a78bfa' }}>{title}</p>
@@ -88,13 +88,13 @@ export default function BadgesPage() {
 
         {titleMeta?.next && (
           <p style={{ margin: '10px 0 0', fontSize: 12, color: '#a5b4fc' }}>
-            다음 칭호 <strong style={{ color: '#fbbf24' }}>{titleMeta.next}</strong>까지{' '}
+            다음 별빛 캐릭터 <strong style={{ color: '#fbbf24' }}>{titleMeta.next}</strong>까지{' '}
             {Math.max(0, titleMeta.nextThreshold - badgeCount)}개 더 필요해요
           </p>
         )}
         {titleMeta && !titleMeta.next && (
           <p style={{ margin: '10px 0 0', fontSize: 13, color: '#fbbf24', fontWeight: 700 }}>
-            🌈 최고 칭호 달성! 모든 뱃지를 수집했어요!
+            🌈 최고 별빛 캐릭터 달성! 모든 뱃지를 수집했어요!
           </p>
         )}
 

@@ -2409,7 +2409,7 @@ export default function TeacherPage() {
               <div style={{ marginBottom: 20 }}>
                 <h2 style={{ margin: "0 0 4px" }}>학급설정</h2>
                 <p className="hint" style={{ margin: 0 }}>
-                  이 학급에서 사용할 뱃지와 칭호를 맞춤 설정합니다.
+                  이 학급에서 사용할 뱃지와 별빛 캐릭터를 맞춤 설정합니다.
                 </p>
               </div>
 

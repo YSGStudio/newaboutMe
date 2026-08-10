@@ -154,7 +154,7 @@ export default function VoyageContent({ standalone = false }: { standalone?: boo
           <div className="voyage-quest-copy">
             <p className="voyage-section-kicker">STARLIGHT QUEST</p>
             <h2>별빛 퀘스트</h2>
-            <span>현재 칭호 <strong>{quest.title}</strong></span>
+            <span>현재 별빛 캐릭터 <strong>{quest.title}</strong></span>
           </div>
           <div className="voyage-quest-progress">
             <div><span>수집 현황</span><strong>{quest.badgeCount} / {quest.totalEnabled}</strong></div>

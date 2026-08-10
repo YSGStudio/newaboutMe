@@ -4,7 +4,7 @@
  * 학생 메인 대시보드 — 경로 "/student"
  * 학생이 로그인(학급코드+이름+PIN)하고 하루를 보내는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
  * 감정 기록(마음일기), 오늘 계획 체크, 클래스메일, 성찰일기, 교우관계 설문 응답,
- * 뱃지·칭호 배너 등 학생 활동 전체를 담습니다. 로그인 후 스타 보이저 탭도 여기서 진입합니다.
+ * 뱃지·별빛 캐릭터 배너 등 학생 활동 전체를 담습니다. 로그인 후 스타 보이저 탭도 여기서 진입합니다.
  * (각 활동은 저장 시 뱃지 지급/연료 적립으로 이어집니다.)
  */
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -1063,7 +1063,7 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* 칭호 & 뱃지 프로필 배너 */}
+      {/* 별빛 캐릭터 & 뱃지 프로필 배너 */}
       {isLoggedIn && (
         <section style={{
           background: 'linear-gradient(135deg, #eef2ff, #ede9fe)',
@@ -1071,10 +1071,10 @@ export default function StudentPage() {
           border: '1px solid #e0e7ff',
           display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto',
         }}>
-          {/* 칭호 */}
+          {/* 별빛 캐릭터 */}
           <a
             href="/student/badges"
-            aria-label={`${studentTitle} 칭호와 배지 보러 가기`}
+            aria-label={`${studentTitle} 별빛 캐릭터와 배지 보러 가기`}
             style={{
               flexShrink: 0,
               display: 'flex',
@@ -1095,7 +1095,7 @@ export default function StudentPage() {
               style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
             />
             <div>
-              <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 칭호</p>
+              <p style={{ margin: 0, fontSize: 10, color: '#6366f1', fontWeight: 700, whiteSpace: 'nowrap' }}>현재 별빛 캐릭터</p>
               <p style={{ margin: '1px 0 0', fontSize: 15, fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap' }}>{studentTitle}</p>
             </div>
           </a>

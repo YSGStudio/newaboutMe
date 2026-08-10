@@ -26,7 +26,7 @@ const features = [
   {
     icon: '🏅',
     title: '별빛 퀘스트',
-    desc: '활동을 이어가며 뱃지를 수집하고 별빛칭호를 성장시켜요. 우주여행 화면에서 현재 수집 현황을 바로 확인합니다.',
+    desc: '활동을 이어가며 뱃지를 수집하고 별빛 캐릭터를 키워요. 우주여행 화면에서 현재 수집 현황을 바로 확인합니다.',
   },
   {
     icon: '💌',
@@ -100,7 +100,7 @@ const aiFeatures = [
 
 const steps = [
   { role: '선생님', color: '#6366f1', steps: ['회원가입 후 학급 개설', '학생 이름과 번호 등록', '학급코드를 학생들에게 전달', '왼쪽 대시보드에서 학급 운영', '우주여행 현황과 성장 리포트 확인'] },
-  { role: '학생', color: '#f59e0b', steps: ['학급코드·이름·PIN으로 로그인', '나의 여행에서 오늘 목적지 확인', '감정 기록과 계획 체크로 연료 충전', '별빛 퀘스트에서 뱃지와 칭호 확인', '친구·선생님과 기록을 나누며 성장'] },
+  { role: '학생', color: '#f59e0b', steps: ['학급코드·이름·PIN으로 로그인', '나의 여행에서 오늘 목적지 확인', '감정 기록과 계획 체크로 연료 충전', '별빛 퀘스트에서 뱃지와 별빛 캐릭터 확인', '친구·선생님과 기록을 나누며 성장'] },
 ];
 
 export default function HomePage() {
@@ -248,7 +248,7 @@ export default function HomePage() {
               { step: '01', icon: '🚀', title: '나의 여행', desc: '로그인하면 현재 목적지와 필요한 연료를 가장 먼저 확인해요.' },
               { step: '02', icon: '💜', title: '오늘의 기록', desc: '감정을 기록하고 계획을 체크해 매일의 연료를 충전해요.' },
               { step: '03', icon: '🔥', title: '연속 부스터', desc: '감정과 계획을 꾸준히 이어가면 우주선의 부스터가 강해져요.' },
-              { step: '04', icon: '🏅', title: '별빛 퀘스트', desc: '뱃지를 모으고 별빛칭호를 키우며 나만의 성장을 확인해요.' },
+              { step: '04', icon: '🏅', title: '별빛 퀘스트', desc: '뱃지를 모으고 별빛 캐릭터를 키우며 나만의 성장을 확인해요.' },
             ].map((item) => (
               <article key={item.step} style={{
                 position: 'relative',
@@ -311,18 +311,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 별빛 퀘스트 & 칭호 ── */}
+      {/* ── 별빛 퀘스트 & 별빛 캐릭터 ── */}
       <section style={{
         background: '#fff', padding: 'clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px)',
         textAlign: 'center',
       }}>
         <p style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, letterSpacing: 2, marginBottom: 12 }}>STARLIGHT QUEST</p>
         <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, margin: '0 0 16px', color: '#1e1b4b' }}>
-          별빛 퀘스트로 칭호를 키워요
+          별빛 퀘스트로 별빛 캐릭터를 키워요
         </h2>
         <p style={{ color: '#64748b', fontSize: 16, maxWidth: 520, margin: '0 auto 56px', lineHeight: 1.7 }}>
           다양한 활동으로 뱃지를 모으면 별빛 새싹부터 별빛 전설까지
-          나의 별빛칭호가 한 단계씩 성장합니다.
+          나의 별빛 캐릭터가 한 단계씩 성장합니다.
         </p>
         <div style={{
           display: 'flex', flexWrap: 'wrap', justifyContent: 'center',

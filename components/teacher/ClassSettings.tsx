@@ -4,7 +4,7 @@
  * ClassSettings — "학급설정" 탭 내용
  * 선택한 학급의 규칙을 교사가 직접 조정합니다.
  * - 뱃지: 어떤 뱃지를 학급에서 사용할지 on/off
- * - 칭호: 5단계 칭호(예: 별빛 새싹~전설)의 이름과 달성 기준(필요 뱃지 개수) 편집
+ * - 별빛 캐릭터: 5단계 별빛 캐릭터(예: 별빛 새싹~전설)의 이름과 달성 기준(필요 뱃지 개수) 편집
  * classId를 prop으로 받아 해당 학급의 설정을 불러오고 저장합니다.
  */
 import { useEffect, useState } from 'react';
@@ -44,7 +44,7 @@ export default function ClassSettings({ classId }: { classId: string }) {
   );
   const [badgeSaving, setBadgeSaving] = useState(false);
 
-  // 칭호 설정 상태
+  // 별빛 캐릭터 설정 상태
   const [titles, setTitles] = useState(DEFAULT_TITLES.map((t) => ({ ...t })));
   const [titleSaving, setTitleSaving] = useState(false);
 
@@ -104,7 +104,7 @@ export default function ClassSettings({ classId }: { classId: string }) {
         method: 'PUT',
         body: JSON.stringify({ classId, titles }),
       });
-      setMsg('칭호 설정이 저장되었습니다.'); clear();
+      setMsg('별빛 캐릭터 설정이 저장되었습니다.'); clear();
     } catch (err) { setError((err as Error).message); clear(); }
     finally { setTitleSaving(false); }
   };
@@ -186,12 +186,12 @@ export default function ClassSettings({ classId }: { classId: string }) {
         </button>
       </section>
 
-      {/* ── 칭호 설정 ── */}
+      {/* ── 별빛 캐릭터 설정 ── */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 20, borderTop: '1.5px solid #e2e8f0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div>
-            <h3 style={{ margin: '0 0 2px', fontSize: 17 }}>칭호 설정</h3>
-            <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>각 칭호의 이름과 뱃지 개수 기준을 직접 설정합니다.</p>
+            <h3 style={{ margin: '0 0 2px', fontSize: 17 }}>별빛 캐릭터 설정</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>각 별빛 캐릭터의 이름과 뱃지 개수 기준을 직접 설정합니다.</p>
           </div>
           <button type="button" className="outline" style={{ width: 'auto', padding: '4px 12px', fontSize: 12 }} onClick={resetTitles}>기본값</button>
         </div>
@@ -205,7 +205,7 @@ export default function ClassSettings({ classId }: { classId: string }) {
                 value={t.name}
                 onChange={(e) => setTitles((prev) => prev.map((ti, i) => i === idx ? { ...ti, name: e.target.value } : ti))}
                 maxLength={30}
-                placeholder="칭호 이름"
+                placeholder="별빛 캐릭터 이름"
                 style={{ margin: 0, fontSize: 14 }}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -225,7 +225,7 @@ export default function ClassSettings({ classId }: { classId: string }) {
         </div>
 
         <button type="button" className="ghost" style={{ width: '100%' }} onClick={saveTitles} disabled={titleSaving}>
-          {titleSaving ? '저장 중...' : '칭호 설정 저장'}
+          {titleSaving ? '저장 중...' : '별빛 캐릭터 설정 저장'}
         </button>
       </section>
     </div>
