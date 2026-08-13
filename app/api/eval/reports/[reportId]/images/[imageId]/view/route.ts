@@ -6,15 +6,19 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 type Params = { params: { reportId: string; imageId: string } };
 
 export async function GET(req: Request, { params }: Params) {
-  // 교사 또는 학생 세션 확인
+  // 교사 또는 학생 세션 확인.
+  // 어느 쪽으로 들어오든 아래에서 보고서 소유권을 반드시 확인하도록,
+  // 여기서는 "어떤 컬럼으로 소유권을 따질지"만 정한다.
   const teacherAuth = await requireTeacher();
-  const isTeacher = !('error' in teacherAuth);
 
-  let studentId: string | null = null;
-  if (!isTeacher) {
+  let ownerFilter: { column: 'teacher_id' | 'student_id'; value: string };
+
+  if (!('error' in teacherAuth)) {
+    ownerFilter = { column: 'teacher_id', value: teacherAuth.teacher.id };
+  } else {
     const studentAuth = await requireStudentSession();
     if ('error' in studentAuth) return studentAuth.error;
-    studentId = studentAuth.student.id;
+    ownerFilter = { column: 'student_id', value: studentAuth.student.id };
   }
 
   // 이미지 조회
@@ -27,17 +31,15 @@ export async function GET(req: Request, { params }: Params) {
 
   if (!image) return NextResponse.json({ error: '이미지를 찾을 수 없습니다.' }, { status: 404 });
 
-  // 학생인 경우 본인 보고서인지 확인
-  if (!isTeacher && studentId) {
-    const { data: report } = await supabaseAdmin
-      .from('eval_reports')
-      .select('id')
-      .eq('id', params.reportId)
-      .eq('student_id', studentId)
-      .maybeSingle();
+  // 보고서 소유권 확인 — 교사는 본인이 작성한 보고서만, 학생은 본인 보고서만 열람할 수 있다.
+  const { data: report } = await supabaseAdmin
+    .from('eval_reports')
+    .select('id')
+    .eq('id', params.reportId)
+    .eq(ownerFilter.column, ownerFilter.value)
+    .maybeSingle();
 
-    if (!report) return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
-  }
+  if (!report) return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
 
   // signed URL 발급 (10분 유효)
   const { data: signedData, error } = await supabaseAdmin.storage

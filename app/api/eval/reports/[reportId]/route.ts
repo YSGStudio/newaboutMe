@@ -73,7 +73,21 @@ export async function DELETE(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
 
-  // 이미지 storage 경로 먼저 수집
+  // 본인 보고서인지 먼저 확인한다.
+  // 확인보다 먼저 storage 경로를 수집하면, 남의 보고서 삭제 요청에도
+  // (DB 삭제는 0건이라 막히지만) 그쪽 이미지 파일이 지워진다.
+  const { data: ownReport } = await supabaseAdmin
+    .from('eval_reports')
+    .select('id')
+    .eq('id', params.reportId)
+    .eq('teacher_id', auth.teacher.id)
+    .maybeSingle();
+
+  if (!ownReport) {
+    return NextResponse.json({ error: '보고서를 찾을 수 없습니다.' }, { status: 404 });
+  }
+
+  // 이미지 storage 경로 수집
   const { data: images } = await supabaseAdmin
     .from('eval_report_images')
     .select('storage_path')
@@ -87,7 +101,7 @@ export async function DELETE(_: Request, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Storage 이미지 삭제
+  // Storage 이미지 삭제 (DB 삭제가 성공한 뒤에만)
   if (images && images.length > 0) {
     await supabaseAdmin.storage.from('eval-images').remove(images.map((img) => img.storage_path));
   }
