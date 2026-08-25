@@ -12,6 +12,7 @@ import Notice from '@/components/ui/Notice';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
+import { EVAL_FEEDBACK_ENABLED } from '@/lib/features';
 
 type StudentItem = {
   id: string;
@@ -254,7 +255,7 @@ const buildStudentHtmlBlock = (
       </div>
       ${emotionInner}
     </div>
-    <div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
+    ${EVAL_FEEDBACK_ENABLED ? `<div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
         <span style="font-size:14px">⭐</span>
         <span style="font-size:14px;font-weight:700;color:#9a3412">평가 현황</span>
@@ -262,7 +263,7 @@ const buildStudentHtmlBlock = (
       </div>
       ${reports.length > 0 ? `<div style="display:flex;gap:6px;margin-bottom:10px">${gradeSummaryHtml}</div>` : ''}
       ${reportsHtml}
-    </div>`;
+    </div>` : ''}`;
 };
 
 const buildAiSectionHtml = (ai: GrowthAiResult | null, errorMessage?: string): string => {
@@ -688,9 +689,12 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       setEvalLoading(true);
       setDetailError('');
       try {
+        // 평가피드백은 비활성 상태다(lib/features.ts). 자료는 남아 있지만 불러오지 않는다.
         const [snapshotData, evalData, hollandData, growthData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
-          api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`),
+          EVAL_FEEDBACK_ENABLED
+            ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`)
+            : Promise.resolve({ reports: [] as EvalReportSummary[] }),
           api<{ report: HollandAiResult | null }>(`/api/ai/holland-report/${activeStudentId}`),
           api<{ report: GrowthAiResult | null }>(`/api/ai/growth-report/${activeStudentId}?period=${period}`),
         ]);
@@ -769,7 +773,9 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         students.map(async (s) => {
           const [snap, evalData] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`),
+            EVAL_FEEDBACK_ENABLED
+              ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
+              : Promise.resolve({ reports: [] as EvalReportSummary[] }),
           ]);
           return { snap, reports: evalData.reports };
         })
@@ -887,7 +893,9 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         students.map(async (s) => {
           const [snap, evalData] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`),
+            EVAL_FEEDBACK_ENABLED
+              ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
+              : Promise.resolve({ reports: [] as EvalReportSummary[] }),
           ]);
           const batchResult = resultByStudent.get(s.id);
           const ai: GrowthAiResult | null = batchResult?.report ? { ...batchResult.report, cached: false } : null;
@@ -1126,7 +1134,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
               <div style={{ display: 'grid', gap: 12 }}>
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
-                <EvalSection reports={evalReports} loading={evalLoading} />
+                {EVAL_FEEDBACK_ENABLED && <EvalSection reports={evalReports} loading={evalLoading} />}
                 <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
                 <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} />
               </div>

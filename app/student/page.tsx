@@ -780,6 +780,9 @@ export default function StudentPage() {
   };
 
   const loadEvalReports = async () => {
+    // 평가피드백은 비활성 상태입니다(lib/features.ts). 탭이 숨겨져 호출될 일이 없지만,
+    // 자료를 불러오지 않는다는 것을 여기서도 분명히 막아 둡니다.
+    if (!EVAL_FEEDBACK_ENABLED) return;
     const d = await api<{ reports: EvalReportSummary[] }>('/api/eval/reports/my');
     setEvalReports(d.reports);
     setEvalReportsLoaded(true);
