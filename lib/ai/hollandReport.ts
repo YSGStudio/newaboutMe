@@ -1,7 +1,6 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { gatherGrowthReportData } from './growthReportData';
-import { gatherAllEvalReports } from './subjectReportData';
 import { SYSTEM_PROMPT, buildUserPrompt, hollandReportResponseSchema, type HollandReportResult } from './hollandReportPrompt';
 import { assertNoRealName } from './anonymize';
 import { getOpenAIClient, GROWTH_REPORT_MODEL } from './openaiClient';
@@ -41,17 +40,16 @@ export async function generateAndSaveHollandReport(
   studentNumber: number,
   studentName: string,
 ): Promise<HollandReportApiResult> {
-  // 학기(120일) 기준으로 데이터 수집 — 가장 많은 맥락 확보
-  const [growthData, evalReports] = await Promise.all([
-    gatherGrowthReportData(studentId, 'semester'),
-    gatherAllEvalReports(studentId, teacherId),
-  ]);
+  // 학기(120일) 기준으로 데이터 수집 — 가장 많은 맥락 확보.
+  // 배움성찰은 gatherGrowthReportData가 함께 모아 오므로 별도 조회가 필요 없다.
+  // (평가피드백은 비활성 상태라 더 이상 읽지 않는다 — lib/features.ts 참고)
+  const growthData = await gatherGrowthReportData(studentId, 'semester');
 
   if (growthData.emotions.length < 10 && growthData.plans.length === 0) {
     throw new InsufficientHollandDataError();
   }
 
-  const userPrompt = buildUserPrompt(studentNumber, growthData, evalReports);
+  const userPrompt = buildUserPrompt(studentNumber, growthData);
   assertNoRealName(userPrompt, studentName);
 
   const client = getOpenAIClient();

@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { EMOTION_META } from '@/types/domain';
 import { studentLabel, toRelativeDateLabel } from './anonymize';
 import type { GrowthReportRawData } from './growthReportData';
-import type { RawEvalReport } from './subjectReportData';
+import { buildLearningPromptBlock, LEARNING_EVIDENCE_RULES } from './learningReportData';
 
 export const SYSTEM_PROMPT = `당신은 대한민국 초등학교 담임교사의 업무를 보조하는 AI입니다.
-학생의 일일계획 실천 패턴, 감정 기록, 과목별 평가 데이터를 종합하여
+학생의 일일계획 실천 패턴, 감정 기록, 배움성찰(학생이 남긴 성찰과 교사가 남긴 피드백)을 종합하여
 홀란드 직업 성격 이론(RIASEC)의 6가지 유형 중 이 학생에게 두드러지는 성향을 추론합니다.
 
 홀란드 6유형:
@@ -24,10 +24,10 @@ export const SYSTEM_PROMPT = `당신은 대한민국 초등학교 담임교사�
 - 추천 직업은 초등학생이 이해할 수 있는 구체적인 직업명으로 5개 제시
 - 반드시 JSON 형식으로만 응답
 
+${LEARNING_EVIDENCE_RULES}
+
 중요: 입력 데이터에 학생의 실명이 포함되지 않습니다.
 출력에서도 "위 학생은" 으로 표현해 주세요.`;
-
-const GRADE_LABEL: Record<'high' | 'mid' | 'low', string> = { high: '잘함', mid: '보통', low: '노력' };
 
 export const hollandReportResponseSchema = z.object({
   primaryType: z.enum(['R', 'I', 'A', 'S', 'E', 'C']),
@@ -44,7 +44,6 @@ export type HollandReportResult = z.infer<typeof hollandReportResponseSchema>;
 export function buildUserPrompt(
   studentNumber: number,
   growthData: GrowthReportRawData,
-  evalReports: RawEvalReport[],
 ): string {
   const label = studentLabel(studentNumber);
   const periodStart = growthData.range.startDate;
@@ -67,25 +66,11 @@ export function buildUserPrompt(
           .join('\n')
       : '(기록된 감정 없음)';
 
-  // ── 평가 ──
-  const evalLines =
-    evalReports.length > 0
-      ? evalReports
-          .map((r) => {
-            const goalLine = r.goal ? `\n  도달목표: ${r.goal}` : '';
-            const taskLine = r.task ? `\n  수행과제: ${r.task}` : '';
-            const subjectLine = r.subject ? ` [${r.subject}]` : '';
-            const itemLines = r.items
-              .map((it) => {
-                const fb = it.teacherFeedback ? ` — "${it.teacherFeedback}"` : '';
-                const crit = it.criterionTitle ? `${it.criterionTitle}: ` : '';
-                return `  - ${crit}${GRADE_LABEL[it.grade]}${fb}`;
-              })
-              .join('\n');
-            return `[${r.title}]${subjectLine}${goalLine}${taskLine}\n${itemLines}`;
-          })
-          .join('\n\n')
-      : '(평가 기록 없음)';
+  // ── 배움성찰 ──
+  // 학생 성찰(자기보고)과 교사 피드백(관찰)이 머리표로 구분된 채 들어간다.
+  const learningBlock = buildLearningPromptBlock(growthData.learning, (iso) =>
+    toRelativeDateLabel(iso, periodStart)
+  );
 
   return `다음은 ${label}의 성장 데이터입니다.
 
@@ -96,8 +81,8 @@ ${planLines}
 총 ${growthData.emotions.length}건
 ${emotionLines}
 
-=== 과목별 평가 기록 ===
-${evalLines}
+=== 배움성찰 기록 ===
+${learningBlock}
 
 위 데이터를 종합하여 홀란드 RIASEC 유형 분석을 JSON으로 생성해주세요:
 {
