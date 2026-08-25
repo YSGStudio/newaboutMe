@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { BADGES } from '@/lib/badges';
 import Notice from '@/components/ui/Notice';
+import StudentRoster from '@/components/teacher/StudentRoster';
 
 const DEFAULT_TITLES = [
   { tier: 1, name: '별빛 새싹',  threshold: 0  },
@@ -122,6 +123,11 @@ export default function ClassSettings({ classId }: { classId: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <Notice type="success" message={msg} />
       <Notice type="error" message={error} />
+
+      {/* ── 학생 명단 ── */}
+      <StudentRoster classId={classId} />
+
+      <div style={{ borderTop: '1.5px solid #e2e8f0' }} />
 
       {/* ── 뱃지 설정 ── */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
