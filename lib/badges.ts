@@ -167,15 +167,25 @@ async function loadBadgeStats(
   const needsReflection = badgeIds.some((id) => id.startsWith('reflection_'));
   const needsLetters = badgeIds.some((id) => id.startsWith('letter_'));
 
-  const [emotionRes, plansRes, reflectionRes, letterRes] = await Promise.all([
+  const [emotionRes, plansRes, reflectionRes, learningReflectionRes, letterRes] = await Promise.all([
     needsEmotion
       ? supabase.from('emotion_feeds').select('emotion_type,created_at').eq('student_id', studentId)
       : Promise.resolve(null),
     needsPlans
       ? supabase.from('plans').select('id').eq('student_id', studentId).eq('is_active', true)
       : Promise.resolve(null),
+    // 성찰 횟수는 두 기능을 합쳐 센다.
+    // 평가피드백(eval_reflections)은 축소 예정이고, 배움성찰이 그 자리를 이어받는다.
+    // 배움성찰은 활동 하나에 질문이 여럿일 수 있으므로 "답을 쓴 제출물 1건"을 1회로 센다.
     needsReflection
       ? supabase.from('eval_reflections').select('id', { count: 'exact', head: true }).eq('student_id', studentId)
+      : Promise.resolve(null),
+    needsReflection
+      ? supabase
+          .from('learning_submissions')
+          .select('id,learning_submission_answers!inner(id)')
+          .eq('student_id', studentId)
+          .neq('learning_submission_answers.answer', '')
       : Promise.resolve(null),
     needsLetters
       ? supabase.from('letters').select('id', { count: 'exact', head: true }).eq('sender_id', studentId)
@@ -237,10 +247,17 @@ async function loadBadgeStats(
     }
   }
 
+  // 배움성찰은 한 제출물에 답이 여러 개 붙으므로 제출물 id 기준으로 중복을 제거한다.
+  const learningReflectionCount = learningReflectionRes
+    ? new Set(((learningReflectionRes.data ?? []) as { id: string }[]).map((row) => row.id)).size
+    : 0;
+
   return {
     emotion,
     plans,
-    reflectionCount: reflectionRes ? reflectionRes.count ?? 0 : null,
+    reflectionCount: reflectionRes || learningReflectionRes
+      ? (reflectionRes?.count ?? 0) + learningReflectionCount
+      : null,
     letterCount: letterRes ? letterRes.count ?? 0 : null,
   };
 }

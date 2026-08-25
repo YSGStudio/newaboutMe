@@ -24,7 +24,10 @@ import RefreshButton from "@/components/ui/RefreshButton";
 import Tabs from "@/components/ui/Tabs";
 import StatsDashboard from "@/components/teacher/StatsDashboard";
 import RelationshipDashboard from "@/components/teacher/RelationshipDashboard";
+import ClassDashboard from "@/components/teacher/ClassDashboard";
+import { EVAL_FEEDBACK_ENABLED } from "@/lib/features";
 import EvalDashboard from "@/components/teacher/EvalDashboard";
+import LearningDashboard from "@/components/teacher/LearningDashboard";
 import ClassSettings from "@/components/teacher/ClassSettings";
 import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
@@ -124,9 +127,11 @@ export default function TeacherPage() {
   const [changePwMessage, setChangePwMessage] = useState("");
   const [changePwError, setChangePwError] = useState("");
   const [activeTab, setActiveTab] = useState<
+    | "dashboard"
     | "class"
     | "student"
     | "feed"
+    | "learning"
     | "eval"
     | "stats"
     | "relationship"
@@ -134,7 +139,7 @@ export default function TeacherPage() {
     | "voyage"
     | "settings"
     | "operator"
-  >("class");
+  >("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // 교사 역할 정보
@@ -158,7 +163,6 @@ export default function TeacherPage() {
 
   const [authLoading, setAuthLoading] = useState(false);
   const [classLoading, setClassLoading] = useState(false);
-  const [studentLoading, setStudentLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
   const [studentListLoading, setStudentListLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState("");
@@ -207,7 +211,6 @@ export default function TeacherPage() {
   const [deletingLetterId, setDeletingLetterId] = useState("");
   const [archivingAll, setArchivingAll] = useState(false);
   const [letterSearch, setLetterSearch] = useState("");
-  const [showAddStudent, setShowAddStudent] = useState(false);
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) ?? null,
@@ -297,6 +300,9 @@ export default function TeacherPage() {
       setHasTeacherSession(true);
       if (data.classes.length > 0 && !selectedClassId) {
         setSelectedClassId(data.classes[0].id);
+        // 학급이 이미 있는 교사에게 학급 관리는 첫 화면으로 쓸모가 없다.
+        // 처음 들어왔을 때(아직 탭을 옮기지 않았을 때)만 대시보드로 옮긴다.
+        setActiveTab((tab) => (tab === "class" ? "dashboard" : tab));
       } else if (data.classes.length === 0) {
         setSelectedClassId("");
         setStudents([]);
@@ -459,6 +465,13 @@ export default function TeacherPage() {
     loadAiUsage();
   }, [loadClasses, loadTeacherRole, loadAiUsage]);
 
+  // 평가피드백을 내린 뒤에도 이전 상태가 남아 빈 화면이 되지 않도록 대시보드로 돌린다.
+  useEffect(() => {
+    if (!EVAL_FEEDBACK_ENABLED && activeTab === "eval") {
+      setActiveTab("dashboard");
+    }
+  }, [activeTab]);
+
   // 무료 전환 후 학급 초과 상태면 학급관리 탭으로 고정
   useEffect(() => {
     if (
@@ -591,35 +604,6 @@ export default function TeacherPage() {
       clearNoticeLater();
     } finally {
       setClassLoading(false);
-    }
-  };
-
-  const onCreateStudent = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedClassId) return;
-    setStudentLoading(true);
-    setAuthError("");
-
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-
-    try {
-      await api(`/api/classes/${selectedClassId}/students`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: String(form.get("name")),
-          studentNumber: Number(form.get("studentNumber")),
-        }),
-      });
-      formEl.reset();
-      await loadStudents(selectedClassId);
-      setAuthMessage("학생이 등록되었습니다.");
-      clearNoticeLater();
-    } catch (error) {
-      setAuthError((error as Error).message);
-      clearNoticeLater();
-    } finally {
-      setStudentLoading(false);
     }
   };
 
@@ -1166,6 +1150,7 @@ export default function TeacherPage() {
             <p className="dashboard-sidebar-mode">교사 대시보드</p>
             <Tabs
               items={[
+                { key: "dashboard", label: "대시보드", icon: "📊", disabled: isOverClassLimit },
                 { key: "class", label: "학급 관리", icon: "🏫" },
                 {
                   key: "student",
@@ -1180,14 +1165,23 @@ export default function TeacherPage() {
                   disabled: isOverClassLimit,
                 },
                 {
-                  key: "eval",
-                  label: "평가피드백",
-                  icon: "📝",
+                  key: "learning",
+                  label: "배움성찰",
+                  icon: "📚",
                   disabled: isOverClassLimit,
                 },
+                // 평가피드백은 비활성 상태입니다(lib/features.ts). 자료는 그대로 두고 탭만 감춥니다.
+                ...(EVAL_FEEDBACK_ENABLED
+                  ? [{
+                      key: "eval",
+                      label: "평가피드백",
+                      icon: "📝",
+                      disabled: isOverClassLimit,
+                    }]
+                  : []),
                 {
                   key: "letters",
-                  label: "클래스메일",
+                  label: "학급편지",
                   icon: "💌",
                   disabled: isOverClassLimit,
                 },
@@ -1485,7 +1479,8 @@ export default function TeacherPage() {
                 <div>
                   <h2 style={{ margin: 0 }}>학생 관리</h2>
                   <p className="hint" style={{ margin: "4px 0 0" }}>
-                    학생을 등록하고 로그인 비밀번호를 관리할 수 있습니다.
+                    등록된 학생의 로그인 비밀번호를 관리할 수 있습니다. 학생 추가와 엑셀
+                    일괄 등록은 학급설정에서 합니다.
                   </p>
                 </div>
                 <div
@@ -1494,16 +1489,13 @@ export default function TeacherPage() {
                 >
                   <button
                     type="button"
-                    className={`student-toolbar-button student-toolbar-button-primary${
-                      showAddStudent ? " is-active" : ""
-                    }`}
-                    onClick={() => setShowAddStudent((v) => !v)}
-                    aria-expanded={showAddStudent}
+                    className="student-toolbar-button student-toolbar-button-primary"
+                    onClick={() => setActiveTab("settings")}
                   >
                     <span className="student-toolbar-icon" aria-hidden="true">
-                      {showAddStudent ? "−" : "+"}
+                      +
                     </span>
-                    {showAddStudent ? "추가 닫기" : "학생 추가"}
+                    학생 추가
                   </button>
                   <RefreshButton
                     onClick={onRefreshStudents}
@@ -1512,48 +1504,6 @@ export default function TeacherPage() {
                   />
                 </div>
               </div>
-
-              {showAddStudent && (
-                <form
-                  className="student-add-form"
-                  onSubmit={onCreateStudent}
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "flex-end",
-                    marginBottom: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ flex: "2 1 160px" }}>
-                    <label>학생 이름</label>
-                    <input name="name" placeholder="김마음" required />
-                  </div>
-                  <div style={{ flex: "1 1 80px" }}>
-                    <label>출석번호</label>
-                    <input
-                      name="studentNumber"
-                      type="number"
-                      min={1}
-                      max={99}
-                      placeholder="1"
-                      required
-                    />
-                  </div>
-                  <div style={{ flex: "0 0 auto", paddingBottom: 0 }}>
-                    <SubmitButton
-                      loading={studentLoading}
-                      idleText="+ 추가"
-                      disabled={!selectedClassId}
-                      style={{
-                        width: "auto",
-                        padding: "10px 20px",
-                        whiteSpace: "nowrap",
-                      }}
-                    />
-                  </div>
-                </form>
-              )}
 
               <div>
                 <h3 style={{ margin: 0 }}>학생 목록</h3>
@@ -1888,7 +1838,19 @@ export default function TeacherPage() {
             </section>
           )}
 
-          {activeTab === "eval" && (
+          {activeTab === "dashboard" && (
+            <ClassDashboard
+              classId={selectedClassId}
+              onOpenStudent={() => setActiveTab("stats")}
+              onNavigate={(tab) => setActiveTab(tab)}
+            />
+          )}
+
+          {activeTab === "learning" && (
+            <LearningDashboard classId={selectedClassId} />
+          )}
+
+          {EVAL_FEEDBACK_ENABLED && activeTab === "eval" && (
             <EvalDashboard
               classId={selectedClassId}
               students={students}

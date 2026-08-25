@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { EMOTION_TYPES } from '@/types/domain';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 import { MAX_NOMINATIONS_PER_TYPE } from '@/lib/relationship';
+import { MAX_ANSWER_LENGTH, MAX_FEEDBACK_LENGTH, MAX_QUESTIONS_PER_ACTIVITY, MAX_LINK_LABEL_LENGTH } from '@/lib/learning';
+import { SUBJECT_LIST } from '@/lib/subjects';
 
 export const teacherSignupSchema = z.object({
   email: z.string().email('이메일 형식이 올바르지 않습니다.'),
@@ -80,4 +82,56 @@ export const relationshipResponseSubmitSchema = z.object({
     targetId: z.string().uuid()
   })).max(MAX_NOMINATIONS_PER_TYPE * 4),
   openResponse: z.string().max(300).trim().optional()
+});
+
+// ── 배움성찰 ────────────────────────────────────────────────────
+// 과목은 자유 입력이 아니라 SUBJECT_LIST 안의 값만 허용한다(교사 화면도 선택형).
+
+export const learningActivityCreateSchema = z.object({
+  classId: z.string().uuid(),
+  subject: z.enum(SUBJECT_LIST),
+  unit: z.string().trim().min(1, '단원을 입력해주세요.').max(60, '단원은 60자 이내로 입력해주세요.'),
+  title: z.string().trim().min(1, '활동명을 입력해주세요.').max(80, '활동명은 80자 이내로 입력해주세요.'),
+  // 성찰 질문은 여러 개를 등록할 수 있다. 최소 1개는 있어야 한다.
+  reflectionQuestions: z
+    .array(z.string().trim().min(1, '성찰 질문을 입력해주세요.').max(200, '성찰 질문은 200자 이내로 입력해주세요.'))
+    .min(1, '성찰 질문을 하나 이상 입력해주세요.')
+    .max(MAX_QUESTIONS_PER_ACTIVITY, `성찰 질문은 최대 ${MAX_QUESTIONS_PER_ACTIVITY}개까지 만들 수 있습니다.`)
+});
+
+export const learningActivityUpdateSchema = learningActivityCreateSchema.omit({ classId: true });
+
+// 질문별 답변을 한 번에 저장한다. 화면에서 여러 칸을 채우고 한 번에 제출하기 때문이다.
+export const learningAnswerSchema = z.object({
+  answers: z
+    .array(z.object({
+      questionId: z.string().uuid(),
+      answer: z.string().max(MAX_ANSWER_LENGTH, `성찰은 ${MAX_ANSWER_LENGTH}자 이내로 써주세요.`)
+    }))
+    .max(MAX_QUESTIONS_PER_ACTIVITY)
+});
+
+export const learningLinkSchema = z.object({
+  url: z.string().trim().min(1, '주소를 입력해주세요.').max(2000, '주소가 너무 깁니다.'),
+  label: z.string().trim().max(MAX_LINK_LABEL_LENGTH, `이름은 ${MAX_LINK_LABEL_LENGTH}자 이내로 입력해주세요.`).optional()
+});
+
+export const learningFeedbackSchema = z.object({
+  feedback: z
+    .string()
+    .trim()
+    .min(1, '피드백 내용을 입력해주세요.')
+    .max(MAX_FEEDBACK_LENGTH, `피드백은 ${MAX_FEEDBACK_LENGTH}자 이내로 입력해주세요.`)
+});
+
+// 엑셀·CSV 일괄 등록 — 브라우저에서 파싱한 결과를 받는다.
+// 파일 자체는 서버로 올리지 않고, 번호·이름만 추려 보낸다.
+export const studentBulkCreateSchema = z.object({
+  students: z
+    .array(z.object({
+      studentNumber: z.number().int().min(1, '출석번호는 1 이상이어야 합니다.').max(99, '출석번호는 99 이하여야 합니다.'),
+      name: z.string().trim().min(1, '이름이 비어 있습니다.').max(30, '이름은 30자 이내여야 합니다.')
+    }))
+    .min(1, '등록할 학생이 없습니다.')
+    .max(100, '한 번에 100명까지 등록할 수 있습니다.')
 });

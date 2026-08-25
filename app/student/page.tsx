@@ -15,6 +15,9 @@ import AuthIllustration from '@/components/ui/AuthIllustration';
 import SubmitButton from '@/components/ui/SubmitButton';
 import Tabs from '@/components/ui/Tabs';
 import VoyageContent from '@/components/student/VoyageContent';
+import BookCard from '@/components/student/BookCard';
+import LearningContent from '@/components/student/LearningContent';
+import { EVAL_FEEDBACK_ENABLED } from '@/lib/features';
 import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
@@ -254,7 +257,7 @@ export default function StudentPage() {
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters'>('voyage');
+  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'plan' | 'learning' | 'eval' | 'relationship' | 'letters'>('voyage');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
@@ -368,6 +371,13 @@ export default function StudentPage() {
   // 선택한 월에 기록이 없으면(이번 달 기록이 아직 없는 경우 등) 전체를 보여줍니다.
   const activeEvalMonthGroup = evalMonthGroups.find((group) => group.key === evalMonth);
   const visibleEvalReports = activeEvalMonthGroup ? activeEvalMonthGroup.reports : evalReports;
+
+  // 평가기록(포트폴리오)을 내린 뒤에도 이전 상태가 남아 빈 화면이 되지 않도록 되돌립니다.
+  useEffect(() => {
+    if (!EVAL_FEEDBACK_ENABLED && activeTab === 'eval') {
+      setActiveTab('voyage');
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!emotionOptions.includes(emotionType)) {
@@ -1136,7 +1146,7 @@ export default function StudentPage() {
             <>
               <button
                 type="button"
-                aria-label="나의 여행 탭 열기"
+                aria-label="별빛여행 탭 열기"
                 onClick={() => setActiveTab('voyage')}
                 style={{
                   width: 'auto',
@@ -1297,10 +1307,12 @@ export default function StudentPage() {
             <p className="dashboard-sidebar-mode">학생 대시보드</p>
             <Tabs
               items={[
-                { key: 'voyage', label: '나의 여행', icon: '🚀' },
-                { key: 'emotion', label: '오늘의 감정', icon: '💜' },
-                { key: 'plan', label: '오늘의 계획', icon: '⭐' },
-                { key: 'eval', label: '포트폴리오', icon: '📝' },
+                { key: 'voyage', label: '별빛여행', icon: '🚀' },
+                { key: 'emotion', label: '마음일기', icon: '💜' },
+                { key: 'plan', label: '일일계획', icon: '⭐' },
+                { key: 'learning', label: '배움성찰', icon: '📚' },
+                // 평가피드백은 비활성 상태입니다(lib/features.ts). 자료는 그대로 두고 탭만 감춥니다.
+                ...(EVAL_FEEDBACK_ENABLED ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
                 ...(lettersEnabled ? [{
                   key: 'letters',
@@ -1310,7 +1322,7 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'voyage' | 'emotion' | 'plan' | 'eval' | 'relationship' | 'letters');
+                setActiveTab(key as 'voyage' | 'emotion' | 'plan' | 'learning' | 'eval' | 'relationship' | 'letters');
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
                 if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
@@ -1839,7 +1851,9 @@ export default function StudentPage() {
             </section>
           )}
 
-          {activeTab === 'eval' && (
+          {activeTab === 'learning' && <LearningContent />}
+
+          {EVAL_FEEDBACK_ENABLED && activeTab === 'eval' && (
             <section className="card">
               <h2 style={{ margin: '0 0 12px' }}>평가기록</h2>
               {evalReports.length === 0 ? (
@@ -1880,97 +1894,37 @@ export default function StudentPage() {
                       const subjectSnapshot = sortedItems[0]?.rubric_subject_snapshot;
                       const topColor = (subjectSnapshot && SUBJECT_COLOR[subjectSnapshot]) ?? DEFAULT_SUBJECT_COLOR;
                       const cardTitle = sortedItems[0]?.rubric_title_snapshot ?? r.title;
-                      const isLoading = loadingEvalId === r.id;
+                      const hasExtras = Boolean(r.eval_reflections?.length || r.eval_parent_comments?.length || r.eval_report_images?.length);
                       return (
-                        <button
+                        <BookCard
                           key={r.id}
-                          type="button"
                           onClick={() => openEvalDetail(r.id)}
                           disabled={evalDetailLoading}
-                          style={{
-                            width: 112,
-                            height: 158,
-                            borderRadius: 14,
-                            border: 'none',
-                            background: '#d7e8f7',
-                            padding: 0,
-                            position: 'relative',
-                            overflow: 'hidden',
-                            cursor: evalDetailLoading ? 'default' : 'pointer',
-                            boxShadow: isLoading
-                              ? `0 0 0 3px ${topColor}, 0 6px 20px ${topColor}50`
-                              : '0 3px 12px rgba(15,15,40,0.16), 0 1px 3px rgba(15,15,40,0.08)',
-                            opacity: evalDetailLoading && !isLoading ? 0.45 : 1,
-                            transition: 'opacity 0.15s, box-shadow 0.15s',
-                            textAlign: 'left',
-                          }}
-                        >
-                          {/* 책 표지 이미지가 카드 전체를 채움 */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src="/book3.png"
-                            alt=""
-                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 50%' }}
-                          />
-
-                          {isLoading ? (
-                            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.55)', zIndex: 3 }}>
-                              <span style={{ fontSize: 11, color: topColor, fontWeight: 700 }}>불러오는 중…</span>
-                            </div>
-                          ) : (
-                            /* 책 표지 안쪽 프레임(안전 영역)에만 정보 배치 */
-                            <div style={{
-                              position: 'absolute', zIndex: 2,
-                              left: '20%', right: '28%', top: '14%', bottom: '20%',
-                              display: 'flex', flexDirection: 'column',
-                            }}>
-                              {/* 등급 배지 (프레임 우상단) */}
-                              {sortedItems.length > 0 && (
-                                <div style={{ alignSelf: 'flex-end', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
-                                  {sortedItems.map((it, i) => (
-                                    <span key={i} style={{
-                                      fontSize: 8.5, fontWeight: 800, color: '#fff', lineHeight: 1.4,
-                                      borderRadius: 5, padding: '1.5px 5px',
-                                      background: GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'],
-                                      boxShadow: '0 1px 3px rgba(20,18,40,0.35)',
-                                    }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
-                                  ))}
-                                </div>
-                              )}
-                              {/* 과목·제목·날짜 (프레임 하단) */}
-                              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {subjectSnapshot && (
-                                  <span style={{
-                                    fontSize: 9, fontWeight: 800, color: topColor, letterSpacing: '0.01em',
-                                    textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.9)',
-                                  }}>
-                                    {subjectSnapshot}
-                                  </span>
-                                )}
-                                <strong style={{
-                                  fontSize: 10.5, fontWeight: 800, color: '#1c1a33', lineHeight: 1.3, wordBreak: 'keep-all',
-                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 7px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.95)',
-                                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                                }}>
-                                  {cardTitle}
-                                </strong>
-                                <span style={{
-                                  fontSize: 8.5, fontWeight: 600, color: '#4b4864', marginTop: 1,
-                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 5px rgba(255,255,255,0.9)',
-                                }}>
-                                  {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
-                                  {(r.eval_reflections?.length || r.eval_parent_comments?.length || r.eval_report_images?.length) ? (
-                                    <span style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>
-                                      {r.eval_reflections?.length ? '✏️' : ''}
-                                      {r.eval_parent_comments?.length ? '💌' : ''}
-                                      {r.eval_report_images?.length ? '🖼️' : ''}
-                                    </span>
-                                  ) : null}
+                          loading={loadingEvalId === r.id}
+                          accentColor={topColor}
+                          eyebrow={subjectSnapshot ?? undefined}
+                          title={cardTitle}
+                          badges={sortedItems.length > 0 ? sortedItems.map((it, i) => (
+                            <span key={i} style={{
+                              fontSize: 8.5, fontWeight: 800, color: '#fff', lineHeight: 1.4,
+                              borderRadius: 5, padding: '1.5px 5px',
+                              background: GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'],
+                              boxShadow: '0 1px 3px rgba(20,18,40,0.35)',
+                            }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
+                          )) : undefined}
+                          caption={
+                            <>
+                              {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                              {hasExtras ? (
+                                <span style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>
+                                  {r.eval_reflections?.length ? '✏️' : ''}
+                                  {r.eval_parent_comments?.length ? '💌' : ''}
+                                  {r.eval_report_images?.length ? '🖼️' : ''}
                                 </span>
-                              </div>
-                            </div>
-                          )}
-                        </button>
+                              ) : null}
+                            </>
+                          }
+                        />
                       );
                     })}
                   </div>
