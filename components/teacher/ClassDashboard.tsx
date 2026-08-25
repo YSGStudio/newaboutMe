@@ -7,21 +7,15 @@
  * 한 화면에서 판단하게 하는 것입니다. 그래서 순서가 이렇습니다.
  *   1) 오늘의 학급 — 숫자 몇 개
  *   2) 살펴볼 학생 — 규칙으로 뽑은 명단 (이 화면의 핵심)
- *   3) 감정 히트맵 — 지난 30일의 공백과 흐름
- *
- * 히트맵 색은 감정 카테고리 6색이 아니라 긍정↔부정 발산형입니다. 이유는
- * lib/class-dashboard.ts의 VALENCE_COLOR 주석 참고(색약 구분 불가 문제).
  */
-import { CSSProperties, ReactNode, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, ReactNode, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
 import {
-  VALENCE_COLOR,
   WATCH_REASON_META,
   WATCH_RULES,
   WatchReasonCode,
-  Valence,
 } from '@/lib/class-dashboard';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -35,11 +29,8 @@ type WatchRow = {
   weekRate: number | null;
 };
 
-type HeatCell = { date: string; valence: Valence | null; emotion: string | null };
-
 type DashboardData = {
   students: Student[];
-  dates: string[];
   kpi: {
     totalStudents: number;
     recordedToday: number;
@@ -74,7 +65,6 @@ type DashboardData = {
     rate: number;
   }>;
   watch: WatchRow[];
-  heatmap: { studentId: string; cells: HeatCell[] }[];
 };
 
 const api = async <T,>(url: string): Promise<T> => {
@@ -83,8 +73,6 @@ const api = async <T,>(url: string): Promise<T> => {
   if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
   return json;
 };
-
-const shortDay = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
 export default function ClassDashboard({
   classId,
@@ -99,7 +87,6 @@ export default function ClassDashboard({
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showTable, setShowTable] = useState(false);
   const [studentFilter, setStudentFilter] = useState<'all' | 'attention' | 'emotion' | 'plan' | 'learning'>('attention');
 
   const load = async () => {
@@ -119,11 +106,6 @@ export default function ClassDashboard({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
-
-  const studentById = useMemo(
-    () => new Map((data?.students ?? []).map((s) => [s.id, s])),
-    [data],
-  );
 
   if (!classId) {
     return (
@@ -350,81 +332,6 @@ export default function ClassDashboard({
         </section>
       )}
 
-      {/* ── 6. 최근 마음 항해 ── */}
-      {kpi && kpi.totalStudents > 0 && (
-        <section className="card class-dashboard-emotion-voyage">
-          <span className="class-dashboard-voyage-star is-one" aria-hidden="true">✦</span>
-          <span className="class-dashboard-voyage-star is-two" aria-hidden="true">★</span>
-          <div className="class-dashboard-emotion-heading">
-            <div><span>STUDENT MIND VOYAGE</span><h3>최근 마음 항해</h3><p>지난 30일 동안 학생들이 남긴 마음의 별빛을 살펴봅니다.</p></div>
-            <button
-              type="button"
-              className="outline"
-              style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }}
-              onClick={() => setShowTable((open) => !open)}
-            >
-              {showTable ? '히트맵 보기' : '표로 보기'}
-            </button>
-          </div>
-
-          {/* 색만으로 구분하지 않도록 범례를 항상 둡니다 */}
-          <div className="class-dashboard-emotion-legend">
-            {(['positive', 'neutral', 'negative', 'none'] as const).map((key) => (
-              <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#6b7280' }}>
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 12, height: 12, borderRadius: 3,
-                    background: VALENCE_COLOR[key].fill,
-                    border: key === 'none' ? '1px solid #e2e8f0' : 'none',
-                  }}
-                />
-                {VALENCE_COLOR[key].label}
-              </span>
-            ))}
-          </div>
-
-          {showTable ? (
-            <HeatTable data={data!} studentById={studentById} />
-          ) : (
-            <div className="class-dashboard-emotion-scroll">
-              <div className="class-dashboard-emotion-map">
-                {data!.heatmap.map((row) => {
-                  const student = studentById.get(row.studentId);
-                  return (
-                    <div key={row.studentId} className="class-dashboard-emotion-row">
-                      <span className="class-dashboard-emotion-name">
-                        {student?.student_number}. {student?.name}
-                      </span>
-                      {/* 셀 사이 2px 간격 — 인접한 칸이 서로 번지지 않게 합니다 */}
-                      <span style={{ display: 'flex', gap: 2 }}>
-                        {row.cells.map((cell) => (
-                          <span
-                            key={cell.date}
-                            title={`${shortDay(cell.date)} · ${cell.emotion ?? '기록 없음'}`}
-                            className={`class-dashboard-emotion-star is-${cell.valence ?? 'none'}`}
-                          />
-                        ))}
-                      </span>
-                    </div>
-                  );
-                })}
-                {/* 날짜 축 — 5일 간격으로만 찍어 라벨이 겹치지 않게 합니다 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <span style={{ width: 78, flexShrink: 0 }} />
-                  <span style={{ display: 'flex', gap: 2 }}>
-                    {data!.dates.map((date, index) => (
-                      <span key={date} style={{ width: 13, flexShrink: 0, fontSize: 9, color: '#94a3b8', textAlign: 'center' }}>
-                        {index % 5 === 0 ? shortDay(date) : ''}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }
@@ -466,38 +373,3 @@ function LearningStatusPill({ status }: { status: 'no_activity' | 'none' | 'subm
   return <StatusPill tone="muted">활동 없음</StatusPill>;
 }
 
-/** 히트맵의 표 대안 — 색을 읽기 어려운 경우를 위해 같은 데이터를 숫자로 보여줍니다. */
-function HeatTable({ data, studentById }: { data: DashboardData; studentById: Map<string, Student> }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table className="table" style={{ minWidth: 420 }}>
-        <thead>
-          <tr>
-            <th>학생</th>
-            <th>기록한 날</th>
-            <th>밝은 기록</th>
-            <th>무거운 기록</th>
-            <th>기록 없는 날</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.heatmap.map((row) => {
-            const student = studentById.get(row.studentId);
-            const recorded = row.cells.filter((c) => c.valence).length;
-            const positive = row.cells.filter((c) => c.valence === 'positive').length;
-            const negative = row.cells.filter((c) => c.valence === 'negative').length;
-            return (
-              <tr key={row.studentId}>
-                <td>{student?.student_number}. {student?.name}</td>
-                <td>{recorded}일</td>
-                <td>{positive}일</td>
-                <td>{negative}일</td>
-                <td>{row.cells.length - recorded}일</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}

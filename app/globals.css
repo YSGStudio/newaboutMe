@@ -4299,27 +4299,6 @@ button.class-dashboard-watch-card:hover:not(:disabled) { opacity: 1; border-colo
 .class-dashboard-watch-reasons { display: flex; flex-wrap: wrap; gap: 5px; }
 .class-dashboard-watch-reasons > span { padding: 3px 8px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 11px; font-weight: 700; }
 
-.class-dashboard-emotion-voyage { position: relative; overflow: hidden; border-color: rgba(139,92,246,.34); background: radial-gradient(circle at 10% 20%, rgba(79,209,229,.16), transparent 23%), radial-gradient(circle at 88% 12%, rgba(251,191,36,.14), transparent 18%), linear-gradient(145deg, #15105f, #25127e 58%, #40129b); box-shadow: var(--shadow-lg); }
-.class-dashboard-voyage-star { position: absolute; color: #ffe47b; pointer-events: none; }
-.class-dashboard-voyage-star.is-one { top: 18px; right: 12%; opacity: .62; font-size: 20px; }
-.class-dashboard-voyage-star.is-two { right: 4%; bottom: 14px; opacity: .28; font-size: 28px; }
-.class-dashboard-emotion-heading { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.class-dashboard-emotion-heading > div > span { color: #4fd1e5; font-size: 9px; font-weight: 900; letter-spacing: .14em; }
-.class-dashboard-emotion-heading h3 { margin: 3px 0 4px; color: #fff; font-size: 20px; }
-.class-dashboard-emotion-heading p { margin: 0; color: #d9d4f7; font-size: 12px; }
-.class-dashboard-emotion-heading button.outline { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.1); color: #fff; }
-.class-dashboard-emotion-legend { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; padding: 9px 11px; border: 1px solid rgba(255,255,255,.12); border-radius: var(--radius-sm); background: rgba(255,255,255,.08); }
-.class-dashboard-emotion-legend > span { color: #d9d4f7 !important; }
-.class-dashboard-emotion-scroll { position: relative; z-index: 1; overflow-x: auto; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: var(--radius); background: rgba(255,255,255,.07); }
-.class-dashboard-emotion-map { display: flex; flex-direction: column; gap: 5px; min-width: max-content; }
-.class-dashboard-emotion-row { display: flex; align-items: center; gap: 8px; }
-.class-dashboard-emotion-name { width: 84px; flex-shrink: 0; overflow: hidden; color: #d9d4f7; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.class-dashboard-emotion-star { width: 13px; height: 13px; flex-shrink: 0; border-radius: 50% 50% 45% 55%; transform: rotate(45deg); }
-.class-dashboard-emotion-star.is-positive { background: #f59e0b; box-shadow: 0 0 7px rgba(245,158,11,.72); }
-.class-dashboard-emotion-star.is-neutral { background: #cbd5e1; box-shadow: 0 0 5px rgba(203,213,225,.4); }
-.class-dashboard-emotion-star.is-negative { background: #3b82f6; box-shadow: 0 0 7px rgba(59,130,246,.72); }
-.class-dashboard-emotion-star.is-none { width: 11px; height: 11px; margin: 1px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); box-shadow: none; }
-.class-dashboard-emotion-voyage .table { position: relative; z-index: 1; border-radius: var(--radius-sm); background: rgba(255,255,255,.96); }
 
 @media (max-width: 900px) {
   .class-dashboard-overview-grid { grid-template-columns: minmax(0, 1fr); }
@@ -4329,7 +4308,6 @@ button.class-dashboard-watch-card:hover:not(:disabled) { opacity: 1; border-colo
   .class-dashboard-bars { width: 100%; }
   .class-dashboard-section-heading { align-items: flex-start; }
   .class-dashboard-watch-grid { grid-template-columns: minmax(0, 1fr); }
-  .class-dashboard-emotion-heading { flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,18 +8,18 @@ import { CATEGORY_VALENCE, WATCH_RULES, WatchReasonCode, Valence } from '@/lib/c
 /**
  * 학급 총 대시보드 집계 (교사 전용)
  *
- * 상단 KPI · "살펴볼 학생" · 감정 히트맵을 한 번의 요청으로 만든다.
+ * 상단 KPI와 "살펴볼 학생"을 한 번의 요청으로 만든다.
  * 학생 30명 × 여러 테이블을 학생마다 조회하면 요청당 쿼리가 수십 개로 불어나므로,
  * 테이블별로 학급 전체를 한 번씩만 읽고 메모리에서 학생별로 접는다.
  *
- * 히트맵은 최근 HEATMAP_DAYS일로 제한한다 — 기간을 열어두면 셀 수가 무한정 늘어난다.
+ * 감정 조회는 최근 LOOKBACK_DAYS일로 제한한다 — 기간을 열어두면 읽는 양이 계속 늘어난다.
  */
 
-const HEATMAP_DAYS = 30;
+const LOOKBACK_DAYS = 30;
 
 type Params = { params: { id: string } };
 
-/** 오늘부터 거꾸로 n일치 서울 날짜 문자열(오래된 것부터) */
+/** 오늘부터 거꾸로 n일치 서울 날짜 문자열(오래된 것부터). '살펴볼 학생' 판정에 쓴다. */
 function recentSeoulDates(days: number): string[] {
   const out: string[] = [];
   for (let i = days - 1; i >= 0; i -= 1) {
@@ -44,17 +44,17 @@ export async function GET(_: Request, { params }: Params) {
   if (studentError) return NextResponse.json({ error: studentError.message }, { status: 500 });
 
   const students = studentRows ?? [];
-  const dates = recentSeoulDates(HEATMAP_DAYS);
+  const dates = recentSeoulDates(LOOKBACK_DAYS);
   const today = todayDate();
 
   if (students.length === 0) {
     return NextResponse.json({
-      students: [], dates, kpi: null, watch: [], heatmap: [],
+      students: [], kpi: null, watch: [],
     });
   }
 
   const studentIds = students.map((s) => s.id);
-  const rangeStartIso = new Date(Date.now() - HEATMAP_DAYS * 86400000).toISOString();
+  const rangeStartIso = new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString();
   const weekAgo = formatDateInSeoul(new Date(Date.now() - 7 * 86400000));
   const twoWeeksAgo = formatDateInSeoul(new Date(Date.now() - 14 * 86400000));
 
@@ -101,7 +101,8 @@ export async function GET(_: Request, { params }: Params) {
   const planOwner = new Map(plans.map((p) => [p.id, p.student_id]));
   const checks = (checksRes.data ?? []).filter((c) => planOwner.has(c.plan_id));
 
-  // ── 감정 히트맵 + 마지막 기록일 ─────────────────────────────────
+  // ── 날짜별 감정 + 마지막 기록일 ─────────────────────────────────
+  // '살펴볼 학생'의 기록 끊김·부정 감정 연속 판정에 쓴다.
   // 하루에 여러 번 기록하면 가장 최근 것을 그 날의 대표로 삼는다.
   const cellByStudentDate = new Map<string, { valence: Valence; emotion: EmotionType; at: string }>();
   const lastRecordDate = new Map<string, string>();
@@ -124,15 +125,6 @@ export async function GET(_: Request, { params }: Params) {
     const prevLast = lastRecordDate.get(feed.student_id);
     if (!prevLast || day > prevLast) lastRecordDate.set(feed.student_id, day);
   });
-
-  const heatmap = students.map((student) => ({
-    studentId: student.id,
-    cells: dates.map((date) => {
-      const cell = cellByStudentDate.get(`${student.id}|${date}`);
-      if (!cell) return { date, valence: null as Valence | null, emotion: null as string | null };
-      return { date, valence: cell.valence, emotion: EMOTION_META[cell.emotion].label };
-    }),
-  }));
 
   // ── 계획 실천률 (오늘 / 이번 주 / 지난주) ────────────────────────
   const rateFor = (from: string, to: string) => {
@@ -197,7 +189,7 @@ export async function GET(_: Request, { params }: Params) {
     const last = lastRecordDate.get(student.id);
     const daysSince = last
       ? Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${last}T00:00:00Z`).getTime()) / 86400000)
-      : HEATMAP_DAYS;
+      : LOOKBACK_DAYS;
     if (daysSince >= WATCH_RULES.silentDays) reasons.push('silent');
 
     // 최근 기록부터 거꾸로 훑어 부정이 연속 몇 번인지 센다.
@@ -310,7 +302,6 @@ export async function GET(_: Request, { params }: Params) {
 
   return NextResponse.json({
     students,
-    dates,
     kpi: {
       totalStudents: students.length,
       recordedToday,
@@ -332,6 +323,5 @@ export async function GET(_: Request, { params }: Params) {
     studentStatus,
     activityProgress,
     watch,
-    heatmap,
   });
 }
