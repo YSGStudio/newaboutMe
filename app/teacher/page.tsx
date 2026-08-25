@@ -24,7 +24,7 @@ import RefreshButton from "@/components/ui/RefreshButton";
 import Tabs from "@/components/ui/Tabs";
 import StatsDashboard from "@/components/teacher/StatsDashboard";
 import RelationshipDashboard from "@/components/teacher/RelationshipDashboard";
-import ClassDashboard from "@/components/teacher/ClassDashboard";
+import ClassDashboard, { type ClassDashboardData } from "@/components/teacher/ClassDashboard";
 import { EVAL_FEEDBACK_ENABLED } from "@/lib/features";
 import EvalDashboard from "@/components/teacher/EvalDashboard";
 import LearningDashboard from "@/components/teacher/LearningDashboard";
@@ -153,6 +153,9 @@ export default function TeacherPage() {
 
   // AI 분석 사용량 (헤더 배지)
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+  // 부트스트랩이 함께 실어 준 첫 대시보드. 대시보드가 스스로 다시 부르지 않도록 넘긴다.
+  const [bootstrapDashboard, setBootstrapDashboard] = useState<ClassDashboardData | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -258,18 +261,6 @@ export default function TeacherPage() {
       setAuthError("");
     }, 2500);
   };
-
-  const loadTeacherRole = useCallback(async () => {
-    try {
-      const data = await api<{
-        teacher: { role: TeacherRole; paidUntil: string | null };
-      }>("/api/auth/teacher/me");
-      setTeacherRole(data.teacher.role);
-      setTeacherPaidUntil(data.teacher.paidUntil);
-    } catch {
-      // 역할 로드 실패해도 기본값(general) 유지
-    }
-  }, []);
 
   const loadAiUsage = useCallback(async () => {
     try {
@@ -446,11 +437,47 @@ export default function TeacherPage() {
     }
   }, []);
 
+  // 첫 진입은 부트스트랩 한 번으로 끝낸다.
+  // 예전에는 classes·role·usage를 각각 부르고, 학급 목록이 와야 대시보드를 불러
+  // 브라우저 왕복이 5회였다. 인증(getUser + 프로필 조회)도 요청마다 반복됐다.
+  const runBootstrap = useCallback(async () => {
+    {
+      try {
+        const data = await api<{
+          teacher: { role: TeacherRole; paidUntil: string | null };
+          classes: ClassItem[];
+          selectedClassId: string | null;
+          usage: AiUsage;
+          dashboard: ClassDashboardData | null;
+        }>("/api/teacher/bootstrap");
+
+        setHasTeacherSession(true);
+        setTeacherRole(data.teacher.role);
+        setTeacherPaidUntil(data.teacher.paidUntil);
+        setAiUsage(data.usage);
+        setClasses(data.classes);
+        setBootstrapDashboard(data.dashboard);
+
+        if (data.selectedClassId) {
+          setSelectedClassId(data.selectedClassId);
+          // 학급이 이미 있는 교사에게 학급 관리는 첫 화면으로 쓸모가 없다.
+          setActiveTab((tab) => (tab === "class" ? "dashboard" : tab));
+        } else {
+          setSelectedClassId("");
+          setStudents([]);
+        }
+      } catch {
+        setClasses([]);
+        setHasTeacherSession(false);
+      } finally {
+        setBootstrapped(true);
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    loadClasses();
-    loadTeacherRole();
-    loadAiUsage();
-  }, [loadClasses, loadTeacherRole, loadAiUsage]);
+    runBootstrap();
+  }, [runBootstrap]);
 
   // 평가피드백을 내린 뒤에도 이전 상태가 남아 빈 화면이 되지 않도록 대시보드로 돌린다.
   useEffect(() => {
@@ -543,7 +570,7 @@ export default function TeacherPage() {
         });
         setAuthMessage("인증 성공. 학급 데이터를 불러옵니다.");
         setHasTeacherSession(true);
-        await Promise.all([loadClasses(), loadTeacherRole(), loadAiUsage()]);
+        await runBootstrap();
       }
       clearNoticeLater();
     } catch (error) {
@@ -1003,6 +1030,9 @@ export default function TeacherPage() {
   };
 
   const isAuthed = hasTeacherSession;
+  // 부트스트랩이 끝나기 전에는 로그인 화면을 띄우지 않는다.
+  // 세션이 있는데도 로그인 폼이 잠깐 스쳤다가 사라지는 깜빡임을 막는다.
+  const isCheckingSession = !bootstrapped && !hasTeacherSession;
 
   const onChangeFeedDate = (nextDate: string) => {
     setFeedDate(nextDate);
@@ -1149,7 +1179,7 @@ export default function TeacherPage() {
         </div>
       )}
 
-      {!isAuthed && (
+      {!isAuthed && !isCheckingSession && (
         <section className="card auth-login-shell">
           <AuthIllustration role="teacher" />
           <div className="auth-form-panel">
@@ -1741,6 +1771,7 @@ export default function TeacherPage() {
           {activeTab === "dashboard" && (
             <ClassDashboard
               classId={selectedClassId}
+              initialData={bootstrapDashboard}
               onOpenStudent={() => setActiveTab("stats")}
               onNavigate={(tab) => setActiveTab(tab)}
             />

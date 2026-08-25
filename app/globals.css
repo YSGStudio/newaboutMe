@@ -4313,3 +4313,30 @@ button.class-dashboard-watch-card:hover:not(:disabled) { opacity: 1; border-colo
 @media (prefers-reduced-motion: reduce) {
   button.class-dashboard-watch-card { transition: none; }
 }
+
+/* ── 대시보드 첫 로딩 자리표시 ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.class-dashboard-skeleton-bar {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f0fb 25%, #e7e4f7 37%, #f1f0fb 63%);
+  background-size: 400% 100%;
+  animation: class-dashboard-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes class-dashboard-skeleton {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .class-dashboard-skeleton-bar { animation: none; }
+}

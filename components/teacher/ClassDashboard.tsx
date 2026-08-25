@@ -29,7 +29,7 @@ type WatchRow = {
   weekRate: number | null;
 };
 
-type DashboardData = {
+export type ClassDashboardData = {
   students: Student[];
   kpi: {
     totalStudents: number;
@@ -76,15 +76,18 @@ const api = async <T,>(url: string): Promise<T> => {
 
 export default function ClassDashboard({
   classId,
+  initialData = null,
   onOpenStudent,
   onNavigate,
 }: {
   classId: string;
+  /** 부트스트랩이 함께 실어 준 첫 데이터. 있으면 마운트 직후 왕복 없이 바로 그린다. */
+  initialData?: ClassDashboardData | null;
   /** 학생 칩을 눌렀을 때 — 성장리포트 탭으로 넘겨 상세를 열게 합니다. */
   onOpenStudent?: (studentId: string) => void;
   onNavigate?: (tab: 'student' | 'feed' | 'learning' | 'letters') => void;
 }) {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<ClassDashboardData | null>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [studentFilter, setStudentFilter] = useState<'all' | 'attention' | 'emotion' | 'plan' | 'learning'>('attention');
@@ -94,7 +97,7 @@ export default function ClassDashboard({
     setLoading(true);
     setError('');
     try {
-      setData(await api<DashboardData>(`/api/stats/class/${classId}/dashboard`));
+      setData(await api<ClassDashboardData>(`/api/stats/class/${classId}/dashboard`));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -102,7 +105,13 @@ export default function ClassDashboard({
     }
   };
 
+  // 부트스트랩이 이 학급 데이터를 이미 줬으면 다시 부르지 않는다.
+  // 학급을 바꿨을 때만 새로 불러온다.
+  const [loadedClassId, setLoadedClassId] = useState(initialData ? classId : '');
+
   useEffect(() => {
+    if (!classId || classId === loadedClassId) return;
+    setLoadedClassId(classId);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
@@ -115,14 +124,9 @@ export default function ClassDashboard({
     );
   }
 
-  if (!data && loading) {
-    return (
-      <section className="card">
-        <h2 style={{ marginTop: 0 }}>대시보드</h2>
-        <p className="hint">불러오는 중...</p>
-      </section>
-    );
-  }
+  // 첫 로딩에는 "불러오는 중" 한 줄 대신 실제 배치와 같은 모양의 자리를 그린다.
+  // 화면이 뒤늦게 쿵 하고 바뀌지 않아 체감이 낫다.
+  if (!data && loading) return <ClassDashboardSkeleton />;
 
   const kpi = data?.kpi;
   const planStudents = kpi?.planStudents
@@ -373,3 +377,53 @@ function LearningStatusPill({ status }: { status: 'no_activity' | 'none' | 'subm
   return <StatusPill tone="muted">활동 없음</StatusPill>;
 }
 
+
+/** 첫 로딩 자리표시 — KPI 타일과 카드의 실제 배치를 그대로 흉내 낸다. */
+function ClassDashboardSkeleton() {
+  const bar = (width: string, height: number) => (
+    <span
+      className="class-dashboard-skeleton-bar"
+      style={{ width, height }}
+      aria-hidden="true"
+    />
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }} aria-busy="true" aria-live="polite">
+      <span className="sr-only">대시보드를 불러오는 중입니다.</span>
+
+      <section className="card">
+        <div className="row space-between" style={{ marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>대시보드</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 10 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{
+              padding: '12px 14px', borderRadius: 14,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+            }}>
+              {bar('18px', 16)}
+              <div style={{ margin: '6px 0 4px' }}>{bar('64px', 22)}</div>
+              {bar('80px', 12)}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <div style={{ marginBottom: 12 }}>{bar('120px', 17)}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{
+              padding: '12px', borderRadius: 12,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+            }}>
+              <div style={{ marginBottom: 8 }}>{bar('140px', 14)}</div>
+              {bar('180px', 12)}
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
