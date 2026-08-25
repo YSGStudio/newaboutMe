@@ -240,6 +240,8 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 };
 
 const getTodayInSeoul = () => formatDateInSeoul(new Date());
+/** 오늘이 속한 달을 'YYYY-MM'으로 돌려줍니다. 평가기록 월별 탭의 기본 선택값입니다. */
+const getThisMonthInSeoul = () => getTodayInSeoul().slice(0, 7);
 
 export default function StudentPage() {
   const [studentName, setStudentName] = useState('');
@@ -256,6 +258,7 @@ export default function StudentPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
+  const [evalMonth, setEvalMonth] = useState(getThisMonthInSeoul);
   const [evalDetail, setEvalDetail] = useState<EvalReportDetail | null>(null);
   const [evalDetailLoading, setEvalDetailLoading] = useState(false);
   const [loadingEvalId, setLoadingEvalId] = useState('');
@@ -343,6 +346,29 @@ export default function StudentPage() {
     [emotionCategory]
   );
 
+  /** 평가기록을 서울 시각 기준 월(YYYY-MM)로 묶습니다. 목록이 최신순이라 그룹 순서도 최신 월부터입니다. */
+  const evalMonthGroups = useMemo(() => {
+    const groups = new Map<string, EvalReportSummary[]>();
+    for (const report of evalReports) {
+      const key = formatDateInSeoul(new Date(report.created_at)).slice(0, 7);
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(report);
+      else groups.set(key, [report]);
+    }
+    return [...groups.entries()].map(([key, reports]) => ({ key, reports }));
+  }, [evalReports]);
+
+  /** 해가 바뀐 기록이 섞여 있으면 탭에 연도를 함께 보여줍니다. */
+  const evalMonthHasMultipleYears = new Set(evalMonthGroups.map((group) => group.key.slice(0, 4))).size > 1;
+  const evalMonthLabel = (key: string) => {
+    const month = Number(key.slice(5, 7));
+    return evalMonthHasMultipleYears ? `${key.slice(0, 4)}년 ${month}월` : `${month}월`;
+  };
+
+  // 선택한 월에 기록이 없으면(이번 달 기록이 아직 없는 경우 등) 전체를 보여줍니다.
+  const activeEvalMonthGroup = evalMonthGroups.find((group) => group.key === evalMonth);
+  const visibleEvalReports = activeEvalMonthGroup ? activeEvalMonthGroup.reports : evalReports;
+
   useEffect(() => {
     if (!emotionOptions.includes(emotionType)) {
       setEmotionType(emotionOptions[0] ?? EMOTION_CATEGORIES[0].emotions[0]);
@@ -359,10 +385,13 @@ export default function StudentPage() {
 
       const shouldRefreshPlanDate = planDate === currentDate;
       const shouldRefreshEmotionDate = emotionDate === currentDate;
+      const previousMonth = currentDate.slice(0, 7);
       currentDate = nextDate;
 
       if (shouldRefreshPlanDate) setPlanDate(nextDate);
       if (shouldRefreshEmotionDate) setEmotionDate(nextDate);
+      // 달이 바뀌면 평가기록 월별 탭도 새 달로 옮깁니다(사용자가 직접 고른 달은 그대로 둡니다).
+      setEvalMonth((current) => (current === previousMonth ? nextDate.slice(0, 7) : current));
 
       void Promise.all([
         api<{ plans: PlanRow[] }>(`/api/plans/today?date=${shouldRefreshPlanDate ? nextDate : planDate}`).then((data) => setPlans(data.plans)),
@@ -831,6 +860,7 @@ export default function StudentPage() {
     setMyFeed(null);
     setEvalReports([]);
     setEvalReportsLoaded(false);
+    setEvalMonth(getThisMonthInSeoul());
     setEvalDetail(null);
     setEditingPlanId('');
     setPlanHistoryMap({});
@@ -1270,7 +1300,7 @@ export default function StudentPage() {
                 { key: 'voyage', label: '나의 여행', icon: '🚀' },
                 { key: 'emotion', label: '오늘의 감정', icon: '💜' },
                 { key: 'plan', label: '오늘의 계획', icon: '⭐' },
-                { key: 'eval', label: '평가기록', icon: '📝' },
+                { key: 'eval', label: '포트폴리오', icon: '📝' },
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
                 ...(lettersEnabled ? [{
                   key: 'letters',
@@ -1815,106 +1845,136 @@ export default function StudentPage() {
               {evalReports.length === 0 ? (
                 <p className="hint">아직 받은 평가가 없습니다.</p>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                  {evalReports.map((r) => {
-                    const sortedItems = [...(r.eval_report_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-                    const subjectSnapshot = sortedItems[0]?.rubric_subject_snapshot;
-                    const topColor = (subjectSnapshot && SUBJECT_COLOR[subjectSnapshot]) ?? DEFAULT_SUBJECT_COLOR;
-                    const cardTitle = sortedItems[0]?.rubric_title_snapshot ?? r.title;
-                    const isLoading = loadingEvalId === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => openEvalDetail(r.id)}
-                        disabled={evalDetailLoading}
-                        style={{
-                          width: 112,
-                          height: 158,
-                          borderRadius: 14,
-                          border: 'none',
-                          background: '#d7e8f7',
-                          padding: 0,
-                          position: 'relative',
-                          overflow: 'hidden',
-                          cursor: evalDetailLoading ? 'default' : 'pointer',
-                          boxShadow: isLoading
-                            ? `0 0 0 3px ${topColor}, 0 6px 20px ${topColor}50`
-                            : '0 3px 12px rgba(15,15,40,0.16), 0 1px 3px rgba(15,15,40,0.08)',
-                          opacity: evalDetailLoading && !isLoading ? 0.45 : 1,
-                          transition: 'opacity 0.15s, box-shadow 0.15s',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {/* 책 표지 이미지가 카드 전체를 채움 */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/book3.png"
-                          alt=""
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 50%' }}
-                        />
+                <>
+                  {/* 월별 탭 — 기록이 두 달 이상에 걸쳐 있을 때만 보여줍니다. */}
+                  {evalMonthGroups.length > 1 && (
+                    <div className="eval-month-tabs" role="group" aria-label="월 선택" style={{ marginBottom: 14 }}>
+                      {[{ key: 'all', label: '전체', icon: '✨', count: evalReports.length }].concat(
+                        evalMonthGroups.map((group) => ({
+                          key: group.key,
+                          label: evalMonthLabel(group.key),
+                          icon: '🗓️',
+                          count: group.reports.length,
+                        }))
+                      ).map((tab) => {
+                        const isActive = (activeEvalMonthGroup?.key ?? 'all') === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            aria-pressed={isActive}
+                            className={`eval-month-tab${isActive ? ' is-active' : ''}`}
+                            onClick={() => setEvalMonth(tab.key)}
+                          >
+                            <span className="eval-month-icon" aria-hidden="true">{tab.icon}</span>
+                            <span>{tab.label}</span>
+                            <span className="eval-month-count">{tab.count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                    {visibleEvalReports.map((r) => {
+                      const sortedItems = [...(r.eval_report_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+                      const subjectSnapshot = sortedItems[0]?.rubric_subject_snapshot;
+                      const topColor = (subjectSnapshot && SUBJECT_COLOR[subjectSnapshot]) ?? DEFAULT_SUBJECT_COLOR;
+                      const cardTitle = sortedItems[0]?.rubric_title_snapshot ?? r.title;
+                      const isLoading = loadingEvalId === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => openEvalDetail(r.id)}
+                          disabled={evalDetailLoading}
+                          style={{
+                            width: 112,
+                            height: 158,
+                            borderRadius: 14,
+                            border: 'none',
+                            background: '#d7e8f7',
+                            padding: 0,
+                            position: 'relative',
+                            overflow: 'hidden',
+                            cursor: evalDetailLoading ? 'default' : 'pointer',
+                            boxShadow: isLoading
+                              ? `0 0 0 3px ${topColor}, 0 6px 20px ${topColor}50`
+                              : '0 3px 12px rgba(15,15,40,0.16), 0 1px 3px rgba(15,15,40,0.08)',
+                            opacity: evalDetailLoading && !isLoading ? 0.45 : 1,
+                            transition: 'opacity 0.15s, box-shadow 0.15s',
+                            textAlign: 'left',
+                          }}
+                        >
+                          {/* 책 표지 이미지가 카드 전체를 채움 */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="/book3.png"
+                            alt=""
+                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 50%' }}
+                          />
 
-                        {isLoading ? (
-                          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.55)', zIndex: 3 }}>
-                            <span style={{ fontSize: 11, color: topColor, fontWeight: 700 }}>불러오는 중…</span>
-                          </div>
-                        ) : (
-                          /* 책 표지 안쪽 프레임(안전 영역)에만 정보 배치 */
-                          <div style={{
-                            position: 'absolute', zIndex: 2,
-                            left: '20%', right: '28%', top: '14%', bottom: '20%',
-                            display: 'flex', flexDirection: 'column',
-                          }}>
-                            {/* 등급 배지 (프레임 우상단) */}
-                            {sortedItems.length > 0 && (
-                              <div style={{ alignSelf: 'flex-end', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
-                                {sortedItems.map((it, i) => (
-                                  <span key={i} style={{
-                                    fontSize: 8.5, fontWeight: 800, color: '#fff', lineHeight: 1.4,
-                                    borderRadius: 5, padding: '1.5px 5px',
-                                    background: GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'],
-                                    boxShadow: '0 1px 3px rgba(20,18,40,0.35)',
-                                  }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
-                                ))}
-                              </div>
-                            )}
-                            {/* 과목·제목·날짜 (프레임 하단) */}
-                            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              {subjectSnapshot && (
-                                <span style={{
-                                  fontSize: 9, fontWeight: 800, color: topColor, letterSpacing: '0.01em',
-                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.9)',
-                                }}>
-                                  {subjectSnapshot}
-                                </span>
-                              )}
-                              <strong style={{
-                                fontSize: 10.5, fontWeight: 800, color: '#1c1a33', lineHeight: 1.3, wordBreak: 'keep-all',
-                                textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 7px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.95)',
-                                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                              }}>
-                                {cardTitle}
-                              </strong>
-                              <span style={{
-                                fontSize: 8.5, fontWeight: 600, color: '#4b4864', marginTop: 1,
-                                textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 5px rgba(255,255,255,0.9)',
-                              }}>
-                                {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
-                                {(r.eval_reflections?.length || r.eval_parent_comments?.length || r.eval_report_images?.length) ? (
-                                  <span style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>
-                                    {r.eval_reflections?.length ? '✏️' : ''}
-                                    {r.eval_parent_comments?.length ? '💌' : ''}
-                                    {r.eval_report_images?.length ? '🖼️' : ''}
-                                  </span>
-                                ) : null}
-                              </span>
+                          {isLoading ? (
+                            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.55)', zIndex: 3 }}>
+                              <span style={{ fontSize: 11, color: topColor, fontWeight: 700 }}>불러오는 중…</span>
                             </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                          ) : (
+                            /* 책 표지 안쪽 프레임(안전 영역)에만 정보 배치 */
+                            <div style={{
+                              position: 'absolute', zIndex: 2,
+                              left: '20%', right: '28%', top: '14%', bottom: '20%',
+                              display: 'flex', flexDirection: 'column',
+                            }}>
+                              {/* 등급 배지 (프레임 우상단) */}
+                              {sortedItems.length > 0 && (
+                                <div style={{ alignSelf: 'flex-end', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+                                  {sortedItems.map((it, i) => (
+                                    <span key={i} style={{
+                                      fontSize: 8.5, fontWeight: 800, color: '#fff', lineHeight: 1.4,
+                                      borderRadius: 5, padding: '1.5px 5px',
+                                      background: GRADE_COLOR[it.grade as 'high' | 'mid' | 'low'],
+                                      boxShadow: '0 1px 3px rgba(20,18,40,0.35)',
+                                    }}>{GRADE_LABEL[it.grade as 'high' | 'mid' | 'low']}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {/* 과목·제목·날짜 (프레임 하단) */}
+                              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                {subjectSnapshot && (
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 800, color: topColor, letterSpacing: '0.01em',
+                                    textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 6px rgba(255,255,255,0.9)',
+                                  }}>
+                                    {subjectSnapshot}
+                                  </span>
+                                )}
+                                <strong style={{
+                                  fontSize: 10.5, fontWeight: 800, color: '#1c1a33', lineHeight: 1.3, wordBreak: 'keep-all',
+                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 7px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.95)',
+                                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                                }}>
+                                  {cardTitle}
+                                </strong>
+                                <span style={{
+                                  fontSize: 8.5, fontWeight: 600, color: '#4b4864', marginTop: 1,
+                                  textShadow: '0 1px 1px rgba(255,255,255,0.95), 0 0 5px rgba(255,255,255,0.9)',
+                                }}>
+                                  {new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                                  {(r.eval_reflections?.length || r.eval_parent_comments?.length || r.eval_report_images?.length) ? (
+                                    <span style={{ marginLeft: 4, fontSize: 10, verticalAlign: 'middle' }}>
+                                      {r.eval_reflections?.length ? '✏️' : ''}
+                                      {r.eval_parent_comments?.length ? '💌' : ''}
+                                      {r.eval_report_images?.length ? '🖼️' : ''}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </section>
           )}

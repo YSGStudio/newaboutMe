@@ -1140,8 +1140,10 @@ button.student-toolbar-button-primary.is-active {
   background: linear-gradient(135deg, #faf9ff, #f5f3ff);
 }
 
-/* ── 평가 · 과목 일러스트 탭 ── */
-.eval-subject-tabs {
+/* ── 평가 · 과목/월별 일러스트 탭 ── */
+/* 교사 화면의 과목 탭과 학생 평가기록의 월별 탭이 같은 스타일을 공유합니다. */
+.eval-subject-tabs,
+.eval-month-tabs {
   display: flex;
   gap: 7px;
   overflow-x: auto;
@@ -1154,7 +1156,8 @@ button.student-toolbar-button-primary.is-active {
   scrollbar-width: thin;
 }
 
-button.eval-subject-tab {
+button.eval-subject-tab,
+button.eval-month-tab {
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
@@ -1173,21 +1176,24 @@ button.eval-subject-tab {
   white-space: nowrap;
 }
 
-button.eval-subject-tab:hover:not(:disabled) {
+button.eval-subject-tab:hover:not(:disabled),
+button.eval-month-tab:hover:not(:disabled) {
   border-color: #ddd6fe;
   background: rgba(255, 255, 255, .8);
   color: #514b72;
   box-shadow: 0 4px 10px rgba(99, 102, 241, .08);
 }
 
-button.eval-subject-tab.is-active {
+button.eval-subject-tab.is-active,
+button.eval-month-tab.is-active {
   border-color: #c4b5fd;
   background: #fff;
   color: #4f46e5;
   box-shadow: 0 5px 14px rgba(99, 102, 241, .14);
 }
 
-button.eval-subject-tab.is-active::after {
+button.eval-subject-tab.is-active::after,
+button.eval-month-tab.is-active::after {
   content: '✦';
   position: absolute;
   right: 4px;
@@ -1196,7 +1202,8 @@ button.eval-subject-tab.is-active::after {
   font-size: 8px;
 }
 
-.eval-subject-icon {
+.eval-subject-icon,
+.eval-month-icon {
   display: inline-grid;
   width: 27px;
   height: 27px;
@@ -1210,11 +1217,14 @@ button.eval-subject-tab.is-active::after {
 }
 
 .eval-subject-tab:hover .eval-subject-icon,
-.eval-subject-tab.is-active .eval-subject-icon {
+.eval-subject-tab.is-active .eval-subject-icon,
+.eval-month-tab:hover .eval-month-icon,
+.eval-month-tab.is-active .eval-month-icon {
   transform: rotate(-5deg) scale(1.06);
 }
 
-.eval-subject-count {
+.eval-subject-count,
+.eval-month-count {
   min-width: 19px;
   padding: 1px 5px;
   border-radius: 10px;
