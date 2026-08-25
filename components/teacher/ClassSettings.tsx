@@ -7,9 +7,10 @@
  * - 별빛 캐릭터: 5단계 별빛 캐릭터(예: 별빛 새싹~전설)의 이름과 달성 기준(필요 뱃지 개수) 편집
  * classId를 prop으로 받아 해당 학급의 설정을 불러오고 저장합니다.
  */
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { BADGES } from '@/lib/badges';
 import Notice from '@/components/ui/Notice';
+import Tabs from '@/components/ui/Tabs';
 import StudentRoster from '@/components/teacher/StudentRoster';
 
 const DEFAULT_TITLES = [
@@ -34,7 +35,23 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   return json;
 };
 
-export default function ClassSettings({ classId }: { classId: string }) {
+type SettingSection = 'classes' | 'roster' | 'letters' | 'badges' | 'titles';
+
+type Props = {
+  classId: string;
+  initialSection?: Exclude<SettingSection, 'classes'>;
+  lettersEnabled?: boolean;
+  lettersToggling?: boolean;
+  onToggleLetters?: () => void;
+  onOpenClassManagement?: () => void;
+  /** 학급 관리 화면을 이 안에서 그린다. 다른 섹션처럼 페이지를 벗어나지 않게 하려는 것. */
+  renderClassManagement?: () => ReactNode;
+  /** 명단이 바뀌면 알린다 — 학생 관리 탭의 목록도 다시 불러오게 한다. */
+  onRosterChanged?: () => void;
+};
+
+export default function ClassSettings({ classId, initialSection = 'roster', lettersEnabled = false, lettersToggling = false, onToggleLetters, onOpenClassManagement, onRosterChanged, renderClassManagement }: Props) {
+  const [activeSection, setActiveSection] = useState<SettingSection>(initialSection);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -75,6 +92,10 @@ export default function ClassSettings({ classId }: { classId: string }) {
       .finally(() => setLoading(false));
   }, [classId]);
 
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
   const onToggleBadge = (id: string) => {
     setBadgeEnabled((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -112,7 +133,18 @@ export default function ClassSettings({ classId }: { classId: string }) {
 
   const resetTitles = () => setTitles(DEFAULT_TITLES.map((t) => ({ ...t })));
 
-  if (!classId) return <p style={{ color: '#94a3b8', fontSize: 14 }}>학급을 선택하면 설정이 표시됩니다.</p>;
+  if (!classId) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Tabs
+        items={[{ key: 'classes', label: '학급관리', icon: '🏫' }]}
+        value="classes"
+        onChange={() => { if (!renderClassManagement) onOpenClassManagement?.(); }}
+      />
+      {renderClassManagement
+        ? renderClassManagement()
+        : <p style={{ color: '#94a3b8', fontSize: 14 }}>학급관리에서 학급을 만들거나 선택해주세요.</p>}
+    </div>
+  );
   if (loading) return <p style={{ color: '#94a3b8', fontSize: 14 }}>불러오는 중...</p>;
 
   // 카테고리별로 그룹
@@ -120,17 +152,61 @@ export default function ClassSettings({ classId }: { classId: string }) {
   const enabledCount = Object.values(badgeEnabled).filter(Boolean).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Tabs
+        items={[
+          { key: 'classes', label: '학급관리', icon: '🏫' },
+          { key: 'roster', label: '학생명단', icon: '🧑‍🚀' },
+          { key: 'letters', label: '학급편지', icon: '💌' },
+          { key: 'badges', label: '뱃지설정', icon: '🏅' },
+          { key: 'titles', label: '별빛단계', icon: '✨' },
+        ]}
+        value={activeSection}
+        onChange={(key) => {
+          // 학급 관리 화면을 안에서 그릴 수 있으면 페이지를 옮기지 않고 섹션만 바꾼다.
+          if (key === 'classes' && !renderClassManagement) {
+            onOpenClassManagement?.();
+            return;
+          }
+          setActiveSection(key as SettingSection);
+        }}
+      />
+
       <Notice type="success" message={msg} />
       <Notice type="error" message={error} />
 
-      {/* ── 학생 명단 ── */}
-      <StudentRoster classId={classId} />
+      {/* ── 학급 관리 ── */}
+      {activeSection === 'classes' && renderClassManagement?.()}
 
-      <div style={{ borderTop: '1.5px solid #e2e8f0' }} />
+      {/* ── 학생 명단 ── */}
+      {activeSection === 'roster' && <StudentRoster classId={classId} onChanged={onRosterChanged} />}
+
+      {/* ── 학급편지 설정 ── */}
+      {activeSection === 'letters' && (
+        <section className="card" style={{ boxShadow: 'var(--shadow-sm)' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>학급편지 설정</h3>
+          <p className="hint" style={{ margin: '0 0 16px' }}>학생들이 학급편지를 주고받을 수 있는지 설정합니다.</p>
+          <div className="row space-between" style={{ padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#fafbff' }}>
+            <div><strong style={{ display: 'block', fontSize: 14 }}>학급편지 사용</strong><span className="hint">끄면 학생 화면에서 편지 기능을 사용할 수 없습니다.</span></div>
+            <div className="row" style={{ width: 'auto' }}>
+              <button
+                type="button"
+                aria-pressed={lettersEnabled}
+                aria-label={`학급편지 ${lettersEnabled ? '끄기' : '켜기'}`}
+                onClick={onToggleLetters}
+                disabled={lettersToggling || !onToggleLetters}
+                style={{ width: 44, minHeight: 24, height: 24, padding: 0, borderRadius: 12, background: lettersEnabled ? '#16a34a' : '#cbd5e1', boxShadow: 'none', position: 'relative' }}
+              >
+                <span style={{ position: 'absolute', top: 3, left: lettersEnabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+              </button>
+              <strong style={{ color: lettersEnabled ? '#16a34a' : '#94a3b8', fontSize: 12 }}>{lettersToggling ? '변경 중' : lettersEnabled ? 'ON' : 'OFF'}</strong>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── 뱃지 설정 ── */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {activeSection === 'badges' && <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div>
             <h3 style={{ margin: '0 0 2px', fontSize: 17 }}>뱃지 설정</h3>
@@ -190,10 +266,10 @@ export default function ClassSettings({ classId }: { classId: string }) {
         <button type="button" className="ghost" style={{ width: '100%', marginTop: 4 }} onClick={saveBadges} disabled={badgeSaving}>
           {badgeSaving ? '저장 중...' : '뱃지 설정 저장'}
         </button>
-      </section>
+      </section>}
 
       {/* ── 별빛 캐릭터 설정 ── */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 20, borderTop: '1.5px solid #e2e8f0' }}>
+      {activeSection === 'titles' && <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div>
             <h3 style={{ margin: '0 0 2px', fontSize: 17 }}>별빛 캐릭터 설정</h3>
@@ -233,7 +309,7 @@ export default function ClassSettings({ classId }: { classId: string }) {
         <button type="button" className="ghost" style={{ width: '100%' }} onClick={saveTitles} disabled={titleSaving}>
           {titleSaving ? '저장 중...' : '별빛 캐릭터 설정 저장'}
         </button>
-      </section>
+      </section>}
     </div>
   );
 }

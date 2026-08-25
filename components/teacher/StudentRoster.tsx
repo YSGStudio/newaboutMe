@@ -11,6 +11,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import Notice from '@/components/ui/Notice';
 import SubmitButton from '@/components/ui/SubmitButton';
 import { parseStudentFile, ParsedStudent } from '@/lib/student-import';
+import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 
 type Student = { id: string; name: string; student_number: number };
 
@@ -43,6 +44,18 @@ export default function StudentRoster({
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+
+  // 삭제 — 교사 비밀번호 확인을 거친다(되돌릴 수 없는 동작이므로)
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePasswordError, setDeletePasswordError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // 학생 비밀번호 변경 (숫자 4자리)
+  const [passwordTarget, setPasswordTarget] = useState<Student | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [importing, setImporting] = useState(false);
@@ -93,6 +106,60 @@ export default function StudentRoster({
     } finally {
       setAdding(false);
       clearLater();
+    }
+  };
+
+  // ── 삭제 · 비밀번호 변경 ─────────────────────────────────────────
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeletePasswordError('');
+    setDeleteLoading(true);
+
+    // 교사 비밀번호를 먼저 확인한다. 틀리면 삭제로 넘어가지 않는다.
+    try {
+      await api('/api/auth/teacher/verify', {
+        method: 'POST',
+        body: JSON.stringify({ password: deletePassword }),
+      });
+    } catch {
+      setDeletePasswordError('비밀번호가 올바르지 않습니다.');
+      setDeleteLoading(false);
+      return;
+    }
+
+    try {
+      await api(`/api/students/${deleteTarget.id}`, { method: 'DELETE' });
+      setDeleteTarget(null);
+      setDeletePassword('');
+      setMsg('학생이 삭제되었습니다.');
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setDeletePasswordError((err as Error).message);
+    } finally {
+      setDeleteLoading(false);
+      clearLater();
+    }
+  };
+
+  const confirmPasswordChange = async () => {
+    if (!passwordTarget) return;
+    setPasswordError('');
+    setPasswordLoading(true);
+    try {
+      await api(`/api/students/${passwordTarget.id}/password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password: newPassword }),
+      });
+      setPasswordTarget(null);
+      setNewPassword('');
+      setMsg('비밀번호가 변경되었습니다.');
+      clearLater();
+    } catch (err) {
+      setPasswordError((err as Error).message);
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -286,24 +353,208 @@ export default function StudentRoster({
         </div>
       )}
 
-      {/* 현재 명단 */}
+      {/* 현재 명단 — 학생 카드 그리드 */}
       {loading ? (
         <p className="hint" style={{ margin: 0 }}>불러오는 중...</p>
       ) : students.length === 0 ? (
         <p className="hint" style={{ margin: 0 }}>아직 등록된 학생이 없습니다.</p>
       ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
           {students.map((student) => (
-            <span
+            <article
               key={student.id}
               style={{
-                fontSize: 12.5, padding: '4px 10px', borderRadius: 999,
-                border: '1px solid var(--border)', background: 'var(--surface)', color: '#334155',
+                display: 'flex', flexDirection: 'column', gap: 8,
+                padding: '12px 13px', borderRadius: 14,
+                border: '1px solid var(--border)', background: 'var(--surface)',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
-              {student.student_number}. {student.name}
-            </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{
+                  flexShrink: 0, width: 26, height: 26, borderRadius: 999,
+                  display: 'grid', placeItems: 'center',
+                  background: 'var(--primary-soft)', color: '#4338ca',
+                  fontSize: 12, fontWeight: 800,
+                }}>
+                  {student.student_number}
+                </span>
+                <strong style={{
+                  fontSize: 14, color: '#1f2937', minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {student.name}
+                </strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: 5 }}>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ width: 'auto', flex: 1, fontSize: 11.5, padding: '5px 6px' }}
+                  onClick={() => {
+                    setPasswordTarget(student);
+                    setNewPassword('');
+                    setPasswordError('');
+                  }}
+                >
+                  비밀번호
+                </button>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{
+                    width: 'auto', flex: 1, fontSize: 11.5, padding: '5px 6px',
+                    color: '#dc2626', borderColor: '#fca5a5',
+                  }}
+                  onClick={() => {
+                    setDeleteTarget(student);
+                    setDeletePassword('');
+                    setDeletePasswordError('');
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
+            </article>
           ))}
+        </div>
+      )}
+
+      {/* 학생 삭제 — 교사 비밀번호 확인 */}
+      {deleteTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px',
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 28px 24px', width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>학생 삭제 확인</p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                <strong style={{ color: '#dc2626' }}>
+                  {deleteTarget.student_number}번 {deleteTarget.name}
+                </strong>{' '}
+                학생을 삭제합니다.
+                <br />
+                감정 피드, 계획, 학생 세션도 함께 삭제되며 복구할 수 없습니다.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+                계속하려면 비밀번호를 입력하세요
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmDelete(); }}
+                placeholder="비밀번호"
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: deletePasswordError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {deletePasswordError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{deletePasswordError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setDeleteTarget(null); setDeletePassword(''); setDeletePasswordError(''); }}
+                disabled={deleteLoading}
+                style={{ width: 'auto', fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteLoading || !deletePassword}
+                style={{
+                  width: 'auto', background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', opacity: !deletePassword || deleteLoading ? 0.5 : 1,
+                }}
+              >
+                {deleteLoading ? '확인 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 학생 비밀번호 변경 */}
+      {passwordTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px',
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 28px 24px', width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>학생 비밀번호 변경</p>
+              <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+                <strong>{passwordTarget.student_number}번 {passwordTarget.name}</strong>{' '}
+                학생의 새 비밀번호(숫자 4자리)를 입력하세요.
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                onKeyDown={(e) => { if (e.key === 'Enter' && STUDENT_PASSWORD_REGEX.test(newPassword)) confirmPasswordChange(); }}
+                placeholder="1234"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: 14,
+                  border: passwordError ? '1.5px solid #dc2626' : '1.5px solid #e2e8f0',
+                  borderRadius: 8, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {passwordError && (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#dc2626' }}>{passwordError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline"
+                onClick={() => { setPasswordTarget(null); setNewPassword(''); setPasswordError(''); }}
+                disabled={passwordLoading}
+                style={{ width: 'auto', fontSize: 14, padding: '8px 18px' }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmPasswordChange}
+                disabled={passwordLoading || !STUDENT_PASSWORD_REGEX.test(newPassword)}
+                style={{
+                  width: 'auto', background: 'var(--primary)', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: passwordLoading || !STUDENT_PASSWORD_REGEX.test(newPassword) ? 0.5 : 1,
+                }}
+              >
+                {passwordLoading ? '변경 중...' : '변경'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

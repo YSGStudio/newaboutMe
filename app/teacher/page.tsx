@@ -33,7 +33,6 @@ import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
 import { formatDateInSeoul } from "@/lib/date";
-import { STUDENT_PASSWORD_REGEX } from "@/lib/password";
 import {
   EMOTION_META,
   REACTION_META,
@@ -141,6 +140,7 @@ export default function TeacherPage() {
     | "operator"
   >("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"roster" | "letters" | "badges" | "titles">("roster");
 
   // 교사 역할 정보
   const [teacherRole, setTeacherRole] = useState<TeacherRole>("general");
@@ -169,20 +169,7 @@ export default function TeacherPage() {
   const [deleteConfirmClass, setDeleteConfirmClass] =
     useState<ClassItem | null>(null);
   const [deleteClassNameInput, setDeleteClassNameInput] = useState("");
-  const [deletingStudentId, setDeletingStudentId] = useState("");
   const [togglingLettersClassId, setTogglingLettersClassId] = useState("");
-  const [deleteConfirmStudent, setDeleteConfirmStudent] =
-    useState<StudentItem | null>(null);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deletePasswordError, setDeletePasswordError] = useState("");
-  const [deletePasswordLoading, setDeletePasswordLoading] = useState(false);
-
-  // 학생 비밀번호 개별 변경
-  const [passwordEditStudent, setPasswordEditStudent] =
-    useState<StudentItem | null>(null);
-  const [newStudentPassword, setNewStudentPassword] = useState("");
-  const [passwordEditError, setPasswordEditError] = useState("");
-  const [passwordEditLoading, setPasswordEditLoading] = useState(false);
 
   // 학급 전체 비밀번호 초기화
   const [showResetAllPasswordConfirm, setShowResetAllPasswordConfirm] =
@@ -686,74 +673,261 @@ export default function TeacherPage() {
     }
   };
 
-  const onDeleteStudent = (student: StudentItem) => {
-    setDeleteConfirmStudent(student);
-    setDeletePassword("");
-    setDeletePasswordError("");
-  };
+  // 학급 관리 화면. 학급 관리 탭과 학급설정의 '학급관리' 섹션이 같은 내용을 쓴다.
+  // 컴포넌트로 분리하면 이 화면이 붙들고 있는 상태·핸들러를 모두 넘겨야 해서,
+  // 렌더 함수로 두고 필요한 곳에서 호출한다.
+  const renderClassManagement = ({ hideNav = false }: { hideNav?: boolean } = {}) => (
+    <section className="card">
+                  {/* 학급설정 안에서 그릴 때는 그쪽 섹션 탭과 겹치므로 숨긴다. */}
+                  {!hideNav && (
+                    <div style={{ marginBottom: 20 }}>
+                      <Tabs
+                        items={[
+                          { key: "classes", label: "학급관리", icon: "🏫" },
+                          { key: "roster", label: "학생명단", icon: "🧑‍🚀" },
+                          { key: "letters", label: "학급편지", icon: "💌" },
+                          { key: "badges", label: "뱃지설정", icon: "🏅" },
+                          { key: "titles", label: "별빛단계", icon: "✨" },
+                        ]}
+                        value="classes"
+                        onChange={(key) => {
+                          if (key === "classes") return;
+                          setSettingsSection(key as typeof settingsSection);
+                          setActiveTab("settings");
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div
+                    className="row space-between"
+                    style={{ alignItems: "flex-start", marginBottom: 12 }}
+                  >
+                    <div>
+                      <h2 style={{ margin: 0 }}>학급 관리</h2>
+                      <p className="hint" style={{ marginTop: 6 }}>
+                        학급 생성, 선택, 삭제를 이 화면에서 바로 처리할 수 있습니다.
+                      </p>
+                    </div>
+                    <span className="badge">총 {classes.length}개 학급</span>
+                  </div>
 
-  const onConfirmDeleteStudent = async () => {
-    if (!deleteConfirmStudent) return;
-    setDeletePasswordError("");
-    setDeletePasswordLoading(true);
+                  {isOverClassLimit && (
+                    <div
+                      style={{
+                        background: "#fef2f2",
+                        border: "1.5px solid #fca5a5",
+                        borderRadius: 12,
+                        padding: "14px 16px",
+                        marginBottom: 14,
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 4px",
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: "#dc2626",
+                        }}
+                      >
+                        ⚠️ 무료회원은 학급을 1개까지만 이용할 수 있습니다
+                      </p>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: "#7f1d1d",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        유료 기간이 종료되어 학급이 {classes.length}개 남아
+                        있습니다. 학급이 1개만 남을 때까지 다른 메뉴는 사용할 수
+                        없습니다. 아래 학급 목록에서 사용하지 않는 학급을
+                        삭제해주세요.
+                      </p>
+                    </div>
+                  )}
 
-    try {
-      await api("/api/auth/teacher/verify", {
-        method: "POST",
-        body: JSON.stringify({ password: deletePassword }),
-      });
-    } catch {
-      setDeletePasswordError("비밀번호가 올바르지 않습니다.");
-      setDeletePasswordLoading(false);
-      return;
-    }
+                  <div
+                    style={{
+                      background: "#eef2ff",
+                      border: "1px solid #c7d2fe",
+                      borderRadius: 12,
+                      padding: "12px 16px",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        color: "#3730a3",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      🏫 <strong>학급 생성 한도 안내</strong> — 무료회원은 학급을{" "}
+                      <strong>1개</strong>까지, 유료회원은 <strong>무제한</strong>
+                      으로 생성할 수 있습니다. 현재 등급은{" "}
+                      {teacherRole === "admin"
+                        ? "관리자"
+                        : teacherRole === "paid"
+                        ? "유료회원"
+                        : "무료회원"}
+                      입니다.
+                    </p>
+                  </div>
 
-    setDeletingStudentId(deleteConfirmStudent.id);
-    setDeleteConfirmStudent(null);
-    setDeletePassword("");
+                  <div
+                    className="grid two"
+                    style={{ alignItems: "start", gap: 14 }}
+                  >
+                    <article className="card" style={{ padding: 12 }}>
+                      <h3 style={{ marginTop: 0, marginBottom: 10 }}>
+                        새 학급 만들기
+                      </h3>
+                      <form
+                        className="grid"
+                        onSubmit={onCreateClass}
+                        ref={classFormRef}
+                      >
+                        <div>
+                          <label>학급명</label>
+                          <input
+                            name="className"
+                            placeholder="햇살반"
+                            required
+                            disabled={!canCreateClass}
+                          />
+                        </div>
+                        <div className="row">
+                          <div style={{ flex: 1 }}>
+                            <label>학년</label>
+                            <input
+                              name="grade"
+                              type="number"
+                              min={1}
+                              max={6}
+                              required
+                              disabled={!canCreateClass}
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label>반</label>
+                            <input
+                              name="section"
+                              type="number"
+                              min={1}
+                              max={20}
+                              required
+                              disabled={!canCreateClass}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label>학급코드 (숫자 1~6자리)</label>
+                          <input
+                            name="classCode"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{1,6}"
+                            maxLength={6}
+                            placeholder="예: 1234"
+                            required
+                            disabled={!canCreateClass}
+                          />
+                        </div>
+                        <SubmitButton
+                          loading={classLoading}
+                          idleText={
+                            canCreateClass ? "학급 추가" : "학급 생성 비활성화"
+                          }
+                          disabled={!canCreateClass}
+                        />
+                      </form>
+                    </article>
 
-    try {
-      await api(`/api/students/${deleteConfirmStudent.id}`, {
-        method: "DELETE",
-      });
-      await loadStudents(selectedClassId);
-      setAuthMessage("학생이 삭제되었습니다.");
-      clearNoticeLater();
-    } catch (error) {
-      setAuthError((error as Error).message);
-      clearNoticeLater();
-    } finally {
-      setDeletingStudentId("");
-      setDeletePasswordLoading(false);
-    }
-  };
-
-  const onChangeStudentPassword = (student: StudentItem) => {
-    setPasswordEditStudent(student);
-    setNewStudentPassword("");
-    setPasswordEditError("");
-  };
-
-  const onConfirmChangeStudentPassword = async () => {
-    if (!passwordEditStudent) return;
-    setPasswordEditError("");
-    setPasswordEditLoading(true);
-
-    try {
-      await api(`/api/students/${passwordEditStudent.id}/password`, {
-        method: "PATCH",
-        body: JSON.stringify({ password: newStudentPassword }),
-      });
-      setPasswordEditStudent(null);
-      setNewStudentPassword("");
-      setAuthMessage("비밀번호가 변경되었습니다.");
-      clearNoticeLater();
-    } catch (error) {
-      setPasswordEditError((error as Error).message);
-    } finally {
-      setPasswordEditLoading(false);
-    }
-  };
+                    <article className="card" style={{ padding: 12 }}>
+                      <div
+                        className="row space-between"
+                        style={{
+                          alignItems: "center",
+                          marginBottom: 10,
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <h3 style={{ margin: 0 }}>학급 목록</h3>
+                        <button
+                          type="button"
+                          className="student-toolbar-button student-toolbar-button-danger"
+                          onClick={onResetAllPasswords}
+                          disabled={!selectedClassId}
+                        >
+                          <span className="student-toolbar-icon" aria-hidden="true">
+                            🔑
+                          </span>
+                          비밀번호 초기화
+                        </button>
+                      </div>
+                      {classes.length === 0 ? (
+                        <EmptyState
+                          title="학급이 없습니다"
+                          description="먼저 학급을 1개 생성하세요."
+                        />
+                      ) : (
+                        <div className="grid" style={{ gap: 10 }}>
+                          {classes.map((c) => {
+                            const isSelected = c.id === selectedClassId;
+                            return (
+                              <article
+                                key={c.id}
+                                className="card"
+                                style={{
+                                  padding: 12,
+                                  borderColor: isSelected ? "#e79b9b" : undefined,
+                                  background: isSelected ? "#fde7e7" : undefined,
+                                }}
+                              >
+                                <div
+                                  className="row space-between"
+                                  style={{ alignItems: "center", marginBottom: 8 }}
+                                >
+                                  <strong>{c.class_name}</strong>
+                                  {isSelected ? (
+                                    <span className="badge">선택됨</span>
+                                  ) : null}
+                                </div>
+                                <p className="hint" style={{ marginTop: 0 }}>
+                                  {c.grade}학년 {c.section}반
+                                </p>
+                                <p className="hint">학급코드: {c.class_code}</p>
+                                <div className="row" style={{ marginTop: 8 }}>
+                                  <button
+                                    type="button"
+                                    className={isSelected ? "ghost" : "outline"}
+                                    onClick={() => setSelectedClassId(c.id)}
+                                  >
+                                    {isSelected ? "현재 선택 중" : "이 학급 선택"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="outline"
+                                    onClick={() => onDeleteClass(c)}
+                                    disabled={deletingClassId === c.id}
+                                  >
+                                    {deletingClassId === c.id
+                                      ? "삭제 중..."
+                                      : "학급 삭제"}
+                                  </button>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </article>
+                  </div>
+                </section>
+  );
 
   const onResetAllPasswords = () => {
     setShowResetAllPasswordConfirm(true);
@@ -1151,10 +1325,9 @@ export default function TeacherPage() {
             <Tabs
               items={[
                 { key: "dashboard", label: "대시보드", icon: "📊", disabled: isOverClassLimit },
-                { key: "class", label: "학급 관리", icon: "🏫" },
                 {
                   key: "student",
-                  label: "학생 관리",
+                  label: "일일계획",
                   icon: "🧑‍🚀",
                   disabled: isOverClassLimit,
                 },
@@ -1193,7 +1366,7 @@ export default function TeacherPage() {
                 },
                 {
                   key: "stats",
-                  label: "성장리포트",
+                  label: "성장분석",
                   icon: "📊",
                   disabled: isOverClassLimit,
                 },
@@ -1240,263 +1413,21 @@ export default function TeacherPage() {
             </div>
           </aside>
 
-          {activeTab === "class" && (
-            <section className="card">
-              <div
-                className="row space-between"
-                style={{ alignItems: "flex-start", marginBottom: 12 }}
-              >
-                <div>
-                  <h2 style={{ margin: 0 }}>학급 관리</h2>
-                  <p className="hint" style={{ marginTop: 6 }}>
-                    학급 생성, 선택, 삭제를 이 화면에서 바로 처리할 수 있습니다.
-                  </p>
-                </div>
-                <span className="badge">총 {classes.length}개 학급</span>
-              </div>
-
-              {isOverClassLimit && (
-                <div
-                  style={{
-                    background: "#fef2f2",
-                    border: "1.5px solid #fca5a5",
-                    borderRadius: 12,
-                    padding: "14px 16px",
-                    marginBottom: 14,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: "0 0 4px",
-                      fontSize: 14,
-                      fontWeight: 800,
-                      color: "#dc2626",
-                    }}
-                  >
-                    ⚠️ 무료회원은 학급을 1개까지만 이용할 수 있습니다
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      color: "#7f1d1d",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    유료 기간이 종료되어 학급이 {classes.length}개 남아
-                    있습니다. 학급이 1개만 남을 때까지 다른 메뉴는 사용할 수
-                    없습니다. 아래 학급 목록에서 사용하지 않는 학급을
-                    삭제해주세요.
-                  </p>
-                </div>
-              )}
-
-              <div
-                style={{
-                  background: "#eef2ff",
-                  border: "1px solid #c7d2fe",
-                  borderRadius: 12,
-                  padding: "12px 16px",
-                  marginBottom: 12,
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13,
-                    color: "#3730a3",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  🏫 <strong>학급 생성 한도 안내</strong> — 무료회원은 학급을{" "}
-                  <strong>1개</strong>까지, 유료회원은 <strong>무제한</strong>
-                  으로 생성할 수 있습니다. 현재 등급은{" "}
-                  {teacherRole === "admin"
-                    ? "관리자"
-                    : teacherRole === "paid"
-                    ? "유료회원"
-                    : "무료회원"}
-                  입니다.
-                </p>
-              </div>
-
-              <div
-                className="grid two"
-                style={{ alignItems: "start", gap: 14 }}
-              >
-                <article className="card" style={{ padding: 12 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 10 }}>
-                    새 학급 만들기
-                  </h3>
-                  <form
-                    className="grid"
-                    onSubmit={onCreateClass}
-                    ref={classFormRef}
-                  >
-                    <div>
-                      <label>학급명</label>
-                      <input
-                        name="className"
-                        placeholder="햇살반"
-                        required
-                        disabled={!canCreateClass}
-                      />
-                    </div>
-                    <div className="row">
-                      <div style={{ flex: 1 }}>
-                        <label>학년</label>
-                        <input
-                          name="grade"
-                          type="number"
-                          min={1}
-                          max={6}
-                          required
-                          disabled={!canCreateClass}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label>반</label>
-                        <input
-                          name="section"
-                          type="number"
-                          min={1}
-                          max={20}
-                          required
-                          disabled={!canCreateClass}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label>학급코드 (숫자 1~6자리)</label>
-                      <input
-                        name="classCode"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]{1,6}"
-                        maxLength={6}
-                        placeholder="예: 1234"
-                        required
-                        disabled={!canCreateClass}
-                      />
-                    </div>
-                    <SubmitButton
-                      loading={classLoading}
-                      idleText={
-                        canCreateClass ? "학급 추가" : "학급 생성 비활성화"
-                      }
-                      disabled={!canCreateClass}
-                    />
-                  </form>
-                </article>
-
-                <article className="card" style={{ padding: 12 }}>
-                  <div
-                    className="row space-between"
-                    style={{
-                      alignItems: "center",
-                      marginBottom: 10,
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <h3 style={{ margin: 0 }}>학급 목록</h3>
-                    <button
-                      type="button"
-                      className="student-toolbar-button student-toolbar-button-danger"
-                      onClick={onResetAllPasswords}
-                      disabled={!selectedClassId}
-                    >
-                      <span className="student-toolbar-icon" aria-hidden="true">
-                        🔑
-                      </span>
-                      비밀번호 초기화
-                    </button>
-                  </div>
-                  {classes.length === 0 ? (
-                    <EmptyState
-                      title="학급이 없습니다"
-                      description="먼저 학급을 1개 생성하세요."
-                    />
-                  ) : (
-                    <div className="grid" style={{ gap: 10 }}>
-                      {classes.map((c) => {
-                        const isSelected = c.id === selectedClassId;
-                        return (
-                          <article
-                            key={c.id}
-                            className="card"
-                            style={{
-                              padding: 12,
-                              borderColor: isSelected ? "#e79b9b" : undefined,
-                              background: isSelected ? "#fde7e7" : undefined,
-                            }}
-                          >
-                            <div
-                              className="row space-between"
-                              style={{ alignItems: "center", marginBottom: 8 }}
-                            >
-                              <strong>{c.class_name}</strong>
-                              {isSelected ? (
-                                <span className="badge">선택됨</span>
-                              ) : null}
-                            </div>
-                            <p className="hint" style={{ marginTop: 0 }}>
-                              {c.grade}학년 {c.section}반
-                            </p>
-                            <p className="hint">학급코드: {c.class_code}</p>
-                            <div className="row" style={{ marginTop: 8 }}>
-                              <button
-                                type="button"
-                                className={isSelected ? "ghost" : "outline"}
-                                onClick={() => setSelectedClassId(c.id)}
-                              >
-                                {isSelected ? "현재 선택 중" : "이 학급 선택"}
-                              </button>
-                              <button
-                                type="button"
-                                className="outline"
-                                onClick={() => onDeleteClass(c)}
-                                disabled={deletingClassId === c.id}
-                              >
-                                {deletingClassId === c.id
-                                  ? "삭제 중..."
-                                  : "학급 삭제"}
-                              </button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  )}
-                </article>
-              </div>
-            </section>
-          )}
+          {activeTab === "class" && renderClassManagement()}
 
           {activeTab === "student" && (
             <section className="card">
               <div className="student-management-header">
                 <div>
-                  <h2 style={{ margin: 0 }}>학생 관리</h2>
+                  <h2 style={{ margin: 0 }}>일일계획</h2>
                   <p className="hint" style={{ margin: "4px 0 0" }}>
-                    등록된 학생의 로그인 비밀번호를 관리할 수 있습니다. 학생 추가와 엑셀
-                    일괄 등록은 학급설정에서 합니다.
+                    학생별 오늘 계획과 체크 현황을 확인합니다.
                   </p>
                 </div>
                 <div
                   className="student-management-actions"
-                  aria-label="학생 관리 도구"
+                  aria-label="일일계획 도구"
                 >
-                  <button
-                    type="button"
-                    className="student-toolbar-button student-toolbar-button-primary"
-                    onClick={() => setActiveTab("settings")}
-                  >
-                    <span className="student-toolbar-icon" aria-hidden="true">
-                      +
-                    </span>
-                    학생 추가
-                  </button>
                   <RefreshButton
                     onClick={onRefreshStudents}
                     loading={studentListLoading}
@@ -1650,37 +1581,6 @@ export default function TeacherPage() {
                             </div>
                           )}
 
-                          <div className="student-card-actions">
-                            <button
-                              type="button"
-                              className="outline"
-                              style={{
-                                fontSize: 12,
-                                padding: "4px 10px",
-                                alignSelf: "flex-start",
-                              }}
-                              onClick={() => onChangeStudentPassword(student)}
-                            >
-                              비밀번호 변경
-                            </button>
-                            <button
-                              type="button"
-                              className="outline"
-                              style={{
-                                fontSize: 12,
-                                padding: "4px 10px",
-                                color: "#dc2626",
-                                borderColor: "#fca5a5",
-                                alignSelf: "flex-start",
-                              }}
-                              onClick={() => onDeleteStudent(student)}
-                              disabled={deletingStudentId === student.id}
-                            >
-                              {deletingStudentId === student.id
-                                ? "삭제 중..."
-                                : "삭제"}
-                            </button>
-                          </div>
                         </article>
                       );
                     })}
@@ -2346,89 +2246,20 @@ export default function TeacherPage() {
               <div style={{ marginBottom: 20 }}>
                 <h2 style={{ margin: "0 0 4px" }}>학급설정</h2>
                 <p className="hint" style={{ margin: 0 }}>
-                  이 학급에서 사용할 뱃지와 별빛 캐릭터를 맞춤 설정합니다.
+                  학생 명단과 학급 기능을 항목별로 설정합니다.
                 </p>
               </div>
 
-              {selectedClass && (
-                <div
-                  style={{
-                    marginBottom: 28,
-                    paddingBottom: 20,
-                    borderBottom: "1.5px solid #e2e8f0",
-                  }}
-                >
-                  <h3 style={{ margin: "0 0 10px", fontSize: 17 }}>
-                    클래스메일
-                  </h3>
-                  <div
-                    className="row"
-                    style={{ alignItems: "center", gap: 8, width: "auto" }}
-                  >
-                    <span style={{ fontSize: 13, color: "#64748b" }}>
-                      클래스메일
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onToggleLetters(
-                          selectedClass.id,
-                          selectedClass.letters_enabled
-                        )
-                      }
-                      disabled={togglingLettersClassId === selectedClass.id}
-                      style={{
-                        width: 44,
-                        height: 24,
-                        borderRadius: 12,
-                        border: "none",
-                        cursor:
-                          togglingLettersClassId === selectedClass.id
-                            ? "not-allowed"
-                            : "pointer",
-                        background: selectedClass.letters_enabled
-                          ? "#16a34a"
-                          : "#cbd5e1",
-                        position: "relative",
-                        transition: "background 0.2s",
-                        padding: 0,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: 3,
-                          left: selectedClass.letters_enabled ? 22 : 3,
-                          width: 18,
-                          height: 18,
-                          borderRadius: "50%",
-                          background: "#fff",
-                          transition: "left 0.2s",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                        }}
-                      />
-                    </button>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: selectedClass.letters_enabled
-                          ? "#16a34a"
-                          : "#94a3b8",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {togglingLettersClassId === selectedClass.id
-                        ? "변경 중..."
-                        : selectedClass.letters_enabled
-                        ? "ON"
-                        : "OFF"}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <ClassSettings classId={selectedClassId} />
+              <ClassSettings
+                classId={selectedClassId}
+                initialSection={settingsSection}
+                lettersEnabled={selectedClass?.letters_enabled}
+                lettersToggling={togglingLettersClassId === selectedClassId}
+                onToggleLetters={selectedClass ? () => onToggleLetters(selectedClass.id, selectedClass.letters_enabled) : undefined}
+                onOpenClassManagement={() => setActiveTab("class")}
+                onRosterChanged={() => selectedClassId && loadStudents(selectedClassId)}
+                renderClassManagement={() => renderClassManagement({ hideNav: true })}
+              />
             </section>
           )}
 
@@ -2659,271 +2490,6 @@ export default function TeacherPage() {
                 {deletingClassId === deleteConfirmClass.id
                   ? "삭제 중..."
                   : "학급 삭제"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 학생 삭제 비밀번호 확인 모달 */}
-      {deleteConfirmStudent && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "0 16px",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "28px 28px 24px",
-              width: "100%",
-              maxWidth: 400,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            }}
-          >
-            <div style={{ marginBottom: 20 }}>
-              <p
-                style={{
-                  margin: "0 0 6px",
-                  fontWeight: 700,
-                  fontSize: 16,
-                  color: "#1e1b4b",
-                }}
-              >
-                학생 삭제 확인
-              </p>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: "#64748b",
-                  lineHeight: 1.6,
-                }}
-              >
-                <strong style={{ color: "#dc2626" }}>
-                  {deleteConfirmStudent.student_number}번{" "}
-                  {deleteConfirmStudent.name}
-                </strong>{" "}
-                학생을 삭제합니다.
-                <br />
-                감정 피드, 계획, 학생 세션도 함께 삭제되며 복구할 수 없습니다.
-              </p>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 6,
-                  color: "#374151",
-                }}
-              >
-                계속하려면 비밀번호를 입력하세요
-              </label>
-              <input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onConfirmDeleteStudent();
-                }}
-                placeholder="비밀번호"
-                autoFocus
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  border: deletePasswordError
-                    ? "1.5px solid #dc2626"
-                    : "1.5px solid #e2e8f0",
-                  borderRadius: 8,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-              {deletePasswordError && (
-                <p
-                  style={{ margin: "6px 0 0", fontSize: 12, color: "#dc2626" }}
-                >
-                  {deletePasswordError}
-                </p>
-              )}
-            </div>
-            <div
-              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
-            >
-              <button
-                type="button"
-                className="outline"
-                onClick={() => {
-                  setDeleteConfirmStudent(null);
-                  setDeletePassword("");
-                  setDeletePasswordError("");
-                }}
-                disabled={deletePasswordLoading}
-                style={{ fontSize: 14, padding: "8px 18px" }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={onConfirmDeleteStudent}
-                disabled={deletePasswordLoading || !deletePassword}
-                style={{
-                  background: "#dc2626",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px 18px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity: !deletePassword || deletePasswordLoading ? 0.5 : 1,
-                }}
-              >
-                {deletePasswordLoading ? "확인 중..." : "삭제"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 학생 개별 비밀번호 변경 모달 */}
-      {passwordEditStudent && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "0 16px",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "28px 28px 24px",
-              width: "100%",
-              maxWidth: 400,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            }}
-          >
-            <div style={{ marginBottom: 20 }}>
-              <p
-                style={{
-                  margin: "0 0 6px",
-                  fontWeight: 700,
-                  fontSize: 16,
-                  color: "#1e1b4b",
-                }}
-              >
-                학생 비밀번호 변경
-              </p>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: "#64748b",
-                  lineHeight: 1.6,
-                }}
-              >
-                <strong style={{ color: "#1e1b4b" }}>
-                  {passwordEditStudent.student_number}번{" "}
-                  {passwordEditStudent.name}
-                </strong>{" "}
-                학생의 새 비밀번호(숫자 4자리)를 입력하세요.
-              </p>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <input
-                type="text"
-                value={newStudentPassword}
-                onChange={(e) =>
-                  setNewStudentPassword(
-                    e.target.value.replace(/[^0-9]/g, "").slice(0, 4)
-                  )
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onConfirmChangeStudentPassword();
-                }}
-                placeholder="1234"
-                inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                autoFocus
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  border: passwordEditError
-                    ? "1.5px solid #dc2626"
-                    : "1.5px solid #e2e8f0",
-                  borderRadius: 8,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-              {passwordEditError && (
-                <p
-                  style={{ margin: "6px 0 0", fontSize: 12, color: "#dc2626" }}
-                >
-                  {passwordEditError}
-                </p>
-              )}
-            </div>
-            <div
-              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
-            >
-              <button
-                type="button"
-                className="outline"
-                onClick={() => {
-                  setPasswordEditStudent(null);
-                  setNewStudentPassword("");
-                  setPasswordEditError("");
-                }}
-                disabled={passwordEditLoading}
-                style={{ fontSize: 14, padding: "8px 18px" }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={onConfirmChangeStudentPassword}
-                disabled={
-                  passwordEditLoading ||
-                  !STUDENT_PASSWORD_REGEX.test(newStudentPassword)
-                }
-                style={{
-                  background: "#6366f1",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px 18px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity:
-                    passwordEditLoading ||
-                    !STUDENT_PASSWORD_REGEX.test(newStudentPassword)
-                      ? 0.5
-                      : 1,
-                }}
-              >
-                {passwordEditLoading ? "변경 중..." : "변경"}
               </button>
             </div>
           </div>
