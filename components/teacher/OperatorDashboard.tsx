@@ -35,7 +35,6 @@ type Overview = {
   };
   activityLast7Days: { emotion: number; planCompleted: number; letter: number; evalReport: number; reflection: number };
   activeStudents: { dau: number; wau: number };
-  nextYearResetDate: string;
   expiringSoon: { id: string; name: string; paidUntil: string | null }[];
 };
 
@@ -55,7 +54,7 @@ const AUDIT_LABEL: Record<string, string> = {
   notice_update: '알림 수정',
   notice_delete: '알림 삭제',
   settings_update: '설정 변경',
-  year_reset_manual: '학년말 초기화',
+  year_reset_manual: '전체 데이터 초기화',
   data_export: '데이터 내보내기',
 };
 
@@ -185,7 +184,7 @@ export default function OperatorDashboard() {
   };
 
   const runYearReset = async () => {
-    const input = window.prompt('학년말 데이터 초기화를 실행하면 모든 학급·학생·기록이 영구 삭제됩니다.\n계속하려면 "초기화"를 입력하세요.');
+    const input = window.prompt('전체 데이터 초기화를 실행하면 모든 학급·학생·기록이 영구 삭제됩니다.\n계속하려면 "초기화"를 입력하세요.');
     if (input === null) return;
     if (input !== '초기화') { window.alert('확인 문구가 일치하지 않아 취소되었습니다.'); return; }
     setResetting(true);
@@ -196,7 +195,7 @@ export default function OperatorDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: '초기화' }),
       });
-      setMessage(`학년말 초기화 완료 — 학급 ${d.deletedClasses}개 삭제`);
+      setMessage(`전체 데이터 초기화 완료 — 학급 ${d.deletedClasses}개 삭제`);
       await load();
       setAuditLoaded(false);
     } catch (err) {
@@ -538,10 +537,7 @@ export default function OperatorDashboard() {
           </div>
 
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>학년말 데이터 초기화</h3>
-            <p className="hint" style={{ margin: '0 0 4px' }}>
-              자동 초기화 예정일: <b>{overview.nextYearResetDate}</b> (매년 3월 1일, 서울 기준)
-            </p>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>전체 데이터 초기화</h3>
             <p style={{ margin: '0 0 10px', fontSize: 13, color: '#b91c1c' }}>
               ⚠ 수동 실행 시 <b>모든 학급·학생·기록이 즉시 영구 삭제</b>됩니다. 되돌릴 수 없습니다.
             </p>
@@ -551,7 +547,7 @@ export default function OperatorDashboard() {
               disabled={resetting}
               style={{ width: 'auto', fontSize: 13, fontWeight: 700, padding: '8px 16px', borderRadius: 10, cursor: 'pointer', border: '1.5px solid #fca5a5', background: '#fff', color: '#dc2626' }}
             >
-              {resetting ? '초기화 중...' : '지금 학년말 초기화 실행'}
+              {resetting ? '초기화 중...' : '지금 전체 초기화 실행'}
             </button>
           </div>
         </div>

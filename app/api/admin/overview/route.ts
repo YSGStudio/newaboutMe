@@ -31,10 +31,6 @@ export async function GET() {
   const weekStartDate = weekStartIso.slice(0, 10);
   const soonDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  // 다음 자동 학년말 초기화일(서울 3/1). 오늘이 3/1 이후면 내년.
-  const y = Number(today.slice(0, 4));
-  const nextYearResetDate = today >= `${y}-03-01` ? `${y + 1}-03-01` : `${y}-03-01`;
-
   const [
     profilesRes,
     classCountRes,
@@ -117,7 +113,6 @@ export async function GET() {
       reflection: reflectionRes.count ?? 0,
     },
     activeStudents: { dau, wau },
-    nextYearResetDate,
     expiringSoon,
   });
 }

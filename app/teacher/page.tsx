@@ -1327,31 +1327,6 @@ export default function TeacherPage() {
               </div>
 
               <div
-                style={{
-                  background: "#fffbeb",
-                  border: "1px solid #fde68a",
-                  borderRadius: 12,
-                  padding: "12px 16px",
-                  marginBottom: 14,
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13,
-                    color: "#92400e",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  📌 <strong>학년도 종료 데이터 삭제 안내</strong> — 매년 2월
-                  마지막 날을 기점으로 모든 학급 데이터(학생 계정, 감정 기록,
-                  계획, 편지, 평가, 설문 등)가 자동 삭제됩니다. 보관이 필요한
-                  자료는 그 전에 성장리포트 PDF 내보내기 등으로 미리
-                  저장해주세요.
-                </p>
-              </div>
-
-              <div
                 className="grid two"
                 style={{ alignItems: "start", gap: 14 }}
               >
@@ -2504,7 +2479,7 @@ export default function TeacherPage() {
       {/* 로그인 직후 관리자 알림장 */}
       <LoginNoticeModal enabled={isAuthed} />
 
-      {/* 학급 생성 동의 모달 */}
+      {/* 학급 생성 확인 모달 */}
       {pendingClass && (
         <div
           style={{
@@ -2542,7 +2517,7 @@ export default function TeacherPage() {
                 border: "1px solid #c7d2fe",
                 borderRadius: 12,
                 padding: "14px 16px",
-                marginBottom: 12,
+                marginBottom: 18,
               }}
             >
               <p
@@ -2568,40 +2543,6 @@ export default function TeacherPage() {
               </p>
             </div>
 
-            <div
-              style={{
-                background: "#fffbeb",
-                border: "1px solid #fde68a",
-                borderRadius: 12,
-                padding: "14px 16px",
-                marginBottom: 18,
-              }}
-            >
-              <p
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  color: "#92400e",
-                }}
-              >
-                📌 학년도 종료 데이터 삭제 정책
-              </p>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: "#78350f",
-                  lineHeight: 1.7,
-                }}
-              >
-                매년 <strong>2월 마지막 날</strong>을 기점으로 학급의 모든
-                데이터(학생 계정, 감정 기록, 계획, 편지, 평가, 설문 등)가{" "}
-                <strong>자동으로 삭제</strong>됩니다. 보관이 필요한 자료는 삭제
-                전에 PDF 내보내기 등으로 직접 저장해야 합니다.
-              </p>
-            </div>
-
             <div className="row" style={{ gap: 8 }}>
               <button
                 type="button"
@@ -2619,7 +2560,7 @@ export default function TeacherPage() {
                 onClick={confirmCreateClass}
                 disabled={classLoading}
               >
-                {classLoading ? "생성 중..." : "동의하고 학급 생성"}
+                {classLoading ? "생성 중..." : "학급 생성"}
               </button>
             </div>
           </div>
