@@ -1792,7 +1792,6 @@ export default function TeacherPage() {
             <ClassDashboard
               classId={selectedClassId}
               initialData={bootstrapDashboard}
-              onOpenStudent={() => setActiveTab("stats")}
               onNavigate={(tab) => setActiveTab(tab)}
             />
           )}

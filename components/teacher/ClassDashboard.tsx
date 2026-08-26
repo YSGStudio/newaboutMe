@@ -67,14 +67,12 @@ const api = async <T,>(url: string): Promise<T> => {
 export default function ClassDashboard({
   classId,
   initialData = null,
-  onOpenStudent,
   onNavigate,
 }: {
   classId: string;
   /** 부트스트랩이 함께 실어 준 첫 데이터. 있으면 마운트 직후 왕복 없이 바로 그린다. */
   initialData?: ClassDashboardData | null;
   /** 학생 칩을 눌렀을 때 — 성장리포트 탭으로 넘겨 상세를 열게 합니다. */
-  onOpenStudent?: (studentId: string) => void;
   onNavigate?: (tab: 'student' | 'feed' | 'learning' | 'letters') => void;
 }) {
   const [data, setData] = useState<ClassDashboardData | null>(initialData);
@@ -207,6 +205,10 @@ export default function ClassDashboard({
               <button type="button" onClick={() => onNavigate?.('feed')}>
                 <span aria-hidden="true">💜</span><span><strong>오늘 마음 기록</strong><small>학급 마음피드 바로 확인</small></span><b>{kpi.recordedToday}/{kpi.totalStudents}</b><i aria-hidden="true">›</i>
               </button>
+              <button type="button" onClick={() => onNavigate?.('student')}>
+                {/* 분모는 계획을 세운 학생 수다. 계획이 없는 학생까지 세면 늘 미달로 보인다. */}
+                <span aria-hidden="true">⭐</span><span><strong>오늘 계획 기록</strong><small>계획을 모두 체크한 학생</small></span><b>{planStudents === 0 ? '계획 없음' : `${planCheckedStudents}/${planStudents}`}</b><i aria-hidden="true">›</i>
+              </button>
             </div>
           </section>
         </div>
@@ -245,10 +247,9 @@ export default function ClassDashboard({
           ) : (
             <div className="class-dashboard-watch-grid">
               {data!.watch.map((row) => (
-                <button
+                // 누르면 성장리포트로 튀던 동작을 뺐다. 읽는 카드일 뿐이라 버튼이 아니다.
+                <div
                   key={row.student.id}
-                  type="button"
-                  onClick={() => onOpenStudent?.(row.student.id)}
                   className="class-dashboard-watch-card"
                 >
                   <span className="class-dashboard-watch-heading">
@@ -270,7 +271,7 @@ export default function ClassDashboard({
                       </span>
                     ))}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           )}

@@ -4275,9 +4275,8 @@ button.class-dashboard-task-list,
 .class-dashboard-activity-bars strong { flex-shrink: 0; color: var(--primary-dark); font-size: 11px; }
 
 .class-dashboard-watch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
-button.class-dashboard-watch-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 118px; padding: 13px 14px; overflow: hidden; border: 1px solid #fecaca; border-radius: var(--radius); background: radial-gradient(circle at 90% 16%, rgba(251,191,36,.18) 0 2px, transparent 3px), linear-gradient(145deg, #fff, #fffafa); color: var(--text); box-shadow: var(--shadow-sm); text-align: left; }
-button.class-dashboard-watch-card::after { position: absolute; right: 12px; bottom: 7px; color: #fbbf24; content: '✦'; opacity: .22; font-size: 18px; }
-button.class-dashboard-watch-card:hover:not(:disabled) { opacity: 1; border-color: #fca5a5; box-shadow: var(--shadow-md); }
+.class-dashboard-watch-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 118px; padding: 13px 14px; overflow: hidden; border: 1px solid #fecaca; border-radius: var(--radius); background: radial-gradient(circle at 90% 16%, rgba(251,191,36,.18) 0 2px, transparent 3px), linear-gradient(145deg, #fff, #fffafa); color: var(--text); box-shadow: var(--shadow-sm); text-align: left; }
+.class-dashboard-watch-card::after { position: absolute; right: 12px; bottom: 7px; color: #fbbf24; content: '✦'; opacity: .22; font-size: 18px; }
 .class-dashboard-watch-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .class-dashboard-watch-heading strong { color: var(--text); font-size: 14px; }
 .class-dashboard-watch-heading > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -4296,9 +4295,6 @@ button.class-dashboard-watch-card:hover:not(:disabled) { opacity: 1; border-colo
   .class-dashboard-watch-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  button.class-dashboard-watch-card { transition: none; }
-}
 
 /* ── 대시보드 첫 로딩 자리표시 ── */
 .sr-only {
