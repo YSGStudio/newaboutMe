@@ -67,6 +67,19 @@ type StudentCell = {
   submission: Submission | null;
 };
 
+/** 활동을 펼쳐 학생 카드를 보고 있는 동안 제출 현황을 다시 읽는 주기 */
+const POLL_INTERVAL_MS = 15_000;
+
+/**
+ * 학생 카드에서 활동 카드의 집계를 다시 센다.
+ * 서버(app/api/learning/activities/route.ts)와 같은 셈법이라야 새로고침 결과와 어긋나지 않는다.
+ * submitted = 제출 + 피드백 완료, reviewed = 피드백 완료.
+ */
+const countCells = (students: StudentCell[]) => ({
+  submittedCount: students.filter((cell) => cell.status !== 'none').length,
+  reviewedCount: students.filter((cell) => cell.status === 'reviewed').length,
+});
+
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(url, {
     ...init,
@@ -125,7 +138,8 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
   // ── 로드 ────────────────────────────────────────────────────────
 
-  const loadActivities = async () => {
+  // quiet=true는 자동 갱신용이다. 실패해도 오류 배너를 띄우지 않고 다음 주기에 다시 시도한다.
+  const loadActivities = async (quiet = false) => {
     if (!classId) return;
     try {
       const data = await api<{ activities: Activity[]; totalStudents: number }>(
@@ -136,6 +150,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       setTotalStudents(data.totalStudents);
       setLoaded(true);
     } catch (err) {
+      if (quiet) return;
       setError((err as Error).message);
       setLoaded(true);
       notifyLater();
@@ -150,20 +165,100 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
-  const loadCells = async (activityId: string) => {
-    setCellsLoading(true);
+  /**
+   * 한 활동의 학생 카드를 읽어온다. 실패하면 null.
+   * quiet=true는 자동 갱신용 — 오류 배너를 띄우지 않고 다음 주기에 다시 시도한다.
+   */
+  const fetchCells = async (activityId: string, quiet = false): Promise<StudentCell[] | null> => {
     try {
       const data = await api<{ students: StudentCell[] }>(
         `/api/learning/activities/${activityId}/submissions`,
         { cache: 'no-store' }
       );
-      setCells(data.students);
+      return data.students;
     } catch (err) {
-      setError((err as Error).message);
-      notifyLater();
+      if (!quiet) {
+        setError((err as Error).message);
+        notifyLater();
+      }
+      return null;
+    }
+  };
+
+  const loadCells = async (activityId: string) => {
+    setCellsLoading(true);
+    try {
+      const students = await fetchCells(activityId);
+      if (students) setCells(students);
     } finally {
       setCellsLoading(false);
     }
+  };
+
+  // ── 자동 갱신 ───────────────────────────────────────────────────
+  // 학생이 제출해도 교사 화면은 스스로 바뀌지 않는다(이 프로젝트에는 Realtime 구독이 없다).
+  // 그래서 폴링으로 메우되, 범위를 최대한 좁힌다.
+  //
+  //   · 교사가 배움성찰 탭에 있을 때만 — 탭을 벗어나면 이 컴포넌트가 언마운트된다(app/teacher/page.tsx)
+  //   · 활동을 펼쳐 학생 카드가 떠 있을 때만 — 접으면 타이머 자체를 만들지 않는다
+  //   · 펼친 활동 하나만 — 활동 목록 전체(/api/learning/activities)는 다시 읽지 않는다
+  //
+  // 활동 카드의 "제출 4/25" 집계는 서버를 다시 부르는 대신 방금 읽어온 학생 카드에서 직접 센다.
+  // 서버(app/api/learning/activities/route.ts)가 쓰는 셈법과 같다 —
+  // submitted는 제출·피드백 완료를 합친 수, reviewed는 피드백 완료만.
+
+  // 인터벌 콜백은 만들어질 때의 값을 붙잡고 있으므로, 매 렌더의 최신 값을 ref로 건네준다.
+  // 교사가 무언가 쓰거나 저장하는 중이면 건너뛴다. 화면을 발밑에서 갈아끼우지 않기 위함이다.
+  const pollBusyRef = useRef(false);
+  pollBusyRef.current =
+    Boolean(openCell) || formOpen || Boolean(proxyTarget) || proxyLinkOpen
+    || saving || feedbackSaving || uploading || proxyLinkSaving;
+  const pollRunningRef = useRef(false);
+
+  useEffect(() => {
+    // 펼쳐진 활동이 없으면 폴링하지 않는다.
+    if (!selectedId) return;
+
+    const refresh = async () => {
+      // 브라우저 탭이 뒤에 있거나 창이 최소화됐으면 읽지 않는다.
+      if (document.hidden) return;
+      // 앞선 요청이 아직 안 끝났으면(느린 회선) 겹쳐 쏘지 않는다.
+      if (pollBusyRef.current || pollRunningRef.current) return;
+
+      pollRunningRef.current = true;
+      try {
+        const students = await fetchCells(selectedId, true);
+        if (!students) return;
+        setCells(students);
+        setActivities((prev) => prev.map((activity) => (
+          activity.id === selectedId ? { ...activity, ...countCells(students) } : activity
+        )));
+      } finally {
+        pollRunningRef.current = false;
+      }
+    };
+
+    // 다른 탭에 갔다 돌아왔을 때는 다음 주기를 기다리지 않고 바로 맞춘다.
+    const onVisibilityChange = () => { if (!document.hidden) refresh(); };
+
+    const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  /**
+   * 새로고침 버튼 — 활동 목록과 함께, 펼쳐둔 활동의 학생 카드까지 다시 읽는다.
+   * 활동만 갱신하면 "제출 4/25"로 숫자는 늘었는데 카드 색은 그대로인 어긋난 화면이 된다.
+   */
+  const refreshNow = async () => {
+    await Promise.all([
+      loadActivities(),
+      selectedId ? loadCells(selectedId) : Promise.resolve(),
+    ]);
   };
 
   const selectActivity = (activityId: string) => {
@@ -404,7 +499,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
           <p>학생의 결과물과 생각을 모아 배움의 과정을 살펴봅니다.</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <RefreshButton onClick={loadActivities} />
+          <RefreshButton onClick={refreshNow} />
           <button
             type="button"
             className="ghost"
