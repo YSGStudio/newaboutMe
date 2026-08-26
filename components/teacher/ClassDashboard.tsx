@@ -200,7 +200,7 @@ export default function ClassDashboard({
                 <span aria-hidden="true">📚</span><span><strong>배움성찰 확인</strong><small>제출 후 피드백을 기다리는 기록</small></span><b>{kpi.pendingReview}건</b><i aria-hidden="true">›</i>
               </button>
               <button type="button" onClick={() => onNavigate?.('letters')}>
-                <span aria-hidden="true">💌</span><span><strong>새 클래스메일</strong><small>아직 정리하지 않은 편지</small></span><b>{kpi.unreadLetters}통</b><i aria-hidden="true">›</i>
+                <span aria-hidden="true">💌</span><span><strong>새 별빛메일</strong><small>아직 정리하지 않은 편지</small></span><b>{kpi.unreadLetters}통</b><i aria-hidden="true">›</i>
               </button>
               <button type="button" onClick={() => onNavigate?.('feed')}>
                 <span aria-hidden="true">💜</span><span><strong>오늘 마음 기록</strong><small>학급 마음피드 바로 확인</small></span><b>{kpi.recordedToday}/{kpi.totalStudents}</b><i aria-hidden="true">›</i>

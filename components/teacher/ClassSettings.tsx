@@ -25,7 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   emotion: '감정 기록',
   plan: '일일 계획',
   reflection: '성찰일기',
-  letter: '클래스메일',
+  letter: '별빛메일',
 };
 
 const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
@@ -157,7 +157,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
         items={[
           { key: 'classes', label: '학급관리', icon: '🏫' },
           { key: 'roster', label: '학생명단', icon: '🧑‍🚀' },
-          { key: 'letters', label: '학급편지', icon: '💌' },
+          { key: 'letters', label: '별빛메일', icon: '💌' },
           { key: 'badges', label: '뱃지설정', icon: '🏅' },
           { key: 'titles', label: '별빛단계', icon: '✨' },
         ]}
@@ -181,18 +181,18 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
       {/* ── 학생 명단 ── */}
       {activeSection === 'roster' && <StudentRoster classId={classId} onChanged={onRosterChanged} />}
 
-      {/* ── 학급편지 설정 ── */}
+      {/* ── 별빛메일 설정 ── */}
       {activeSection === 'letters' && (
         <section className="card" style={{ boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>학급편지 설정</h3>
-          <p className="hint" style={{ margin: '0 0 16px' }}>학생들이 학급편지를 주고받을 수 있는지 설정합니다.</p>
+          <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>별빛메일 설정</h3>
+          <p className="hint" style={{ margin: '0 0 16px' }}>학생들이 별빛메일을 주고받을 수 있는지 설정합니다.</p>
           <div className="row space-between" style={{ padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#fafbff' }}>
-            <div><strong style={{ display: 'block', fontSize: 14 }}>학급편지 사용</strong><span className="hint">끄면 학생 화면에서 편지 기능을 사용할 수 없습니다.</span></div>
+            <div><strong style={{ display: 'block', fontSize: 14 }}>별빛메일 사용</strong><span className="hint">끄면 학생 화면에서 편지 기능을 사용할 수 없습니다.</span></div>
             <div className="row" style={{ width: 'auto' }}>
               <button
                 type="button"
                 aria-pressed={lettersEnabled}
-                aria-label={`학급편지 ${lettersEnabled ? '끄기' : '켜기'}`}
+                aria-label={`별빛메일 ${lettersEnabled ? '끄기' : '켜기'}`}
                 onClick={onToggleLetters}
                 disabled={lettersToggling || !onToggleLetters}
                 style={{ width: 44, minHeight: 24, height: 24, padding: 0, borderRadius: 12, background: lettersEnabled ? '#16a34a' : '#cbd5e1', boxShadow: 'none', position: 'relative' }}

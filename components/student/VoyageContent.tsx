@@ -46,7 +46,7 @@ const SOURCE_LABEL: Record<string, string> = {
   plan_check: '오늘 계획 전체 체크',
   emotion_feed: '감정 기록',
   reflection: '성찰일기',
-  letter: '클래스메일',
+  letter: '별빛메일',
   badge: '새 뱃지 획득',
   weekly_streak: '주간 개근 보너스',
   teacher_grant: '선생님 특별 연료',
@@ -103,7 +103,7 @@ export default function VoyageContent({ standalone = false }: { standalone?: boo
     { icon: '✅', name: '오늘 계획', fuel: 5, done: data.missions.plan },
     { icon: '💜', name: '감정 기록', fuel: 8, done: data.missions.emotion },
     { icon: '📖', name: '성찰일기', fuel: 10, done: data.missions.reflection },
-    { icon: '💌', name: '클래스메일', fuel: 5, done: data.missions.letterCount > 0 },
+    { icon: '💌', name: '별빛메일', fuel: 5, done: data.missions.letterCount > 0 },
   ];
   const questPercent = quest ? Math.min(100, (quest.badgeCount / quest.totalEnabled) * 100) : 0;
 

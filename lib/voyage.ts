@@ -106,7 +106,7 @@ export async function grantFuel(
   const baseAmount = options?.baseAmount ?? rule?.base ?? 0;
   const isRevoke = sourceType === 'teacher_revoke' || baseAmount < 0;
   // 매일 반복하는 감정 기록과 계획 체크만 연속 일수 및 부스터에 반영한다.
-  // 성찰일기·클래스메일·배지·교사 지급 등은 기본 연료만 지급한다.
+  // 성찰일기·별빛메일·배지·교사 지급 등은 기본 연료만 지급한다.
   const appliesBooster = !isRevoke
     && options?.applyBooster !== false
     && BOOSTER_ELIGIBLE_SOURCES.has(sourceType);

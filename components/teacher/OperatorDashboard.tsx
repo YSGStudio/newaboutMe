@@ -440,7 +440,7 @@ export default function OperatorDashboard() {
                 {[
                   ['감정 기록', overview.activityLast7Days.emotion],
                   ['계획 실천', overview.activityLast7Days.planCompleted],
-                  ['클래스메일', overview.activityLast7Days.letter],
+                  ['별빛메일', overview.activityLast7Days.letter],
                   ['평가', overview.activityLast7Days.evalReport],
                   ['성찰일기', overview.activityLast7Days.reflection],
                 ].map(([label, count]) => (

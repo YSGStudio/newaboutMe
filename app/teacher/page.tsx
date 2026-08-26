@@ -4,7 +4,7 @@
  * 교사 대시보드 — 경로 "/teacher"
  * 교사가 로그인(이메일+비밀번호)해 학급을 운영하는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
  * 상단 탭으로 기능을 전환합니다: 학급관리 · 학생관리 · 마음피드 · 평가피드백 · 교우관계 ·
- * 성장리포트 · 클래스메일 · 학급설정, 그리고 관리자 전용 운영관리(회원·사용량·공지).
+ * 성장리포트 · 별빛메일 · 학급설정, 그리고 관리자 전용 운영관리(회원·사용량·공지).
  * 각 탭의 실제 내용은 components/teacher/*의 대시보드 컴포넌트들이 담당합니다.
  */
 import {
@@ -190,7 +190,7 @@ export default function TeacherPage() {
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
-  // 클래스메일 — 편지 관련 상태
+  // 별빛메일 — 편지 관련 상태
   const [classLetters, setClassLetters] = useState<LetterRow[]>([]);
   const [lettersLoading, setLettersLoading] = useState(false);
   const [lettersLoaded, setLettersLoaded] = useState(false);
@@ -222,7 +222,7 @@ export default function TeacherPage() {
     [classLetters]
   );
 
-  // 클래스메일 검색 — 제목·내용·보낸사람/받는사람 이름(출석번호)을 모두 훑는다.
+  // 별빛메일 검색 — 제목·내용·보낸사람/받는사람 이름(출석번호)을 모두 훑는다.
   // 검색어가 있으면 읽음처리한 지난 편지까지 포함해 전체에서 찾고,
   // 검색어가 없으면 새 편지만 보여준다. (학급 단위로 한 번에 불러오므로 서버 요청 없이 즉시 필터링)
   const filteredLetters = useMemo(() => {
@@ -718,7 +718,7 @@ export default function TeacherPage() {
                         items={[
                           { key: "classes", label: "학급관리", icon: "🏫" },
                           { key: "roster", label: "학생명단", icon: "🧑‍🚀" },
-                          { key: "letters", label: "학급편지", icon: "💌" },
+                          { key: "letters", label: "별빛메일", icon: "💌" },
                           { key: "badges", label: "뱃지설정", icon: "🏅" },
                           { key: "titles", label: "별빛단계", icon: "✨" },
                         ]}
@@ -1404,7 +1404,7 @@ export default function TeacherPage() {
                   : []),
                 {
                   key: "letters",
-                  label: "학급편지",
+                  label: "별빛메일",
                   icon: "💌",
                   disabled: isOverClassLimit,
                 },
@@ -1819,7 +1819,7 @@ export default function TeacherPage() {
               <div className="row space-between" style={{ marginBottom: 12 }}>
                 <div>
                   <p className="starlight-mail-kicker">✦ STARLIGHT POST ✦</p>
-                  <h2 className="starlight-mail-title">클래스메일</h2>
+                  <h2 className="starlight-mail-title">별빛메일</h2>
                   <p className="hint" style={{ marginTop: 4 }}>
                     학급 내 학생들이 주고받은 편지를 확인하고 관리할 수
                     있습니다.
@@ -2748,7 +2748,7 @@ export default function TeacherPage() {
                 <li>내가 만든 모든 학급이 삭제됩니다.</li>
                 <li>
                   학급에 속한 모든 데이터(학생 계정, 감정 기록, 계획,
-                  클래스메일, 성찰일기, 교우관계 설문, 뱃지, 평가 기록, AI 분석
+                  별빛메일, 성찰일기, 교우관계 설문, 뱃지, 평가 기록, AI 분석
                   결과 등)가 함께 삭제됩니다.
                 </li>
               </ol>

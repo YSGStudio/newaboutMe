@@ -3,7 +3,7 @@
 /**
  * 학생 메인 대시보드 — 경로 "/student"
  * 학생이 로그인(학급코드+이름+PIN)하고 하루를 보내는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
- * 감정 기록(마음일기), 오늘 계획 체크, 클래스메일, 성찰일기, 교우관계 설문 응답,
+ * 감정 기록(마음일기), 오늘 계획 체크, 별빛메일, 성찰일기, 교우관계 설문 응답,
  * 뱃지·별빛 캐릭터 배너 등 학생 활동 전체를 담습니다. 로그인 후 스타 보이저 탭도 여기서 진입합니다.
  * (각 활동은 저장 시 뱃지 지급/연료 적립으로 이어집니다.)
  */
@@ -288,7 +288,7 @@ export default function StudentPage() {
   const [surveyError, setSurveyError] = useState('');
   const [surveyStep, setSurveyStep] = useState(0);
 
-  // 클래스메일 상태
+  // 별빛메일 상태
   const [letterBox, setLetterBox] = useState<'received' | 'sent'>('received');
   const [receivedLetters, setReceivedLetters] = useState<ReceivedLetter[]>([]);
   const [sentLetters, setSentLetters] = useState<SentLetter[]>([]);
@@ -1319,7 +1319,7 @@ export default function StudentPage() {
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
                 ...(lettersEnabled ? [{
                   key: 'letters',
-                  label: `클래스메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
+                  label: `별빛메일${receivedLetters.filter((l) => !l.is_read).length > 0 ? ` (${receivedLetters.filter((l) => !l.is_read).length})` : ''}`,
                   icon: '💌',
                 }] : []),
               ]}
@@ -1733,7 +1733,7 @@ export default function StudentPage() {
               <div className="row space-between" style={{ marginBottom: 12 }}>
                 <div>
                   <p className="starlight-mail-kicker">✦ 나의 별빛 우체통 ✦</p>
-                  <h2 className="starlight-mail-title">클래스메일</h2>
+                  <h2 className="starlight-mail-title">별빛메일</h2>
                 </div>
                 <button
                   type="button"

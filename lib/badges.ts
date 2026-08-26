@@ -36,10 +36,10 @@ export const BADGES: BadgeDef[] = [
   { id: 'reflection_5',     name: '생각하는 아이', icon: '💭', category: 'reflection', categoryColor: '#3b82f6', condition: '성찰일기 누적 5회 작성' },
   { id: 'reflection_10',    name: '깊은 생각',    icon: '🧠', category: 'reflection',  categoryColor: '#3b82f6', condition: '성찰일기 누적 10회 작성' },
   { id: 'reflection_20',    name: '성찰 마스터',  icon: '🪞', category: 'reflection',  categoryColor: '#3b82f6', condition: '성찰일기 누적 20회 작성' },
-  // 클래스메일 (3개)
-  { id: 'letter_first',     name: '첫 편지',      icon: '💌', category: 'letter',      categoryColor: '#f472b6', condition: '클래스메일 첫 발송' },
-  { id: 'letter_10',        name: '따뜻한 마음',  icon: '💛', category: 'letter',      categoryColor: '#f472b6', condition: '클래스메일 누적 10통 발송' },
-  { id: 'letter_20',        name: '우리 반 연결고리', icon: '🤝', category: 'letter', categoryColor: '#f472b6', condition: '클래스메일 누적 20통 발송' },
+  // 별빛메일 (3개)
+  { id: 'letter_first',     name: '첫 편지',      icon: '💌', category: 'letter',      categoryColor: '#f472b6', condition: '별빛메일 첫 발송' },
+  { id: 'letter_10',        name: '따뜻한 마음',  icon: '💛', category: 'letter',      categoryColor: '#f472b6', condition: '별빛메일 누적 10통 발송' },
+  { id: 'letter_20',        name: '우리 반 연결고리', icon: '🤝', category: 'letter', categoryColor: '#f472b6', condition: '별빛메일 누적 20통 발송' },
 ];
 
 export const BADGE_MAP = Object.fromEntries(BADGES.map((b) => [b.id, b]));
@@ -314,7 +314,7 @@ function checkCondition(stats: BadgeStats, badgeId: string): boolean {
     case 'reflection_20':
       return (stats.reflectionCount ?? 0) >= 20;
 
-    // ── 클래스메일 ──────────────────────────────────────────
+    // ── 별빛메일 ──────────────────────────────────────────
     case 'letter_first':
       return (stats.letterCount ?? 0) >= 1;
     case 'letter_10':
