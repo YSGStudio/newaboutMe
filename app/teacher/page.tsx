@@ -155,6 +155,11 @@ export default function TeacherPage() {
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   // 부트스트랩이 함께 실어 준 첫 대시보드. 대시보드가 스스로 다시 부르지 않도록 넘긴다.
   const [bootstrapDashboard, setBootstrapDashboard] = useState<ClassDashboardData | null>(null);
+  // 지금 students 상태가 어느 학급 명단인지 가리킨다.
+  // 부트스트랩 응답(dashboard)에 이미 실려 온 명단도 여기에 기록해서,
+  // 로그인 직후 같은 명단을 /api/classes/[id]/students로 한 번 더 받지 않게 한다.
+  // students를 바꾸는 곳에서는 이 값도 함께 맞춘다 — 어긋나면 남의 학급 명단이 남는다.
+  const loadedRosterClassId = useRef<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   // 부트스트랩이 도는 동안 로그인 화면에 안내를 띄운다.
   const [bootstrapping, setBootstrapping] = useState(false);
@@ -286,6 +291,7 @@ export default function TeacherPage() {
       } else if (data.classes.length === 0) {
         setSelectedClassId("");
         setStudents([]);
+        loadedRosterClassId.current = null;
       }
     } catch {
       setClasses([]);
@@ -299,6 +305,7 @@ export default function TeacherPage() {
       `/api/classes/${classId}/students`
     );
     setStudents(data.students);
+    loadedRosterClassId.current = classId;
   }, []);
 
   const loadClassLetters = useCallback(async (classId: string) => {
@@ -464,12 +471,19 @@ export default function TeacherPage() {
         setBootstrapDashboard(data.dashboard);
 
         if (data.selectedClassId) {
+          // dashboard에는 이 학급 명단이 이미 들어 있다(lib/class-dashboard-data.ts).
+          // 여기서 바로 채워두면 아래 effect가 /api/classes/[id]/students를 다시 부르지 않는다.
+          if (data.dashboard) {
+            setStudents(data.dashboard.students);
+            loadedRosterClassId.current = data.selectedClassId;
+          }
           setSelectedClassId(data.selectedClassId);
           // 학급이 이미 있는 교사에게 학급 관리는 첫 화면으로 쓸모가 없다.
           setActiveTab((tab) => (tab === "class" ? "dashboard" : tab));
         } else {
           setSelectedClassId("");
           setStudents([]);
+          loadedRosterClassId.current = null;
         }
       } catch {
         setClasses([]);
@@ -505,9 +519,12 @@ export default function TeacherPage() {
 
   useEffect(() => {
     if (selectedClassId) {
-      loadStudents(selectedClassId).catch((err: Error) =>
-        setAuthError(err.message)
-      );
+      // 이미 이 학급 명단을 들고 있으면(부트스트랩이 실어다 준 경우 포함) 다시 읽지 않는다.
+      if (loadedRosterClassId.current !== selectedClassId) {
+        loadStudents(selectedClassId).catch((err: Error) =>
+          setAuthError(err.message)
+        );
+      }
     } else {
       setFeeds([]);
     }
@@ -631,6 +648,7 @@ export default function TeacherPage() {
     await api("/api/auth/teacher/logout", { method: "POST" });
     setClasses([]);
     setStudents([]);
+    loadedRosterClassId.current = null;
     setFeeds([]);
     setSelectedClassId("");
     setHasTeacherSession(false);
@@ -654,6 +672,7 @@ export default function TeacherPage() {
       setDeleteAccountPassword("");
       setClasses([]);
       setStudents([]);
+      loadedRosterClassId.current = null;
       setFeeds([]);
       setSelectedClassId("");
       setHasTeacherSession(false);
@@ -692,6 +711,7 @@ export default function TeacherPage() {
       if (selectedClassId === classId) {
         setSelectedClassId("");
         setStudents([]);
+        loadedRosterClassId.current = null;
       }
       setDeleteConfirmClass(null);
       setDeleteClassNameInput("");
