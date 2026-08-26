@@ -20,7 +20,7 @@ export type AiUsage = {
 };
 
 // 이번 달 1일 서울 자정의 UTC ISO
-const seoulMonthStartIso = () =>
+export const seoulMonthStartIso = () =>
   getSeoulDayRange(`${todayDate().slice(0, 7)}-01`).startIso;
 
 // 등급별 월 한도 — app_settings의 값을 읽어 결정(관리자는 무제한).

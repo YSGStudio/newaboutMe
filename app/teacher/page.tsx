@@ -156,6 +156,8 @@ export default function TeacherPage() {
   // 부트스트랩이 함께 실어 준 첫 대시보드. 대시보드가 스스로 다시 부르지 않도록 넘긴다.
   const [bootstrapDashboard, setBootstrapDashboard] = useState<ClassDashboardData | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
+  // 부트스트랩이 도는 동안 로그인 화면에 안내를 띄운다.
+  const [bootstrapping, setBootstrapping] = useState(false);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -440,7 +442,10 @@ export default function TeacherPage() {
   // 첫 진입은 부트스트랩 한 번으로 끝낸다.
   // 예전에는 classes·role·usage를 각각 부르고, 학급 목록이 와야 대시보드를 불러
   // 브라우저 왕복이 5회였다. 인증(getUser + 프로필 조회)도 요청마다 반복됐다.
+  // 데이터를 다 받은 뒤에야 대시보드로 넘어간다.
+  // 화면부터 띄우고 나중에 채우면 빈 카드가 먼저 보였다가 값이 튀어 들어와 어수선하다.
   const runBootstrap = useCallback(async () => {
+    setBootstrapping(true);
     {
       try {
         const data = await api<{
@@ -471,6 +476,7 @@ export default function TeacherPage() {
         setHasTeacherSession(false);
       } finally {
         setBootstrapped(true);
+        setBootstrapping(false);
       }
     }
   }, []);
@@ -568,8 +574,8 @@ export default function TeacherPage() {
             password: payload.password,
           }),
         });
-        setAuthMessage("인증 성공. 학급 데이터를 불러옵니다.");
-        setHasTeacherSession(true);
+        // hasTeacherSession은 부트스트랩이 끝날 때 켜진다.
+        // 미리 켜면 데이터 없는 대시보드가 먼저 보인다.
         await runBootstrap();
       }
       clearNoticeLater();
@@ -1033,6 +1039,8 @@ export default function TeacherPage() {
   // 부트스트랩이 끝나기 전에는 로그인 화면을 띄우지 않는다.
   // 세션이 있는데도 로그인 폼이 잠깐 스쳤다가 사라지는 깜빡임을 막는다.
   const isCheckingSession = !bootstrapped && !hasTeacherSession;
+  // 로그인 화면 위에 덮는 안내. 첫 진입의 세션 확인과 로그인 직후 로딩을 같은 화면으로 다룬다.
+  const isPreparing = bootstrapping || isCheckingSession;
 
   const onChangeFeedDate = (nextDate: string) => {
     setFeedDate(nextDate);
@@ -1179,7 +1187,19 @@ export default function TeacherPage() {
         </div>
       )}
 
-      {!isAuthed && !isCheckingSession && (
+      {/* 데이터를 다 받을 때까지 로그인 화면에 머문다. 다 받으면 대시보드로 넘어간다. */}
+      {!isAuthed && isPreparing && (
+        <section className="card auth-login-shell">
+          <AuthIllustration role="teacher" />
+          <div className="auth-form-panel auth-preparing-panel" role="status" aria-live="polite">
+            <span className="auth-preparing-spinner" aria-hidden="true">✦</span>
+            <strong>데이터를 불러오는 중입니다.</strong>
+            <p>학급과 학생 기록을 준비하고 있어요. 잠시만 기다려주세요.</p>
+          </div>
+        </section>
+      )}
+
+      {!isAuthed && !isPreparing && (
         <section className="card auth-login-shell">
           <AuthIllustration role="teacher" />
           <div className="auth-form-panel">

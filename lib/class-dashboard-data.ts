@@ -33,8 +33,18 @@ export type ClassDashboardPayload = Awaited<ReturnType<typeof buildClassDashboar
 
 /** 학급을 담당하지 않는 교사가 부르면 null을 돌려준다. 라우트가 403으로 바꾼다. */
 export async function buildClassDashboard(classId: string, teacherId: string) {
-  // 소유 확인과 학생 조회를 함께 던진다. 확인 후 조회하면 왕복이 하나 더 늘어난다.
-  const [ownedRes, studentRes] = await Promise.all([
+  const dates = recentSeoulDates(LOOKBACK_DAYS);
+  const today = todayDate();
+  const rangeStartIso = new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString();
+  const weekAgo = formatDateInSeoul(new Date(Date.now() - 7 * 86400000));
+  const twoWeeksAgo = formatDateInSeoul(new Date(Date.now() - 14 * 86400000));
+
+  // 전부 학급 기준으로 거른다. 학생 목록을 먼저 받아 그 id로 좁히던 때는
+  // 이 배치가 학생 조회를 기다려야 해서 왕복이 한 번 더 있었다.
+  const [
+    ownedRes, studentRes,
+    feedsRes, plansRes, checksRes, learningActRes, learningSubRes, nominationRes, lettersRes,
+  ] = await Promise.all([
     supabaseAdmin
       .from('classes')
       .select('id')
@@ -46,43 +56,22 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       .select('id,name,student_number')
       .eq('class_id', classId)
       .order('student_number', { ascending: true }),
-  ]);
-
-  // 담당 학급이 아니면 학생 데이터를 들고 있더라도 내보내지 않는다.
-  if (!ownedRes.data) return null;
-  if (studentRes.error) throw new Error(studentRes.error.message);
-
-  const students = studentRes.data ?? [];
-  const dates = recentSeoulDates(LOOKBACK_DAYS);
-  const today = todayDate();
-
-  if (students.length === 0) {
-    return { students: [], kpi: null, watch: [] };
-  }
-
-  const studentIds = students.map((s) => s.id);
-  const rangeStartIso = new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString();
-  const weekAgo = formatDateInSeoul(new Date(Date.now() - 7 * 86400000));
-  const twoWeeksAgo = formatDateInSeoul(new Date(Date.now() - 14 * 86400000));
-
-  // 테이블별로 한 번씩만 읽는다.
-  const [feedsRes, plansRes, checksRes, learningActRes, learningSubRes, nominationRes, lettersRes] = await Promise.all([
     supabaseAdmin
       .from('emotion_feeds')
-      .select('student_id,emotion_type,created_at')
-      .in('student_id', studentIds)
+      .select('student_id,emotion_type,created_at,students!inner(class_id)')
+      .eq('students.class_id', classId)
       .gte('created_at', rangeStartIso),
     supabaseAdmin
       .from('plans')
-      .select('id,student_id')
-      .in('student_id', studentIds)
+      .select('id,student_id,students!inner(class_id)')
+      .eq('students.class_id', classId)
       .eq('is_active', true),
-    // 임베드 조인으로 이 학급 학생의 체크만 서버에서 걸러 온다.
-    // 예전에는 전체 학급의 2주치를 받아 메모리에서 걸러, 학급이 늘수록 그대로 커졌다.
+    // plans → students 2단계 조인으로 이 학급 체크만 서버에서 걸러 온다.
+    // 예전에는 전체 학급의 2주치를 받아 메모리에서 걸렀다.
     supabaseAdmin
       .from('plan_checks')
-      .select('plan_id,is_completed,check_date,plans!inner(student_id)')
-      .in('plans.student_id', studentIds)
+      .select('plan_id,is_completed,check_date,plans!inner(students!inner(class_id))')
+      .eq('plans.students.class_id', classId)
       .gte('check_date', twoWeeksAgo),
     supabaseAdmin
       .from('learning_activities')
@@ -91,8 +80,8 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('learning_submissions')
-      .select('activity_id,student_id,status,feedback_text,submitted_at')
-      .in('student_id', studentIds),
+      .select('activity_id,student_id,status,feedback_text,submitted_at,students!inner(class_id)')
+      .eq('students.class_id', classId),
     // 설문과 지명을 한 번에 가져온다. 최신 설문 id를 받은 뒤 다시 조회하면 왕복이 하나 늘어난다.
     supabaseAdmin
       .from('relationship_nominations')
@@ -104,6 +93,16 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       .eq('class_id', classId)
       .is('teacher_archived_at', null),
   ]);
+
+  // 담당 학급이 아니면 데이터를 들고 있더라도 내보내지 않는다.
+  if (!ownedRes.data) return null;
+  if (studentRes.error) throw new Error(studentRes.error.message);
+
+  const students = studentRes.data ?? [];
+  if (students.length === 0) {
+    return { students: [], kpi: null, watch: [] };
+  }
+  const studentIds = students.map((s) => s.id);
 
   const feeds = feedsRes.data ?? [];
   const plans = plansRes.data ?? [];
