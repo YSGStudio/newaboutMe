@@ -3,7 +3,14 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate } from '@/lib/date';
 import type { Period } from '@/lib/stats';
 import { gatherGrowthReportData } from './growthReportData';
-import { SYSTEM_PROMPT, buildUserPrompt, growthReportResponseSchema, type GrowthReportResult } from './growthReportPrompt';
+import {
+  SYSTEM_PROMPT,
+  buildUserPrompt,
+  growthReportResponseSchema,
+  hasEnoughDataForHolland,
+  type GrowthReportResult,
+  type HollandResult,
+} from './growthReportPrompt';
 import { assertNoRealName } from './anonymize';
 import { getOpenAIClient, GROWTH_REPORT_MODEL } from './openaiClient';
 
@@ -21,12 +28,30 @@ export type GrowthReportApiResult = GrowthReportResult & {
   dataSummary?: { planCount: number; emotionCount: number };
 };
 
+// 통합 이전(2026-08-28 마이그레이션 전)에 저장된 행은 요약·키워드·성향이 비어 있다.
+// 그 행도 그대로 읽어서 보여주고, 재분석하면 3부 구성으로 채워진다.
 type CachedRow = {
+  overall_summary: string | null;
+  strength_keywords: unknown;
   plan_analysis: string;
   emotion_insight: string;
+  learning_insight: string | null;
   growth_suggestion: string;
+  holland_primary_type: string | null;
+  holland_primary_label: string | null;
+  holland_primary_reason: string | null;
+  holland_secondary_type: string | null;
+  holland_secondary_label: string | null;
+  holland_secondary_reason: string | null;
+  holland_career_suggestions: unknown;
   created_at: string;
 };
+
+const CACHED_COLUMNS =
+  'overall_summary, strength_keywords, plan_analysis, emotion_insight, learning_insight, growth_suggestion, ' +
+  'holland_primary_type, holland_primary_label, holland_primary_reason, ' +
+  'holland_secondary_type, holland_secondary_label, holland_secondary_reason, ' +
+  'holland_career_suggestions, created_at';
 
 export async function getOrGenerateGrowthReport(
   studentId: string,
@@ -41,14 +66,14 @@ export async function getOrGenerateGrowthReport(
   if (!forceRefresh) {
     const { data: cached } = await supabaseAdmin
       .from('ai_growth_reports')
-      .select('plan_analysis, emotion_insight, growth_suggestion, created_at')
+      .select(CACHED_COLUMNS)
       .eq('student_id', studentId)
       .eq('period', period)
       .eq('generated_date', generatedDate)
       .maybeSingle();
 
     if (cached) {
-      return buildApiResultFromCache(cached as CachedRow);
+      return buildApiResultFromCache(cached as unknown as CachedRow);
     }
   }
 
@@ -93,7 +118,10 @@ export async function getOrGenerateGrowthReport(
     throw new Error('AI 응답 형식이 올바르지 않습니다.');
   }
 
-  const result = validated.data;
+  // 근거가 부족한데도 모델이 성향을 채워 보내는 경우가 있어 서버에서 한 번 더 막는다.
+  const holland: HollandResult | null =
+    hasEnoughDataForHolland(data) ? validated.data.holland ?? null : null;
+  const result: GrowthReportResult = { ...validated.data, holland };
 
   const { error: saveError } = await supabaseAdmin
     .from('ai_growth_reports')
@@ -102,9 +130,19 @@ export async function getOrGenerateGrowthReport(
       teacher_id: teacherId,
       period,
       generated_date: generatedDate,
+      overall_summary: result.overallSummary,
+      strength_keywords: result.strengthKeywords,
       plan_analysis: result.planAnalysis,
       emotion_insight: result.emotionInsight,
+      learning_insight: result.learningInsight ?? null,
       growth_suggestion: result.growthSuggestion,
+      holland_primary_type: holland?.primaryType ?? null,
+      holland_primary_label: holland?.primaryLabel ?? null,
+      holland_primary_reason: holland?.primaryReason ?? null,
+      holland_secondary_type: holland?.secondaryType ?? null,
+      holland_secondary_label: holland?.secondaryLabel ?? null,
+      holland_secondary_reason: holland?.secondaryReason ?? null,
+      holland_career_suggestions: holland?.careerSuggestions ?? null,
     }, { onConflict: 'student_id,period,generated_date' });
 
   // 저장 실패를 삼키면 "분석은 됐는데 다시 열면 사라지는" 유령 버그가 된다.
@@ -127,7 +165,7 @@ export async function getOrGenerateGrowthReport(
 export async function getSavedGrowthReport(studentId: string, period: Period): Promise<GrowthReportApiResult | null> {
   const { data } = await supabaseAdmin
     .from('ai_growth_reports')
-    .select('plan_analysis, emotion_insight, growth_suggestion, created_at')
+    .select(CACHED_COLUMNS)
     .eq('student_id', studentId)
     .eq('period', period)
     .order('generated_date', { ascending: false })
@@ -135,14 +173,36 @@ export async function getSavedGrowthReport(studentId: string, period: Period): P
     .maybeSingle();
 
   if (!data) return null;
-  return buildApiResultFromCache(data as CachedRow);
+  return buildApiResultFromCache(data as unknown as CachedRow);
 }
 
+/** JSONB 컬럼은 무엇이든 들어올 수 있으므로 문자열 배열로 좁혀서 꺼낸다. */
+const toStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
 function buildApiResultFromCache(cached: CachedRow): GrowthReportApiResult {
+  // 홀란드는 주 유형이 있어야 의미가 있다. 통합 이전 행은 여기서 자연스럽게 null이 된다.
+  const holland: HollandResult | null =
+    cached.holland_primary_type && cached.holland_primary_label && cached.holland_primary_reason
+      ? {
+          primaryType: cached.holland_primary_type as HollandResult['primaryType'],
+          primaryLabel: cached.holland_primary_label,
+          primaryReason: cached.holland_primary_reason,
+          secondaryType: (cached.holland_secondary_type as HollandResult['secondaryType']) ?? null,
+          secondaryLabel: cached.holland_secondary_label ?? null,
+          secondaryReason: cached.holland_secondary_reason ?? null,
+          careerSuggestions: toStringArray(cached.holland_career_suggestions),
+        }
+      : null;
+
   return {
+    overallSummary: cached.overall_summary ?? '',
+    strengthKeywords: toStringArray(cached.strength_keywords),
     planAnalysis: cached.plan_analysis,
     emotionInsight: cached.emotion_insight,
+    learningInsight: cached.learning_insight ?? undefined,
     growthSuggestion: cached.growth_suggestion,
+    holland,
     generatedAt: cached.created_at,
     cached: true,
   };

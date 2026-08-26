@@ -3,7 +3,8 @@
 /**
  * StatsDashboard — "성장리포트" 탭
  * 학생별 통계(오늘/기간 실천률, 감정 분포, 배움성찰 현황)를 카드로 보여주고,
- * AI 성장 분석·홀란드 성향 분석을 개별 학생에 대해 실행하며, 개별/전체 PDF로 내보냅니다.
+ * AI 성장 리포트(총평·영역별 인사이트·홀란드 성향을 한 번에 생성)를 개별 학생에 대해 실행하며,
+ * 개별/전체 PDF로 내보냅니다.
  * "전체 리포트 내보내기"와 "전체 분석하기"는 유료(PRO) 전용 — canBatchAnalyze prop으로 잠급니다.
  */
 import { useEffect, useState } from 'react';
@@ -100,19 +101,10 @@ const learningSubmittedCount = (summary: LearningReport['summary']) => summary.s
 /** 배움성찰 블록 강조색 — 평가피드백이 쓰던 주황 계열 자리를 그대로 물려받는다. */
 const LEARNING_ACCENT = '#ea580c';
 
-type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; learning: LearningReport | null; ai: GrowthAiResult | null; aiError?: string; holland?: HollandAiResult | null };
+type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; learning: LearningReport | null; ai: GrowthAiResult | null; aiError?: string };
 
-type GrowthAiResult = {
-  planAnalysis: string;
-  emotionInsight: string;
-  // 배움성찰 기록이 없는 학급도 있어 AI가 생략할 수 있다.
-  learningInsight?: string;
-  growthSuggestion: string;
-  generatedAt: string;
-  cached: boolean;
-};
-
-type HollandAiResult = {
+/** 홀란드 성향 — 통합 리포트의 ③ 앞으로 파트. 근거가 부족하면 AI가 생략하므로 null일 수 있습니다. */
+type HollandResult = {
   primaryType: string;
   primaryLabel: string;
   primaryReason: string;
@@ -120,7 +112,23 @@ type HollandAiResult = {
   secondaryLabel?: string | null;
   secondaryReason?: string | null;
   careerSuggestions: string[];
+};
+
+/**
+ * 통합 AI 성장 리포트 — 분석 한 번으로 3부(한눈에 보기 / 지금의 모습 / 앞으로)가 모두 나옵니다.
+ * 통합(2026-08-28) 이전에 저장된 분석은 overallSummary가 빈 문자열이고 holland가 null입니다.
+ */
+type GrowthAiResult = {
+  overallSummary: string;
+  strengthKeywords: string[];
+  planAnalysis: string;
+  emotionInsight: string;
+  // 배움성찰 기록이 없는 학급도 있어 AI가 생략할 수 있다.
+  learningInsight?: string;
+  growthSuggestion: string;
+  holland?: HollandResult | null;
   generatedAt: string;
+  cached: boolean;
 };
 
 const HOLLAND_TYPE_COLOR: Record<string, { bg: string; color: string }> = {
@@ -140,7 +148,8 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
 
 
 // AI 분석 버튼(분석하기/재분석)을 누를 때마다 사용량 차감을 사전에 알리는 확인창
-const AI_USAGE_CONFIRM_MESSAGE = 'AI 분석을 사용합니다. AI 분석 사용횟수를 1회 차감합니다.';
+// 성장 분석과 성향 분석이 한 번의 호출로 합쳐져 있어 차감은 1회다.
+const AI_USAGE_CONFIRM_MESSAGE = '성장 분석과 성향 분석을 한 번에 생성합니다. AI 분석 사용횟수를 1회 차감합니다.';
 
 const api = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
@@ -351,39 +360,42 @@ const buildStudentHtmlBlock = (
     </div>` : ''}`;
 };
 
+/**
+ * PDF용 통합 AI 리포트 블록 — ① 한눈에 보기 / ② 지금의 모습 / ③ 앞으로 3부를 한 덩어리로 그립니다.
+ * 화면(AiGrowthSection)과 같은 순서·같은 강조색을 씁니다.
+ */
 const buildAiSectionHtml = (ai: GrowthAiResult | null, errorMessage?: string): string => {
   if (!ai) {
     return `<p style="margin-top:12px;font-size:13px;color:#ef4444;text-align:center">${escapeHtml(errorMessage || 'AI 분석을 불러올 수 없습니다.')}</p>`;
   }
 
-  const aiCard = (label: string, body: string, accent: string) => `
+  const partLabel = (text: string) => `
+    <p style="margin:14px 0 8px;font-size:12px;font-weight:800;color:#86198f;letter-spacing:0.02em">${escapeHtml(text)}</p>`;
+
+  const insightCard = (label: string, body: string, accent: string) => `
     <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid ${accent}">
       <p style="margin:0 0 5px;font-size:12px;font-weight:700;color:${accent}">
-        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${accent};margin-right:6px;vertical-align:middle"></span>${label}
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${accent};margin-right:6px;vertical-align:middle"></span>${escapeHtml(label)}
       </p>
       <p style="margin:0;font-size:13px;color:#334155;line-height:1.65">${escapeHtml(body)}</p>
     </div>`;
 
-  return `
-    <div style="background:#fdf4ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #f0abfc">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:20px">✨</span>
-        <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 분석</span>
-      </div>
-      ${aiCard('일일계획 실천 분석', ai.planAnalysis, '#16a34a')}
-      ${aiCard('감정 패턴 인사이트', ai.emotionInsight, '#7c3aed')}
-      ${ai.learningInsight ? aiCard('배움성찰 인사이트', ai.learningInsight, LEARNING_ACCENT) : ''}
-      ${aiCard('맞춤 성장 제언', ai.growthSuggestion, '#0284c7')}
-      <p style="margin:2px 0 0;font-size:11px;color:#9333ea;text-align:center">⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.</p>
-    </div>`;
-};
+  const chip = (text: string, bg: string, color: string) =>
+    `<span style="display:inline-block;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:${bg};color:${color};margin:0 6px 6px 0">${escapeHtml(text)}</span>`;
 
-const buildHollandSectionHtml = (holland: HollandAiResult | null): string => {
-  if (!holland) return '';
+  // ── ① 한눈에 보기 ── (통합 이전에 저장된 분석은 총평이 없어 통째로 생략된다)
+  const summaryHtml = ai.overallSummary
+    ? `${partLabel('① 한눈에 보기')}
+      <div style="background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid #a21caf">
+        <p style="margin:0;font-size:13.5px;color:#1e293b;line-height:1.7;font-weight:600">${escapeHtml(ai.overallSummary)}</p>
+        ${ai.strengthKeywords.length > 0
+          ? `<div style="margin-top:10px">${ai.strengthKeywords.map((k) => chip(`✦ ${k}`, '#ede9fe', '#6366f1')).join('')}</div>`
+          : ''}
+      </div>`
+    : '';
 
-  const primary = HOLLAND_TYPE_COLOR[holland.primaryType] ?? { bg: '#f1f5f9', color: '#334155' };
-  const secondary = holland.secondaryType ? (HOLLAND_TYPE_COLOR[holland.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
-
+  // ── ③ 앞으로 · 홀란드 성향 ──
+  const holland = ai.holland ?? null;
   const typeCard = (badge: string, badgeColor: string, bg: string, label: string, reason: string) => `
     <div style="background:${bg};border-radius:10px;padding:10px 12px;margin-bottom:8px">
       <p style="margin:0 0 6px">
@@ -393,25 +405,46 @@ const buildHollandSectionHtml = (holland: HollandAiResult | null): string => {
       <p style="margin:0;font-size:13px;color:#1e293b;line-height:1.65">${escapeHtml(reason)}</p>
     </div>`;
 
-  const careerChips = holland.careerSuggestions
-    .map((c) => `<span style="display:inline-block;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:#e0f2fe;color:#0c4a6e;margin:0 6px 6px 0">${escapeHtml(c)}</span>`)
-    .join('');
-
-  return `
-    <div style="background:#f0f9ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #bae6fd">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:20px">🔍</span>
-        <span style="font-size:15px;font-weight:700;color:#0c4a6e">홀란드 기반 성향 분석</span>
-      </div>
+  let hollandHtml = '';
+  if (holland) {
+    const primary = HOLLAND_TYPE_COLOR[holland.primaryType] ?? { bg: '#f1f5f9', color: '#334155' };
+    const secondary = holland.secondaryType ? (HOLLAND_TYPE_COLOR[holland.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+    hollandHtml = `
       ${typeCard(`주된 성향 · ${holland.primaryType}형`, primary.color, primary.bg, holland.primaryLabel, holland.primaryReason)}
       ${secondary && holland.secondaryLabel && holland.secondaryReason
         ? typeCard(`보조 성향 · ${holland.secondaryType}형`, secondary.color, secondary.bg, holland.secondaryLabel, holland.secondaryReason)
         : ''}
-      <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#0369a1">💼 추천 직업군</p>
-        <div>${careerChips}</div>
+      ${holland.careerSuggestions.length > 0
+        ? `<div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+             <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#0369a1">💼 추천 직업군</p>
+             <div>${holland.careerSuggestions.map((c) => chip(c, '#e0f2fe', '#0c4a6e')).join('')}</div>
+           </div>`
+        : ''}`;
+  } else {
+    hollandHtml = `
+      <p style="background:#fff;border-radius:10px;padding:10px 12px;margin:0 0 8px;font-size:12.5px;color:#64748b;line-height:1.6">
+        성향을 추론할 기록이 아직 부족해 이번 리포트에는 홀란드 분석이 포함되지 않았습니다.
+      </p>`;
+  }
+
+  return `
+    <div style="background:#fdf4ff;border-radius:16px;padding:18px 18px 14px;margin-top:12px;border:1px solid #f0abfc">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:20px">✨</span>
+        <span style="font-size:15px;font-weight:700;color:#86198f">AI 성장 리포트</span>
       </div>
-      <p style="margin:2px 0 0;font-size:11px;color:#0369a1;text-align:center">⚠ AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.</p>
+      ${summaryHtml}
+      ${partLabel('② 지금의 모습')}
+      ${insightCard('일일계획 실천 분석', ai.planAnalysis, '#16a34a')}
+      ${insightCard('감정 패턴 인사이트', ai.emotionInsight, '#7c3aed')}
+      ${ai.learningInsight ? insightCard('배움성찰 인사이트', ai.learningInsight, LEARNING_ACCENT) : ''}
+      ${partLabel('③ 앞으로')}
+      ${hollandHtml}
+      ${insightCard('맞춤 성장 제언', ai.growthSuggestion, '#0284c7')}
+      <p style="margin:6px 0 0;font-size:11px;color:#9333ea;text-align:center;line-height:1.6">
+        ⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.<br />
+        성향 분석은 AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.
+      </p>
     </div>`;
 };
 
@@ -500,12 +533,15 @@ function SummaryTile({ icon, label, value, accent }: { icon: string; label: stri
   );
 }
 
-const AI_GROWTH_SECTIONS: { key: keyof Pick<GrowthAiResult, 'planAnalysis' | 'emotionInsight' | 'learningInsight' | 'growthSuggestion'>; label: string; accent: string }[] = [
+/** ② 지금의 모습 — 자료 출처별 인사이트 세 블록. 배움성찰은 기록이 없으면 AI가 생략합니다. */
+const AI_NOW_SECTIONS: { key: keyof Pick<GrowthAiResult, 'planAnalysis' | 'emotionInsight' | 'learningInsight'>; label: string; accent: string }[] = [
   { key: 'planAnalysis', label: '일일계획 실천 분석', accent: '#16a34a' },
   { key: 'emotionInsight', label: '감정 패턴 인사이트', accent: '#7c3aed' },
   { key: 'learningInsight', label: '배움성찰 인사이트', accent: LEARNING_ACCENT },
-  { key: 'growthSuggestion', label: '맞춤 성장 제언', accent: '#0284c7' },
 ];
+
+/** 맞춤 성장 제언 — ③ 앞으로의 마지막 블록이라 위 목록과 분리해 둡니다. */
+const AI_SUGGESTION_ACCENT = '#0284c7';
 
 /**
  * LearningSection — 성장리포트의 "배움성찰 현황" 블록
@@ -642,6 +678,46 @@ function EvalSection({ reports, loading }: { reports: EvalReportSummary[]; loadi
   );
 }
 
+/** 리포트 3부 각 파트의 머리말 */
+function PartLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 800, color: '#86198f', letterSpacing: '0.02em' }}>
+      {children}
+    </p>
+  );
+}
+
+/** 좌측에 강조색 띠를 두른 흰 카드 — ②·③의 인사이트 블록 공통 모양 */
+function InsightCard({ label, accent, body }: { label: string; accent: string; body: string }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', borderLeft: `3px solid ${accent}` }}>
+      <p style={{ margin: '0 0 5px', fontSize: 12, fontWeight: 700, color: accent, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: accent, flexShrink: 0 }} />
+        {label}
+      </p>
+      <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.65 }}>{body}</p>
+    </div>
+  );
+}
+
+/** 홀란드 주/보조 성향 카드 */
+function HollandTypeCard({ badge, label, reason, tone }: { badge: string; label: string; reason: string; tone: { bg: string; color: string } }) {
+  return (
+    <div style={{ background: tone.bg, borderRadius: 10, padding: '10px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: tone.color, color: '#fff' }}>{badge}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: tone.color }}>{label}</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{reason}</p>
+    </div>
+  );
+}
+
+/**
+ * AiGrowthSection — 통합 AI 성장 리포트 (분석 버튼 1개)
+ * 예전에는 성장 분석과 홀란드 성향 분석이 카드 두 개로 나뉘어 각각 버튼을 눌러야 했습니다.
+ * 지금은 한 번의 분석으로 ① 한눈에 보기 → ② 지금의 모습 → ③ 앞으로 세 부분을 모두 보여줍니다.
+ */
 function AiGrowthSection({
   result, loading, error, onAnalyze,
 }: {
@@ -650,25 +726,34 @@ function AiGrowthSection({
   error: string;
   onAnalyze: (forceRefresh: boolean) => void;
 }) {
+  const holland = result?.holland ?? null;
+  const primaryTone = holland ? (HOLLAND_TYPE_COLOR[holland.primaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+  const secondaryTone = holland?.secondaryType ? (HOLLAND_TYPE_COLOR[holland.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
+
   return (
     <div style={{ background: '#fdf4ff', borderRadius: 12, padding: '12px 14px 10px', border: '1px solid #f0abfc' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <span style={{ fontSize: 14 }}>✨</span>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#86198f' }}>AI 성장 분석</h3>
+        <span style={{ fontSize: 14 }} aria-hidden>✨</span>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#86198f' }}>AI 성장 리포트</h3>
         {result?.cached && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a21caf', background: '#fae8ff', borderRadius: 20, padding: '2px 8px' }}>캐시됨</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a21caf', background: '#fae8ff', borderRadius: 999, padding: '2px 8px' }}>캐시됨</span>
         )}
       </div>
 
       {!result && !loading && (
-        <button type="button" className="ghost" style={{ width: '100%' }} onClick={() => onAnalyze(false)}>
-          ✨ 분석하기
-        </button>
+        <div style={{ textAlign: 'center', padding: '4px 0 0' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
+            계획·감정·배움성찰을 종합해 총평, 영역별 인사이트, 홀란드 성향과 성장 제언을 한 번에 생성합니다.
+          </p>
+          <button type="button" className="ghost" style={{ width: '100%' }} onClick={() => onAnalyze(false)}>
+            ✨ 분석하기
+          </button>
+        </div>
       )}
 
       {loading && (
         <div style={{ textAlign: 'center', padding: '16px 0', color: '#86198f' }}>
-          <p style={{ margin: 0, fontSize: 13 }}>AI가 분석하고 있습니다... (3~5초 소요)</p>
+          <p style={{ margin: 0, fontSize: 13 }}>AI가 분석하고 있습니다... (5~10초 소요)</p>
         </div>
       )}
 
@@ -677,114 +762,75 @@ function AiGrowthSection({
       {result && !loading && (
         <>
           <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+            {/* ── ① 한눈에 보기 ── 통합 이전에 저장된 분석에는 총평이 없어 통째로 생략된다 */}
+            {result.overallSummary && (
+              <>
+                <PartLabel>① 한눈에 보기</PartLabel>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', borderLeft: '3px solid #a21caf' }}>
+                  <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#1e293b', lineHeight: 1.7 }}>{result.overallSummary}</p>
+                  {result.strengthKeywords.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                      {result.strengthKeywords.map((keyword) => (
+                        <span key={keyword} className="badge">✦ {keyword}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ── ② 지금의 모습 ── */}
+            <PartLabel>② 지금의 모습</PartLabel>
             {/* 배움성찰 인사이트는 기록이 없으면 AI가 생략하므로 빈 카드가 남지 않게 거른다 */}
-            {AI_GROWTH_SECTIONS.filter(({ key }) => Boolean(result[key])).map(({ key, label, accent }) => (
-              <div key={key} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', borderLeft: `3px solid ${accent}` }}>
-                <p style={{ margin: '0 0 5px', fontSize: 12, fontWeight: 700, color: accent, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: accent, flexShrink: 0 }} />
-                  {label}
-                </p>
-                <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.65 }}>{result[key]}</p>
-              </div>
+            {AI_NOW_SECTIONS.filter(({ key }) => Boolean(result[key])).map(({ key, label, accent }) => (
+              <InsightCard key={key} label={label} accent={accent} body={result[key] as string} />
             ))}
+
+            {/* ── ③ 앞으로 ── */}
+            <PartLabel>③ 앞으로</PartLabel>
+            {holland && primaryTone ? (
+              <>
+                <HollandTypeCard
+                  badge={`주된 성향 · ${holland.primaryType}형`}
+                  label={holland.primaryLabel}
+                  reason={holland.primaryReason}
+                  tone={primaryTone}
+                />
+                {holland.secondaryType && holland.secondaryLabel && holland.secondaryReason && secondaryTone && (
+                  <HollandTypeCard
+                    badge={`보조 성향 · ${holland.secondaryType}형`}
+                    label={holland.secondaryLabel}
+                    reason={holland.secondaryReason}
+                    tone={secondaryTone}
+                  />
+                )}
+                {holland.careerSuggestions.length > 0 && (
+                  <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#0369a1' }}>💼 추천 직업군</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {holland.careerSuggestions.map((career) => (
+                        <span key={career} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: '#e0f2fe', color: '#0c4a6e' }}>
+                          {career}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', margin: 0, fontSize: 12.5, color: '#64748b', lineHeight: 1.6 }}>
+                성향을 추론할 기록이 아직 부족해 홀란드 분석은 포함되지 않았습니다. 감정 기록이 10건 이상 쌓이면 다음 분석에 함께 나옵니다.
+              </p>
+            )}
+            <InsightCard label="맞춤 성장 제언" accent={AI_SUGGESTION_ACCENT} body={result.growthSuggestion} />
           </div>
+
           <button type="button" className="outline" style={{ width: '100%', fontSize: 12 }} onClick={() => onAnalyze(true)} disabled={loading}>
             🔄 재분석
           </button>
-          <p style={{ margin: '8px 0 0', fontSize: 11, color: '#9333ea', textAlign: 'center' }}>
-            ⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
-function HollandSection({
-  result, loading, error, onGenerate,
-}: {
-  result: HollandAiResult | null;
-  loading: boolean;
-  error: string;
-  onGenerate: () => void;
-}) {
-  const primaryColor = result ? (HOLLAND_TYPE_COLOR[result.primaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
-  const secondaryColor = result?.secondaryType ? (HOLLAND_TYPE_COLOR[result.secondaryType] ?? { bg: '#f1f5f9', color: '#334155' }) : null;
-
-  return (
-    <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '12px 14px 12px', border: '1px solid #bae6fd' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <span style={{ fontSize: 14 }}>🔍</span>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0c4a6e' }}>홀란드 기반 성향 분석</h3>
-        {result && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#0369a1', background: '#e0f2fe', borderRadius: 20, padding: '2px 8px' }}>
-            {new Date(result.generatedAt).toLocaleDateString('ko-KR')}
-          </span>
-        )}
-      </div>
-
-      {!result && !loading && (
-        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
-            계획·감정·평가 데이터를 바탕으로 홀란드 RIASEC 성향을 분석합니다.
-          </p>
-          <button type="button" className="ghost" style={{ width: '100%', fontSize: 13 }} onClick={onGenerate}>
-            🔍 AI 생성
-          </button>
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '16px 0', color: '#0c4a6e' }}>
-          <p style={{ margin: 0, fontSize: 13 }}>AI가 성향을 분석하고 있습니다... (5~10초 소요)</p>
-        </div>
-      )}
-
-      {error && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#ef4444' }}>{error}</p>}
-
-      {result && !loading && (
-        <>
-          {/* 주된 성향 */}
-          <div style={{ background: primaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: primaryColor?.color, color: '#fff' }}>
-                주된 성향 · {result.primaryType}형
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: primaryColor?.color }}>{result.primaryLabel}</span>
-            </div>
-            <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{result.primaryReason}</p>
-          </div>
-
-          {/* 보조 성향 */}
-          {result.secondaryType && result.secondaryLabel && result.secondaryReason && (
-            <div style={{ background: secondaryColor?.bg, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: secondaryColor?.color, color: '#fff' }}>
-                  보조 성향 · {result.secondaryType}형
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: secondaryColor?.color }}>{result.secondaryLabel}</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{result.secondaryReason}</p>
-            </div>
-          )}
-
-          {/* 추천 직업 */}
-          <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#0369a1' }}>💼 추천 직업군</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {result.careerSuggestions.map((career) => (
-                <span key={career} style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: '#e0f2fe', color: '#0c4a6e' }}>
-                  {career}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <button type="button" className="outline" style={{ width: '100%', fontSize: 12 }} onClick={onGenerate} disabled={loading}>
-            🔄 재분석
-          </button>
-          <p style={{ margin: '8px 0 0', fontSize: 11, color: '#0369a1', textAlign: 'center' }}>
-            ⚠ AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: '#9333ea', textAlign: 'center', lineHeight: 1.6 }}>
+            ⚠ AI 생성 결과는 참고용입니다. 학교생활기록부 기재 전 반드시 검토하세요.<br />
+            성향 분석은 AI 추론 결과로, 정식 직업 적성 검사를 대체하지 않습니다.
           </p>
         </>
       )}
@@ -820,17 +866,12 @@ export default function StatsDashboard({ classId, students, className, canBatchA
   const [learningReport, setLearningReport] = useState<LearningReport | null>(null);
   const [exportAllLoading, setExportAllLoading] = useState(false);
 
-  // AI 성장 분석 (개별 학생, 모달)
+  // AI 성장 리포트 (개별 학생, 모달) — 성향 분석까지 이 하나에 담긴다
   const [aiResult, setAiResult] = useState<GrowthAiResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
-  // 홀란드 기반 성향 분석
-  const [hollandResult, setHollandResult] = useState<HollandAiResult | null>(null);
-  const [hollandLoading, setHollandLoading] = useState(false);
-  const [hollandError, setHollandError] = useState('');
-
-  // AI 성장 분석 (학급 전체)
+  // AI 성장 리포트 (학급 전체)
   const [classAiRunning, setClassAiRunning] = useState(false);
   const [classAiTotal, setClassAiTotal] = useState(0);
   // 분석 완료 후 PDF 다운로드를 위해 결과를 state에 보관 (popup은 사용자 클릭 시 열어야 차단 안 됨)
@@ -841,8 +882,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
     setAiResult(null);
     setAiError('');
-    setHollandResult(null);
-    setHollandError('');
 
     const load = async () => {
       setDetailLoading(true);
@@ -850,19 +889,17 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       setDetailError('');
       try {
         // 평가피드백은 비활성 상태다(lib/features.ts). 자료는 남아 있지만 불러오지 않는다.
-        const [snapshotData, evalData, learningData, hollandData, growthData] = await Promise.all([
+        const [snapshotData, evalData, learningData, growthData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
           EVAL_FEEDBACK_ENABLED
             ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`)
             : Promise.resolve({ reports: [] as EvalReportSummary[] }),
           api<LearningReport>(`/api/learning/student/${activeStudentId}?period=${period}`),
-          api<{ report: HollandAiResult | null }>(`/api/ai/holland-report/${activeStudentId}`),
           api<{ report: GrowthAiResult | null }>(`/api/ai/growth-report/${activeStudentId}?period=${period}`),
         ]);
         setSnapshot(snapshotData);
         setEvalReports(evalData.reports);
         setLearningReport(learningData);
-        if (hollandData.report) setHollandResult(hollandData.report);
         if (growthData.report) setAiResult(growthData.report);
       } catch (err) {
         setSnapshot(null);
@@ -894,22 +931,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     }
   };
 
-  const analyzeHolland = async () => {
-    if (!activeStudentId || hollandLoading) return;
-    if (!(await confirm(AI_USAGE_CONFIRM_MESSAGE))) return;
-    setHollandLoading(true);
-    setHollandError('');
-    try {
-      const result = await apiPost<HollandAiResult>(`/api/ai/holland-report/${activeStudentId}`, {});
-      setHollandResult(result);
-      onAiUsageChanged?.();
-    } catch (err) {
-      setHollandError((err as Error).message);
-    } finally {
-      setHollandLoading(false);
-    }
-  };
-
   const openDetail = (studentId: string) => {
     if (isLoading) return;
     setActiveStudentId(studentId);
@@ -924,8 +945,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     setLearningReport(null);
     setAiResult(null);
     setAiError('');
-    setHollandResult(null);
-    setHollandError('');
   };
 
   const exportAllReportsPdf = async () => {
@@ -1009,7 +1028,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     </div>
     ${buildStudentHtmlBlock(snapshot, evalReports, learningReport)}
     ${aiResult ? buildAiSectionHtml(aiResult) : ''}
-    ${buildHollandSectionHtml(hollandResult)}
   </body>
 </html>`;
 
@@ -1022,14 +1040,14 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
   const analyzeAllStudents = async () => {
     if (students.length === 0 || classAiRunning) return;
-    const required = students.length * 2;
+    const required = students.length;
     const estMinutes = Math.max(1, Math.ceil(students.length / 5) * 0.5);
     const confirmed = await confirm({
       title: '전체 분석 사용 확인',
       message:
-        `${students.length}명 학생의 AI 분석(성장분석 + 홀란드 성향분석)을 생성합니다.\n약 ${estMinutes}분 소요됩니다.\n\n`
-        + `학생 1명당 성장분석 1회 + 홀란드분석 1회, 최대 2회씩 차감합니다.\n`
-        + `(최대 ${required}회 · 이미 분석된 결과는 차감되지 않습니다)`,
+        `${students.length}명 학생의 AI 성장 리포트(총평·영역별 인사이트·성향 분석)를 생성합니다.\n약 ${estMinutes}분 소요됩니다.\n\n`
+        + `학생 1명당 1회씩 차감합니다.\n`
+        + `(최대 ${required}회 · 오늘 이미 분석된 학생은 차감되지 않습니다)`,
       confirmText: '분석 시작',
     });
     if (!confirmed) return;
@@ -1038,17 +1056,15 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     setClassAiTotal(students.length);
 
     try {
-      // 서버에서 학급 전체를 5명씩 끊어 성장·홀란드 분석을 함께 생성하고,
-      // 시작 전 최대 필요 횟수(학생 수 × 2)가 부족하면 아무것도 진행하지 않고 안내 메시지를 반환한다.
-      // 분석 결과 본문(report·holland)을 응답에 그대로 담아주므로, DB를 다시 읽지 않고 바로 사용한다.
+      // 서버에서 학급 전체를 5명씩 끊어 통합 리포트를 생성하고,
+      // 시작 전 최대 필요 횟수(학생 수 × 1)가 부족하면 아무것도 진행하지 않고 안내 메시지를 반환한다.
+      // 분석 결과 본문을 응답에 그대로 담아주므로, DB를 다시 읽지 않고 바로 사용한다.
       const batch = await apiPost<{
         results: {
           studentId: string;
           status: 'success' | 'error';
           message?: string;
-          report?: { planAnalysis: string; emotionInsight: string; growthSuggestion: string; generatedAt: string };
-          holland?: HollandAiResult | null;
-          hollandMessage?: string;
+          report?: Omit<GrowthAiResult, 'cached'>;
         }[];
       }>('/api/ai/growth-report/class', { classId, period });
       const resultByStudent = new Map(batch.results.map((r) => [r.studentId, r]));
@@ -1065,8 +1081,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
           const batchResult = resultByStudent.get(s.id);
           const ai: GrowthAiResult | null = batchResult?.report ? { ...batchResult.report, cached: false } : null;
           const aiError = ai ? undefined : batchResult?.message;
-          const holland = batchResult?.holland ?? null;
-          return { snap, reports: evalData.reports, learning, ai, aiError, holland };
+          return { snap, reports: evalData.reports, learning, ai, aiError };
         })
       );
       // popup은 비동기 함수 내부에서 열면 브라우저가 차단함.
@@ -1093,7 +1108,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
     const classTitle = className?.trim() || '우리반';
 
-    const studentSections = classAiResults.map(({ snap, reports, learning, ai, aiError, holland }) => `
+    const studentSections = classAiResults.map(({ snap, reports, learning, ai, aiError }) => `
       <div class="student-block">
         <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
           <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
@@ -1101,7 +1116,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         </div>
         ${buildStudentHtmlBlock(snap, reports, learning)}
         ${buildAiSectionHtml(ai, aiError)}
-        ${buildHollandSectionHtml(holland ?? null)}
       </div>`).join('');
 
     const html = `<!doctype html>
@@ -1303,7 +1317,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
                 <LearningSection report={learningReport} />
                 {EVAL_FEEDBACK_ENABLED && <EvalSection reports={evalReports} loading={evalLoading} />}
                 <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
-                <HollandSection result={hollandResult} loading={hollandLoading} error={hollandError} onGenerate={analyzeHolland} />
               </div>
             )}
           </div>

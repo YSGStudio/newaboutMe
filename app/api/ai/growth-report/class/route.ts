@@ -4,13 +4,7 @@ import { requireTeacher, requireTeacherClass, hasActivePaidPlan } from '@/lib/au
 import { getAiUsage, logAiUsage } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isPeriod } from '@/lib/stats';
-import { getOrGenerateGrowthReport, InsufficientDataError } from '@/lib/ai/growthReport';
-import {
-  getSavedHollandReport,
-  generateAndSaveHollandReport,
-  InsufficientHollandDataError,
-  type HollandReportApiResult,
-} from '@/lib/ai/hollandReport';
+import { getOrGenerateGrowthReport, InsufficientDataError, type GrowthReportApiResult } from '@/lib/ai/growthReport';
 
 const bodySchema = z.object({
   classId: z.string().uuid(),
@@ -20,28 +14,20 @@ const bodySchema = z.object({
 
 // OpenAI rate limit을 고려해 한 번에 이 개수만큼만 동시 호출(=5명씩 배치 처리)
 const CONCURRENCY = 5;
-// 전체분석은 개별분석과 동일하게 성장 1회 + 홀란드 1회 = 학생 1명당 최대 2회 차감한다.
-// (이미 분석된 항목은 재사용하며 차감하지 않는다)
-const GROWTH_COST = 1;
-const HOLLAND_COST = 1;
-const MAX_COST_PER_STUDENT = GROWTH_COST + HOLLAND_COST;
+// 성장·성향 분석이 한 번의 호출로 통합되어(2026-08-28) 학생 1명당 1회만 차감한다.
+// (이미 오늘 분석된 학생은 캐시를 재사용하며 차감하지 않는다)
+const MAX_COST_PER_STUDENT = 1;
 
-type GrowthReportContent = {
-  planAnalysis: string;
-  emotionInsight: string;
-  growthSuggestion: string;
-  generatedAt: string;
-};
+// 성향(홀란드)까지 포함한 통합 리포트 본문. cached/dataSummary는 프론트에서 쓰지 않아 뺀다.
+type GrowthReportContent = Omit<GrowthReportApiResult, 'cached' | 'dataSummary'>;
 
 type StudentResult = {
   studentId: string;
   status: 'success' | 'error';
-  message?: string; // 성장분석 실패 사유 (성장분석 기준으로 성공/실패를 판단)
+  message?: string; // 분석 실패 사유
   // 성공 시 생성된(또는 캐시된) 분석 결과를 그대로 담아 반환한다.
   // 프론트가 DB를 다시 읽지 않고 이 값을 바로 PDF에 사용하도록 하기 위함.
   report?: GrowthReportContent;
-  holland?: HollandReportApiResult | null; // 홀란드 결과 (없거나 실패 시 null)
-  hollandMessage?: string;                  // 홀란드 실패 사유
 };
 
 export async function POST(req: Request) {
@@ -74,35 +60,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ results: [], total: 0, succeeded: 0, failed: 0 });
   }
 
-  // 성장 1 + 홀란드 1 = 학생당 최대 2회. 시작 전 최악의 경우(전원 신규 생성)를 미리 확보한다.
+  // 학생당 1회. 시작 전 최악의 경우(전원 신규 생성)를 미리 확보한다.
   const usage = await getAiUsage(auth.teacher);
   const required = students.length * MAX_COST_PER_STUDENT;
   if (usage.remaining !== null && usage.remaining < required) {
     return NextResponse.json(
       {
-        error: `전체 분석에는 최대 ${required}회가 필요합니다(학생 ${students.length}명 × 2: 성장 1 + 홀란드 1). 남은 사용 횟수가 ${usage.remaining}회로 부족해 분석을 시작할 수 없습니다.`,
+        error: `전체 분석에는 최대 ${required}회가 필요합니다(학생 ${students.length}명 × 1회). 남은 사용 횟수가 ${usage.remaining}회로 부족해 분석을 시작할 수 없습니다.`,
         usage,
       },
       { status: 429 }
     );
   }
 
-  // 5명 단위(청크)로 동시 분석하고, 한 청크가 끝날 때마다 그 청크에서 새로 생성된(캐시/재사용 아닌)
-  // 성장·홀란드 각각의 건수만큼 차감한다. 위에서 최대 필요량을 미리 확인했으므로 중간 초과는 없다.
+  // 5명 단위(청크)로 동시 분석하고, 한 청크가 끝날 때마다 그 청크에서 새로 생성된
+  // (캐시 재사용이 아닌) 건수만큼 차감한다. 위에서 최대 필요량을 확인했으므로 중간 초과는 없다.
   const results: StudentResult[] = [];
 
   for (let i = 0; i < students.length; i += CONCURRENCY) {
     const chunk = students.slice(i, i + CONCURRENCY);
 
     const chunkResults = await Promise.allSettled(
-      chunk.map(async (s): Promise<StudentResult & { growthGenerated: boolean; hollandGenerated: boolean }> => {
-        // --- 성장분석: 오늘자 캐시가 있으면 재사용(차감 없음) ---
-        let report: GrowthReportContent | undefined;
-        let growthGenerated = false;
-        let status: 'success' | 'error' = 'success';
-        let message: string | undefined;
+      chunk.map(async (s): Promise<StudentResult & { generated: boolean }> => {
+        // 성장·성향이 한 번에 나오므로 호출도 한 번이다. 오늘자 캐시가 있으면 재사용(차감 없음).
         try {
-          const g = await getOrGenerateGrowthReport(
+          // dataSummary는 프론트가 쓰지 않으므로 응답에서 뺀다.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { cached, dataSummary, ...report } = await getOrGenerateGrowthReport(
             s.id,
             auth.teacher.id,
             s.student_number,
@@ -110,56 +94,24 @@ export async function POST(req: Request) {
             parsed.data.period,
             parsed.data.forceRefresh ?? false,
           );
-          report = {
-            planAnalysis: g.planAnalysis,
-            emotionInsight: g.emotionInsight,
-            growthSuggestion: g.growthSuggestion,
-            generatedAt: g.generatedAt,
-          };
-          growthGenerated = !g.cached;
+          return { studentId: s.id, status: 'success', report, generated: !cached };
         } catch (err) {
-          status = 'error';
-          message = err instanceof InsufficientDataError ? err.message : (err as Error).message;
+          const message = err instanceof InsufficientDataError ? err.message : (err as Error).message;
           if (!(err instanceof InsufficientDataError)) {
-            console.error(`[ai/growth-report/class] 학생 ${s.id} 성장분석 실패:`, message);
+            console.error(`[ai/growth-report/class] 학생 ${s.id} 분석 실패:`, message);
           }
+          return { studentId: s.id, status: 'error', message, generated: false };
         }
-
-        // --- 홀란드분석: 이미 저장된 결과가 있으면 재사용(차감 없음), 없으면 새로 생성 ---
-        let holland: HollandReportApiResult | null = null;
-        let hollandGenerated = false;
-        let hollandMessage: string | undefined;
-        try {
-          const saved = await getSavedHollandReport(s.id);
-          if (saved) {
-            holland = saved;
-          } else {
-            holland = await generateAndSaveHollandReport(s.id, auth.teacher.id, s.student_number, s.name);
-            hollandGenerated = true;
-          }
-        } catch (err) {
-          hollandMessage = err instanceof InsufficientHollandDataError ? err.message : (err as Error).message;
-          if (!(err instanceof InsufficientHollandDataError)) {
-            console.error(`[ai/growth-report/class] 학생 ${s.id} 홀란드분석 실패:`, hollandMessage);
-          }
-        }
-
-        return { studentId: s.id, status, message, report, holland, hollandMessage, growthGenerated, hollandGenerated };
       })
     );
 
-    // 이 청크에서 새로 생성된 성장·홀란드 건수만큼 각각 차감(로그)한다.
+    // 이 청크에서 새로 생성된 건수만큼 차감(로그)한다.
     const logs: Promise<void>[] = [];
     chunkResults.forEach((r, idx) => {
       if (r.status === 'fulfilled') {
-        const { growthGenerated, hollandGenerated, ...studentResult } = r.value;
+        const { generated, ...studentResult } = r.value;
         results.push(studentResult);
-        if (growthGenerated) {
-          for (let n = 0; n < GROWTH_COST; n += 1) logs.push(logAiUsage(auth.teacher.id, 'growth_report', studentResult.studentId));
-        }
-        if (hollandGenerated) {
-          for (let n = 0; n < HOLLAND_COST; n += 1) logs.push(logAiUsage(auth.teacher.id, 'holland_report', studentResult.studentId));
-        }
+        if (generated) logs.push(logAiUsage(auth.teacher.id, 'growth_report', studentResult.studentId));
       } else {
         results.push({ studentId: chunk[idx].id, status: 'error', message: (r.reason as Error)?.message ?? '알 수 없는 오류' });
       }
