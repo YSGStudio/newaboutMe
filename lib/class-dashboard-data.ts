@@ -270,6 +270,7 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       : [],
   );
 
+  // 학생별 현황 — 화면에 표로 내보내지는 않고, 아래 KPI·참여율 계산에만 쓴다.
   const studentStatus = students.map((student) => {
     const studentPlans = plansByStudent.get(student.id) ?? [];
     const completedPlans = studentPlans.filter((plan) => todayCheckByPlan.get(plan.id) === true).length;
@@ -341,7 +342,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       learningRate: latestActivity ? safeRate(latestSubmitted, students.length) : null,
     },
     latestActivity: latestActivity ? { id: latestActivity.id, title: latestActivity.title, subject: latestActivity.subject } : null,
-    studentStatus,
     activityProgress,
     watch,
   };

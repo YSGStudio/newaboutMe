@@ -4267,20 +4267,6 @@ button.class-dashboard-task-list,
 .class-dashboard-task-list button b { color: var(--primary-dark); font-size: 13px; white-space: nowrap; }
 .class-dashboard-task-list button i { color: var(--primary); font-size: 20px; font-style: normal; }
 
-.class-dashboard-filters { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
-.class-dashboard-filters::-webkit-scrollbar { display: none; }
-.class-dashboard-filters button { width: auto; min-height: 34px; padding: 6px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); box-shadow: none; font-size: 12px; white-space: nowrap; }
-.class-dashboard-filters button.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dark); }
-.class-dashboard-student-table-wrap { overflow-x: auto; }
-.class-dashboard-student-table { min-width: 760px; }
-.class-dashboard-student-table td:first-child button { width: auto; min-height: 32px; padding: 4px 7px; background: transparent; color: var(--text); box-shadow: none; font-weight: 700; }
-.class-dashboard-status { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.class-dashboard-status.is-ok { background: #f0fdf4; color: #166534; }
-.class-dashboard-status.is-warn { background: #fef3c7; color: #92400e; }
-.class-dashboard-status.is-muted { background: #f1f5f9; color: #64748b; }
-.class-dashboard-reasons { display: flex; flex-wrap: wrap; gap: 4px; }
-.class-dashboard-reasons span { padding: 3px 7px; border-radius: 999px; background: #fff7d8; color: #92400e; font-size: 10px; font-weight: 700; }
-.class-dashboard-reasons em { color: var(--ok); font-size: 11px; font-style: normal; font-weight: 700; }
 
 .class-dashboard-activity-bars { display: flex; flex-direction: column; gap: 12px; }
 .class-dashboard-activity-bars > div > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 5px; color: var(--text); font-size: 12px; }

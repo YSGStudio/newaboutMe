@@ -8,7 +8,7 @@
  *   1) 오늘의 학급 — 숫자 몇 개
  *   2) 살펴볼 학생 — 규칙으로 뽑은 명단 (이 화면의 핵심)
  */
-import { CSSProperties, ReactNode, useEffect, useState } from 'react';
+import { CSSProperties, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
@@ -45,16 +45,6 @@ export type ClassDashboardData = {
   } | null;
   participation: { emotionRate: number; planRate: number; learningRate: number | null };
   latestActivity: { id: string; title: string; subject: string } | null;
-  studentStatus: Array<{
-    student: Student;
-    emotionRecorded: boolean;
-    planCompleted: number;
-    planTotal: number;
-    planRate: number | null;
-    planChecked?: boolean;
-    learningStatus: 'no_activity' | 'none' | 'submitted' | 'reviewed';
-    attentionReasons: string[];
-  }>;
   activityProgress: Array<{
     id: string;
     title: string;
@@ -90,7 +80,6 @@ export default function ClassDashboard({
   const [data, setData] = useState<ClassDashboardData | null>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [studentFilter, setStudentFilter] = useState<'all' | 'attention' | 'emotion' | 'plan' | 'learning'>('attention');
 
   const load = async () => {
     if (!classId) return;
@@ -129,20 +118,9 @@ export default function ClassDashboard({
   if (!data && loading) return <ClassDashboardSkeleton />;
 
   const kpi = data?.kpi;
-  const planStudents = kpi?.planStudents
-    ?? data?.studentStatus?.filter((row) => row.planTotal > 0).length
-    ?? 0;
-  const planCheckedStudents = kpi?.planCheckedStudents
-    ?? data?.studentStatus?.filter((row) => row.planChecked === true).length
-    ?? 0;
+  const planStudents = kpi?.planStudents ?? 0;
+  const planCheckedStudents = kpi?.planCheckedStudents ?? 0;
   const planCheckedRate = planStudents > 0 ? Math.round((planCheckedStudents / planStudents) * 100) : 0;
-  const filteredStudents = (data?.studentStatus ?? []).filter((row) => {
-    if (studentFilter === 'all') return true;
-    if (studentFilter === 'attention') return row.attentionReasons.length > 0;
-    if (studentFilter === 'emotion') return !row.emotionRecorded;
-    if (studentFilter === 'plan') return row.planTotal > 0 && row.planRate !== 100;
-    return row.learningStatus === 'none' || row.learningStatus === 'submitted';
-  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -232,43 +210,6 @@ export default function ClassDashboard({
             </div>
           </section>
         </div>
-      )}
-
-      {/* ── 3. 학생 활동 현황 ── */}
-      {kpi && kpi.totalStudents > 0 && data && (
-        <section className="card class-dashboard-students">
-          <div className="class-dashboard-section-heading">
-            <div><span aria-hidden="true">✦</span><div><h3>학생 활동 현황</h3><p>오늘 기록과 최근 배움성찰을 함께 확인합니다.</p></div></div>
-            <button type="button" className="outline" onClick={() => onNavigate?.('student')}>학생 관리</button>
-          </div>
-          <div className="class-dashboard-filters" role="group" aria-label="학생 현황 필터">
-            {([
-              ['attention', '확인 필요'], ['all', '전체'], ['emotion', '마음 미기록'], ['plan', '계획 미완료'], ['learning', '배움성찰'],
-            ] as const).map(([key, label]) => (
-              <button key={key} type="button" className={studentFilter === key ? 'is-active' : ''} aria-pressed={studentFilter === key} onClick={() => setStudentFilter(key)}>{label}</button>
-            ))}
-          </div>
-          {filteredStudents.length === 0 ? (
-            <EmptyState title="해당하는 학생이 없습니다" description="선택한 조건에서 확인할 학생이 없습니다." />
-          ) : (
-            <div className="class-dashboard-student-table-wrap">
-              <table className="table class-dashboard-student-table">
-                <thead><tr><th>학생</th><th>마음 기록</th><th>오늘 계획</th><th>최근 배움성찰</th><th>확인할 내용</th></tr></thead>
-                <tbody>
-                  {filteredStudents.map((row) => (
-                    <tr key={row.student.id}>
-                      <td><button type="button" onClick={() => onOpenStudent?.(row.student.id)}>{row.student.student_number}. {row.student.name}</button></td>
-                      <td><StatusPill tone={row.emotionRecorded ? 'ok' : 'muted'}>{row.emotionRecorded ? '기록 완료' : '미기록'}</StatusPill></td>
-                      <td>{row.planTotal === 0 ? <StatusPill tone="muted">계획 없음</StatusPill> : <StatusPill tone={row.planRate === 100 ? 'ok' : 'warn'}>{row.planCompleted}/{row.planTotal}</StatusPill>}</td>
-                      <td><LearningStatusPill status={row.learningStatus} /></td>
-                      <td><div className="class-dashboard-reasons">{row.attentionReasons.length > 0 ? row.attentionReasons.map((reason) => <span key={reason}>{reason}</span>) : <em>양호</em>}</div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
       )}
 
       {/* ── 4. 최근 배움성찰 제출률 ── */}
@@ -366,16 +307,6 @@ function ParticipationBar({ label, value }: { label: string; value: number | nul
   );
 }
 
-function StatusPill({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; children: ReactNode }) {
-  return <span className={`class-dashboard-status is-${tone}`}>{children}</span>;
-}
-
-function LearningStatusPill({ status }: { status: 'no_activity' | 'none' | 'submitted' | 'reviewed' }) {
-  if (status === 'reviewed') return <StatusPill tone="ok">피드백 완료</StatusPill>;
-  if (status === 'submitted') return <StatusPill tone="warn">확인 필요</StatusPill>;
-  if (status === 'none') return <StatusPill tone="muted">미제출</StatusPill>;
-  return <StatusPill tone="muted">활동 없음</StatusPill>;
-}
 
 
 /** 첫 로딩 자리표시 — KPI 타일과 카드의 실제 배치를 그대로 흉내 낸다. */
