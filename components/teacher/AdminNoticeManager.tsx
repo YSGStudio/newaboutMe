@@ -10,6 +10,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import RefreshButton from '@/components/ui/RefreshButton';
+import { api } from '@/lib/api-client';
 
 type Notice = {
   id: string;
@@ -20,13 +21,6 @@ type Notice = {
   isActive: boolean;
   createdAt: string;
   dismissedCount: number;
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, init);
-  const json = await res.json();
-  if (!res.ok) throw new Error(typeof json?.error === 'string' ? json.error : '요청에 실패했습니다.');
-  return json;
 };
 
 // 서울 기준 오늘 날짜(YYYY-MM-DD)
@@ -81,7 +75,6 @@ export default function AdminNoticeManager() {
     try {
       await api('/api/admin/notices', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createForm),
       });
       setCreateForm(emptyForm());
@@ -100,7 +93,6 @@ export default function AdminNoticeManager() {
     try {
       await api(`/api/admin/notices/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       await load();

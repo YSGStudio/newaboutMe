@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { SUBJECT_LIST } from '@/lib/subjects';
+import { api } from '@/lib/api-client';
 
 // ── Types ──────────────────────────────────────────────────────────
 type RubricCriterion = {
@@ -167,13 +168,6 @@ function SubjectTabs({
     </div>
   );
 }
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
 
 // ── Sub: 채점기준 관리 ────────────────────────────────────────────
 type FormCriterion = { title: string; levelHigh: string; levelMid: string; levelLow: string };

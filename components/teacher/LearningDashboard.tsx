@@ -16,6 +16,7 @@ import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { SUBJECT_LIST, SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
+import { api } from '@/lib/api-client';
 import {
   LearningStatus,
   TEACHER_STATUS_LABEL,
@@ -79,16 +80,6 @@ const countCells = (students: StudentCell[]) => ({
   submittedCount: students.filter((cell) => cell.status !== 'none').length,
   reviewedCount: students.filter((cell) => cell.status === 'reviewed').length,
 });
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    ...init,
-    headers: init?.body instanceof FormData ? init.headers : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
 
 const EMPTY_FORM = {
   subject: SUBJECT_LIST[0] as string,

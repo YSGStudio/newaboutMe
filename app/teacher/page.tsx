@@ -33,6 +33,7 @@ import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
 import { formatDateInSeoul } from "@/lib/date";
+import { api } from "@/lib/api-client";
 import {
   EMOTION_META,
   REACTION_META,
@@ -99,16 +100,6 @@ type AiUsage = {
   used: number;
   limit: number | null; // null = 무제한(관리자)
   remaining: number | null;
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || "요청에 실패했습니다.");
-  return json;
 };
 
 export default function TeacherPage() {

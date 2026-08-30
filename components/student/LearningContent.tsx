@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice';
 import BookCard from '@/components/student/BookCard';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { formatDateInSeoul } from '@/lib/date';
+import { studentApi as api } from '@/lib/api-client';
 import {
   LearningStatus,
   STUDENT_STATUS_LABEL,
@@ -58,16 +59,6 @@ type Detail = {
     links: SubmissionLink[];
   } | null;
   status: LearningStatus;
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    ...init,
-    headers: init?.body instanceof FormData ? init.headers : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했어요.');
-  return json;
 };
 
 /** 서울 시각 기준 'YYYY-MM' — 월별 탭 그룹 키. 평가기록 탭과 같은 방식입니다. */

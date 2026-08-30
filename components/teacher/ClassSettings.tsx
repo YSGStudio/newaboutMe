@@ -12,6 +12,7 @@ import { BADGES } from '@/lib/badges';
 import Notice from '@/components/ui/Notice';
 import Tabs from '@/components/ui/Tabs';
 import StudentRoster from '@/components/teacher/StudentRoster';
+import { api } from '@/lib/api-client';
 
 const DEFAULT_TITLES = [
   { tier: 1, name: '별빛 새싹',  threshold: 0  },
@@ -26,13 +27,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   plan: '일일 계획',
   reflection: '성찰일기',
   letter: '별빛메일',
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
 };
 
 type SettingSection = 'classes' | 'roster' | 'letters' | 'badges' | 'titles';

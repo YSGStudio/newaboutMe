@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import RefreshButton from '@/components/ui/RefreshButton';
 import AdminNoticeManager from '@/components/teacher/AdminNoticeManager';
+import { api } from '@/lib/api-client';
 
 type Role = 'general' | 'paid' | 'admin';
 
@@ -64,13 +65,6 @@ const FEATURE_LABEL: Record<string, string> = {
   growth_report: '성장 분석',
   holland_report: '홀란드 분석',
   subject_report: '종합평가',
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, init);
-  const json = await res.json();
-  if (!res.ok) throw new Error(typeof json?.error === 'string' ? json.error : '요청에 실패했습니다.');
-  return json;
 };
 
 type SortKey = 'name' | 'createdAt' | 'aiUsedThisMonth' | 'role';
@@ -131,7 +125,6 @@ export default function OperatorDashboard() {
     try {
       await api('/api/admin/teachers', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teacherId,
           role: edit.role,
@@ -169,7 +162,6 @@ export default function OperatorDashboard() {
     try {
       const d = await api<{ settings: AppSettings }>('/api/admin/settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settingsForm),
       });
       setSettings(d.settings);
@@ -192,7 +184,6 @@ export default function OperatorDashboard() {
     try {
       const d = await api<{ deletedClasses: number }>('/api/admin/reset-year', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: '초기화' }),
       });
       setMessage(`전체 데이터 초기화 완료 — 학급 ${d.deletedClasses}개 삭제`);

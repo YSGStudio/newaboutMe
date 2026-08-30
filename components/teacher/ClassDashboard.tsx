@@ -12,6 +12,7 @@ import { CSSProperties, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
+import { api } from '@/lib/api-client';
 import {
   WATCH_REASON_META,
   WATCH_RULES,
@@ -57,13 +58,6 @@ export type ClassDashboardData = {
   watch: WatchRow[];
 };
 
-const api = async <T,>(url: string): Promise<T> => {
-  const res = await fetch(url, { cache: 'no-store' });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
-
 export default function ClassDashboard({
   classId,
   initialData = null,
@@ -84,7 +78,10 @@ export default function ClassDashboard({
     setLoading(true);
     setError('');
     try {
-      setData(await api<ClassDashboardData>(`/api/stats/class/${classId}/dashboard`));
+      setData(
+        // 학급 대시보드는 항상 최신값이어야 한다 — 브라우저 캐시를 타지 않게 한다.
+        await api<ClassDashboardData>(`/api/stats/class/${classId}/dashboard`, { cache: 'no-store' }),
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -307,8 +304,6 @@ function ParticipationBar({ label, value }: { label: string; value: number | nul
     </div>
   );
 }
-
-
 
 /** 첫 로딩 자리표시 — KPI 타일과 카드의 실제 배치를 그대로 흉내 낸다. */
 function ClassDashboardSkeleton() {

@@ -21,6 +21,7 @@ import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
 import type { AwardedBadge } from '@/lib/badges';
+import { studentApi as api } from '@/lib/api-client';
 
 type PlanRow = { id: string; title: string; isCompleted: boolean | null };
 type PlanAchievementRow = {
@@ -229,16 +230,6 @@ const buildEmotionStatsHtml = (stats: NonNullable<EmotionStats>): string => {
     </div>
   </body>
 </html>`;
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) }
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청 실패');
-  return json;
 };
 
 const getTodayInSeoul = () => formatDateInSeoul(new Date());

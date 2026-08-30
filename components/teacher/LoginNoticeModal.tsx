@@ -7,15 +7,9 @@
  * (알림을 만드는 쪽은 AdminNoticeManager, 여기서는 보여주고 닫는 역할만 합니다.)
  */
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api-client';
 
 type Notice = { id: string; title: string; content: string };
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, init);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
 
 // 로그인 직후 표시되는 관리자 알림장.
 // enabled(로그인 상태)가 true가 되면 활성 알림을 불러와 하나씩 순서대로 보여준다.

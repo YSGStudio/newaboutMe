@@ -14,6 +14,7 @@ import { useConfirm } from '@/components/ui/useConfirm';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { STATUS_COLOR, TEACHER_STATUS_LABEL, type LearningStatus } from '@/lib/learning';
+import { api, apiPost } from '@/lib/api-client';
 
 type StudentItem = {
   id: string;
@@ -28,7 +29,6 @@ type EmotionDistributionItem = {
   count: number;
   ratio: number;
 };
-
 
 type StudentSnapshot = {
   range: {
@@ -145,24 +145,9 @@ const periodMeta: Record<Period, { label: string; hint: string }> = {
   semester: { label: '학기', hint: '최근 120일' }
 };
 
-
 // AI 분석 버튼(분석하기/재분석)을 누를 때마다 사용량 차감을 사전에 알리는 확인창
 // 성장 분석과 성향 분석이 한 번의 호출로 합쳐져 있어 차감은 1회다.
 const AI_USAGE_CONFIRM_MESSAGE = '성장 분석과 성향 분석을 한 번에 생성합니다. AI 분석 사용횟수를 1회 차감합니다.';
-
-const api = async <T,>(url: string): Promise<T> => {
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
-
-const apiPost = async <T,>(url: string, body: unknown): Promise<T> => {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
 
 const escapeHtml = (value: string) =>
   value
@@ -171,7 +156,6 @@ const escapeHtml = (value: string) =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-
 
 // 달성률·제출률 막대 색 — 계획 실천률과 배움성찰 제출률이 같은 기준(80/50)을 쓴다.
 const rateBarColor = (pct: number) =>

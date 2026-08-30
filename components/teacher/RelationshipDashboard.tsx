@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
+import { api } from '@/lib/api-client';
 
 type SurveyItem = {
   id: string;
@@ -74,13 +75,6 @@ type ReportResponse = {
   survey: { id: string; title: string; includesNegative: boolean; closedAt: string | null; createdAt: string };
   sociogram: SociogramReport;
   openResponses: string[];
-};
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
 };
 
 /** 마감하지 않은 설문을 열어둔 동안 학생 제출 현황을 다시 읽는 주기 */

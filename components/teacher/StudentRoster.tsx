@@ -12,18 +12,9 @@ import Notice from '@/components/ui/Notice';
 import SubmitButton from '@/components/ui/SubmitButton';
 import { parseStudentFile, ParsedStudent } from '@/lib/student-import';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
+import { api } from '@/lib/api-client';
 
 type Student = { id: string; name: string; student_number: number };
-
-const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error || '요청에 실패했습니다.');
-  return json;
-};
 
 type Preview = {
   students: ParsedStudent[];
