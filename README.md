@@ -1,6 +1,6 @@
 # MaumDiary MVP (Next.js + Supabase)
 
-`마음일기_개발기획서.md` 기반으로 구현한 MVP입니다.
+`docs/specs/마음일기_개발기획서.md` 기반으로 구현한 MVP입니다.
 
 ## 구현 범위
 - 교사 인증: 회원가입/로그인/로그아웃
