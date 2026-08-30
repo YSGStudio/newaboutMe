@@ -4054,7 +4054,7 @@ button.login-notice-confirm {
 /* ── 교사 배움성찰 대시보드 ── */
 .learning-dashboard {
   overflow: hidden;
-  padding: 0;
+  padding: 0 0 36px;
 }
 
 .learning-dashboard-header {
@@ -4128,7 +4128,7 @@ button.login-notice-confirm {
 .learning-form-heading strong { color: var(--text); font-size: 15px; }
 .learning-form-heading p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 
-.learning-activity-list { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
+.learning-activity-list { display: flex; flex-direction: column; gap: 12px; }
 .learning-activity-card {
   position: relative;
   overflow: hidden;

@@ -3,6 +3,7 @@ import { createStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentLoginSchema } from '@/lib/validators';
 import { verifyPassword } from '@/lib/password';
+import { isEvalFeedbackClass } from '@/lib/eval-access';
 
 // 브루트포스 방어: 연속 실패 시 일정 시간 로그인 잠금
 const MAX_FAILED_ATTEMPTS = 5;
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
   const { data: classRow } = await supabaseAdmin
     .from('classes')
-    .select('id,class_name,class_code,letters_enabled')
+    .select('id,class_name,class_code,letters_enabled,teacher_id')
     .eq('class_code', classCode)
     .maybeSingle();
 
@@ -82,9 +83,18 @@ export async function POST(req: Request) {
 
   await createStudentSession(matchedStudent.id);
 
+  // 평가피드백은 관리자 학급에만 열려 있다(lib/features.ts).
+  const evalFeedbackEnabled = await isEvalFeedbackClass(classRow.teacher_id);
+
   return NextResponse.json({
     ok: true,
     student: { id: matchedStudent.id, name: matchedStudent.name, studentNumber: matchedStudent.student_number },
-    class: { id: classRow.id, className: classRow.class_name, classCode: classRow.class_code, lettersEnabled: classRow.letters_enabled }
+    class: {
+      id: classRow.id,
+      className: classRow.class_name,
+      classCode: classRow.class_code,
+      lettersEnabled: classRow.letters_enabled,
+      evalFeedbackEnabled
+    }
   });
 }

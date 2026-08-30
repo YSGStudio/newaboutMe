@@ -25,7 +25,7 @@ import Tabs from "@/components/ui/Tabs";
 import StatsDashboard from "@/components/teacher/StatsDashboard";
 import RelationshipDashboard from "@/components/teacher/RelationshipDashboard";
 import ClassDashboard, { type ClassDashboardData } from "@/components/teacher/ClassDashboard";
-import { EVAL_FEEDBACK_ENABLED } from "@/lib/features";
+import { canSeeEvalFeedback } from "@/lib/features";
 import EvalDashboard from "@/components/teacher/EvalDashboard";
 import LearningDashboard from "@/components/teacher/LearningDashboard";
 import ClassSettings from "@/components/teacher/ClassSettings";
@@ -485,12 +485,15 @@ export default function TeacherPage() {
     runBootstrap();
   }, [runBootstrap]);
 
-  // 평가피드백을 내린 뒤에도 이전 상태가 남아 빈 화면이 되지 않도록 대시보드로 돌린다.
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const evalFeedbackVisible = canSeeEvalFeedback(teacherRole);
+
+  // 권한이 없는데 이전 상태가 남아 빈 화면이 되지 않도록 대시보드로 돌린다.
   useEffect(() => {
-    if (!EVAL_FEEDBACK_ENABLED && activeTab === "eval") {
+    if (!evalFeedbackVisible && activeTab === "eval") {
       setActiveTab("dashboard");
     }
-  }, [activeTab]);
+  }, [activeTab, evalFeedbackVisible]);
 
   // 무료 전환 후 학급 초과 상태면 학급관리 탭으로 고정
   useEffect(() => {
@@ -1393,8 +1396,8 @@ export default function TeacherPage() {
                   icon: "📚",
                   disabled: isOverClassLimit,
                 },
-                // 평가피드백은 비활성 상태입니다(lib/features.ts). 자료는 그대로 두고 탭만 감춥니다.
-                ...(EVAL_FEEDBACK_ENABLED
+                // 평가피드백은 관리자 계정에만 보입니다(lib/features.ts).
+                ...(evalFeedbackVisible
                   ? [{
                       key: "eval",
                       label: "평가피드백",
@@ -1800,7 +1803,7 @@ export default function TeacherPage() {
             <LearningDashboard classId={selectedClassId} />
           )}
 
-          {EVAL_FEEDBACK_ENABLED && activeTab === "eval" && (
+          {evalFeedbackVisible && activeTab === "eval" && (
             <EvalDashboard
               classId={selectedClassId}
               students={students}
@@ -2274,6 +2277,7 @@ export default function TeacherPage() {
               students={students}
               className={selectedClass?.class_name}
               canBatchAnalyze={canUseAi}
+              showEval={evalFeedbackVisible}
               onAiUsageChanged={loadAiUsage}
             />
           )}

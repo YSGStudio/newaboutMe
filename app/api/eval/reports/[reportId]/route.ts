@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
+import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 type Params = { params: { reportId: string } };
@@ -7,6 +8,10 @@ type Params = { params: { reportId: string } };
 export async function GET(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const denied = denyEvalTeacher(auth.teacher);
+  if (denied) return denied;
 
   // 본인 보고서인지 확인
   const { data: report, error } = await supabaseAdmin
@@ -72,6 +77,10 @@ export async function GET(_: Request, { params }: Params) {
 export async function DELETE(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const denied = denyEvalTeacher(auth.teacher);
+  if (denied) return denied;
 
   // 본인 보고서인지 먼저 확인한다.
   // 확인보다 먼저 storage 경로를 수집하면, 남의 보고서 삭제 요청에도

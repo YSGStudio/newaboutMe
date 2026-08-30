@@ -77,7 +77,7 @@ export async function requireStudentSession() {
 
   const { data: classRow } = await supabaseAdmin
     .from('classes')
-    .select('id,class_name,class_code,letters_enabled')
+    .select('id,class_name,class_code,letters_enabled,teacher_id')
     .eq('id', student.class_id)
     .maybeSingle();
 

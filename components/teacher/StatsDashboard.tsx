@@ -13,7 +13,6 @@ import Notice from '@/components/ui/Notice';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
-import { EVAL_FEEDBACK_ENABLED } from '@/lib/features';
 import { STATUS_COLOR, TEACHER_STATUS_LABEL, type LearningStatus } from '@/lib/learning';
 
 type StudentItem = {
@@ -198,6 +197,7 @@ const buildStudentHtmlBlock = (
   snap: StudentSnapshot,
   reports: EvalReportSummary[],
   learning: LearningReport | null,
+  showEval: boolean,
 ): string => {
 
   const gradeBg:    Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low: '#fee2e2' };
@@ -324,7 +324,7 @@ const buildStudentHtmlBlock = (
       ${summaryTile('🎯', `${snap.average.achievementRate}%`, '평균 실천률', '#16a34a')}
       ${summaryTile('💭', `${snap.emotions.totalFeeds}건`, '감정 기록', '#7c3aed')}
       ${summaryTile('📚', `${learningSubmittedCount(learningSummary)}건`, '배움성찰', LEARNING_ACCENT)}
-      ${EVAL_FEEDBACK_ENABLED ? summaryTile('⭐', `${reports.length}건`, '평가', '#d97706') : ''}
+      ${showEval ? summaryTile('⭐', `${reports.length}건`, '평가', '#d97706') : ''}
     </div>
     <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
@@ -349,7 +349,7 @@ const buildStudentHtmlBlock = (
       </div>
       ${learningInnerHtml}
     </div>
-    ${EVAL_FEEDBACK_ENABLED ? `<div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
+    ${showEval ? `<div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
         <span style="font-size:14px">⭐</span>
         <span style="font-size:14px;font-weight:700;color:#9a3412">평가 현황</span>
@@ -853,7 +853,7 @@ function ProBadge() {
   );
 }
 
-export default function StatsDashboard({ classId, students, className, canBatchAnalyze = false, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canBatchAnalyze?: boolean; onAiUsageChanged?: () => void }) {
+export default function StatsDashboard({ classId, students, className, canBatchAnalyze = false, showEval = false, onAiUsageChanged }: { classId: string; students: StudentItem[]; className?: string; canBatchAnalyze?: boolean; showEval?: boolean; onAiUsageChanged?: () => void }) {
   const { confirm, confirmDialog } = useConfirm();
   const [period, setPeriod] = useState<Period>('month');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -888,10 +888,10 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       setEvalLoading(true);
       setDetailError('');
       try {
-        // 평가피드백은 비활성 상태다(lib/features.ts). 자료는 남아 있지만 불러오지 않는다.
+        // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts). 그 밖에는 불러오지 않는다.
         const [snapshotData, evalData, learningData, growthData] = await Promise.all([
           api<StudentSnapshot>(`/api/stats/student/${activeStudentId}/snapshot?period=${period}`),
-          EVAL_FEEDBACK_ENABLED
+          showEval
             ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${activeStudentId}?period=${period}`)
             : Promise.resolve({ reports: [] as EvalReportSummary[] }),
           api<LearningReport>(`/api/learning/student/${activeStudentId}?period=${period}`),
@@ -911,7 +911,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     };
 
     load();
-  }, [activeStudentId, isDetailOpen, period]);
+  }, [activeStudentId, isDetailOpen, period, showEval]);
 
   const isLoading = detailLoading || evalLoading;
 
@@ -955,7 +955,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         students.map(async (s) => {
           const [snap, evalData, learning] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            EVAL_FEEDBACK_ENABLED
+            showEval
               ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
               : Promise.resolve({ reports: [] as EvalReportSummary[] }),
             api<LearningReport>(`/api/learning/student/${s.id}?period=${period}`),
@@ -976,7 +976,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
             <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
             <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
           </div>
-          ${buildStudentHtmlBlock(snap, reports, learning)}
+          ${buildStudentHtmlBlock(snap, reports, learning, showEval)}
         </div>`).join('');
 
       const html = `<!doctype html>
@@ -1026,7 +1026,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">별빛로그 보고서</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${snapshot.student.studentNumber}번 ${escapeHtml(snapshot.student.name)} · ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})</p>
     </div>
-    ${buildStudentHtmlBlock(snapshot, evalReports, learningReport)}
+    ${buildStudentHtmlBlock(snapshot, evalReports, learningReport, showEval)}
     ${aiResult ? buildAiSectionHtml(aiResult) : ''}
   </body>
 </html>`;
@@ -1073,7 +1073,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         students.map(async (s) => {
           const [snap, evalData, learning] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            EVAL_FEEDBACK_ENABLED
+            showEval
               ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
               : Promise.resolve({ reports: [] as EvalReportSummary[] }),
             api<LearningReport>(`/api/learning/student/${s.id}?period=${period}`),
@@ -1114,7 +1114,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
           <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
           <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
         </div>
-        ${buildStudentHtmlBlock(snap, reports, learning)}
+        ${buildStudentHtmlBlock(snap, reports, learning, showEval)}
         ${buildAiSectionHtml(ai, aiError)}
       </div>`).join('');
 
@@ -1292,11 +1292,11 @@ export default function StatsDashboard({ classId, students, className, canBatchA
             </div>
 
             {snapshot && (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${EVAL_FEEDBACK_ENABLED ? 4 : 3}, 1fr)`, gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${showEval ? 4 : 3}, 1fr)`, gap: 8 }}>
                 <SummaryTile icon="🎯" label="평균 실천률" value={`${snapshot.average.achievementRate}%`} accent="#16a34a" />
                 <SummaryTile icon="💭" label="감정 기록" value={`${snapshot.emotions.totalFeeds}건`} accent="#7c3aed" />
                 <SummaryTile icon="📚" label="배움성찰" value={`${learningSubmittedCount(learningReport?.summary ?? EMPTY_LEARNING_SUMMARY)}건`} accent={LEARNING_ACCENT} />
-                {EVAL_FEEDBACK_ENABLED && <SummaryTile icon="⭐" label="평가" value={`${evalReports.length}건`} accent="#d97706" />}
+                {showEval && <SummaryTile icon="⭐" label="평가" value={`${evalReports.length}건`} accent="#d97706" />}
               </div>
             )}
 
@@ -1315,7 +1315,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
                 <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <LearningSection report={learningReport} />
-                {EVAL_FEEDBACK_ENABLED && <EvalSection reports={evalReports} loading={evalLoading} />}
+                {showEval && <EvalSection reports={evalReports} loading={evalLoading} />}
                 <AiGrowthSection result={aiResult} loading={aiLoading} error={aiError} onAnalyze={analyzeStudent} />
               </div>
             )}

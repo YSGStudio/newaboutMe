@@ -17,7 +17,6 @@ import Tabs from '@/components/ui/Tabs';
 import VoyageContent from '@/components/student/VoyageContent';
 import BookCard from '@/components/student/BookCard';
 import LearningContent from '@/components/student/LearningContent';
-import { EVAL_FEEDBACK_ENABLED } from '@/lib/features';
 import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
@@ -316,6 +315,9 @@ export default function StudentPage() {
   const [planCelebration, setPlanCelebration] = useState<{ planId: string; key: number; kind: 'complete' | 'encourage' } | null>(null);
 
   const [lettersEnabled, setLettersEnabled] = useState(true);
+  // 평가피드백(포트폴리오)은 관리자 선생님의 학급에만 열려 있습니다(lib/features.ts).
+  // 서버가 학급 담임의 role을 보고 내려주는 값입니다.
+  const [evalFeedbackEnabled, setEvalFeedbackEnabled] = useState(false);
   const [studentTitle, setStudentTitle] = useState('별빛 새싹');
   const [studentBadgeCount, setStudentBadgeCount] = useState(0);
   const [voyageSummary, setVoyageSummary] = useState<VoyageSummary | null>(null);
@@ -372,12 +374,12 @@ export default function StudentPage() {
   const activeEvalMonthGroup = evalMonthGroups.find((group) => group.key === evalMonth);
   const visibleEvalReports = activeEvalMonthGroup ? activeEvalMonthGroup.reports : evalReports;
 
-  // 평가기록(포트폴리오)을 내린 뒤에도 이전 상태가 남아 빈 화면이 되지 않도록 되돌립니다.
+  // 권한이 없는데 이전 상태가 남아 빈 화면이 되지 않도록 되돌립니다.
   useEffect(() => {
-    if (!EVAL_FEEDBACK_ENABLED && activeTab === 'eval') {
+    if (!evalFeedbackEnabled && activeTab === 'eval') {
       setActiveTab('voyage');
     }
-  }, [activeTab]);
+  }, [activeTab, evalFeedbackEnabled]);
 
   useEffect(() => {
     if (!emotionOptions.includes(emotionType)) {
@@ -487,7 +489,7 @@ export default function StudentPage() {
     try {
       const data = await api<{
         student: { id: string; name: string; studentNumber: number };
-        class: { id: string; lettersEnabled: boolean };
+        class: { id: string; lettersEnabled: boolean; evalFeedbackEnabled: boolean };
       }>('/api/auth/student/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -501,6 +503,7 @@ export default function StudentPage() {
       // 초기 데이터를 모두 불러온 뒤에야 대시보드를 보여준다(빈 화면으로 진입하지 않도록).
       setBootLoading(true);
       setLettersEnabled(data.class.lettersEnabled ?? true);
+      setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
       const loginToday = getTodayInSeoul();
       setPlanDate(loginToday);
       setEmotionDate(loginToday);
@@ -780,9 +783,9 @@ export default function StudentPage() {
   };
 
   const loadEvalReports = async () => {
-    // 평가피드백은 비활성 상태입니다(lib/features.ts). 탭이 숨겨져 호출될 일이 없지만,
-    // 자료를 불러오지 않는다는 것을 여기서도 분명히 막아 둡니다.
-    if (!EVAL_FEEDBACK_ENABLED) return;
+    // 평가피드백은 관리자 선생님의 학급에만 열려 있습니다(lib/features.ts).
+    // 탭이 숨겨져 호출될 일이 없지만, 자료를 불러오지 않는다는 것을 여기서도 분명히 막아 둡니다.
+    if (!evalFeedbackEnabled) return;
     const d = await api<{ reports: EvalReportSummary[] }>('/api/eval/reports/my');
     setEvalReports(d.reports);
     setEvalReportsLoaded(true);
@@ -945,11 +948,12 @@ export default function StudentPage() {
       try {
         const data = await api<{
           student: { id: string; name: string; studentNumber: number };
-          class: { id: string; lettersEnabled: boolean };
+          class: { id: string; lettersEnabled: boolean; evalFeedbackEnabled: boolean };
         }>('/api/auth/student/me');
         if (cancelled) return;
 
         setLettersEnabled(data.class.lettersEnabled ?? true);
+        setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
         const loginToday = getTodayInSeoul();
         setPlanDate(loginToday);
         setEmotionDate(loginToday);
@@ -1314,8 +1318,8 @@ export default function StudentPage() {
                 { key: 'emotion', label: '마음일기', icon: '💜' },
                 { key: 'plan', label: '일일계획', icon: '⭐' },
                 { key: 'learning', label: '배움성찰', icon: '📚' },
-                // 평가피드백은 비활성 상태입니다(lib/features.ts). 자료는 그대로 두고 탭만 감춥니다.
-                ...(EVAL_FEEDBACK_ENABLED ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
+                // 평가피드백은 관리자 선생님의 학급에만 보입니다(lib/features.ts).
+                ...(evalFeedbackEnabled ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
                 ...(lettersEnabled ? [{
                   key: 'letters',
@@ -1856,7 +1860,7 @@ export default function StudentPage() {
 
           {activeTab === 'learning' && <LearningContent />}
 
-          {EVAL_FEEDBACK_ENABLED && activeTab === 'eval' && (
+          {evalFeedbackEnabled && activeTab === 'eval' && (
             <section className="card">
               <h2 style={{ margin: '0 0 12px' }}>평가기록</h2>
               {evalReports.length === 0 ? (

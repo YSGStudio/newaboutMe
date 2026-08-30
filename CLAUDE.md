@@ -132,24 +132,43 @@ design.md에 없는 **새로운 패턴·색·토큰·컴포넌트 구조를 도�
 - 교사 화면: 간결한 명사형
 - 사용자에게 "칭호"가 아니라 **"별빛 캐릭터"**로 표기
 
-## 기능 플래그 — 평가피드백 비활성화
+## 기능 플래그 — 평가피드백 (관리자 전용 보관 모드)
 
-`lib/features.ts`의 **`EVAL_FEEDBACK_ENABLED = false`** 하나로 평가피드백(과정중심평가)이 화면에서 내려가 있습니다. 배움성찰이 이 기능을 이어받았고, 병행 운영을 끝낸 상태입니다.
+`lib/features.ts`가 평가피드백(과정중심평가)의 노출 범위를 정합니다. 배움성찰이 이 기능을 이어받아 새 자료는 더 입력하지 않지만, **이미 쌓인 자료를 계속 열어볼 수 있도록 관리자 계정과 그 관리자가 담임인 학급의 학생에게만** 탭이 보입니다. 일반·유료 교사와 그 학급 학생에게는 보이지 않습니다.
 
-**자료는 하나도 지우지 않았습니다.** 탭만 감춘 것이고, 플래그를 `true`로 되돌리면 그대로 복구됩니다.
+| 플래그 | 현재 값 | 뜻 |
+|---|---|---|
+| `EVAL_FEEDBACK_ENABLED` | `true` | 기능 자체를 켤지. `false`면 누구에게도 안 보임 |
+| `EVAL_FEEDBACK_ADMIN_ONLY` | `true` | 관리자(와 그 학급 학생)에게만 보일지. `false`면 모두에게 열림 |
 
-### 플래그가 영향을 주는 곳
+두 값을 합쳐 판단하는 함수가 **`canSeeEvalFeedback(role)`** 이고, 화면·라우트가 모두 이 함수를 씁니다.
+
+### 판단에 쓰는 role
+
+| 주체 | 무엇의 role인가 |
+|---|---|
+| 교사 | 로그인한 본인의 `teacher_profiles.role` |
+| 학생 | 학급 담임(`classes.teacher_id`)의 `teacher_profiles.role` — 학생은 Auth 사용자가 아니라 직접 판단할 role이 없습니다 |
+
+학생 쪽은 서버가 판단해서 내려줍니다. `/api/auth/student/login`과 `/api/auth/student/me`의 응답에 `class.evalFeedbackEnabled`가 들어 있고, `app/student/page.tsx`가 그 값을 상태로 들고 탭을 그립니다.
+
+### 영향을 주는 곳
 
 | 파일 | 동작 |
 |---|---|
-| `app/teacher/page.tsx` | `평가피드백` 탭이 `items`에서 빠지고 렌더링도 막힘. `activeTab`이 `eval`이면 `dashboard`로 되돌림 |
-| `app/student/page.tsx` | `포트폴리오` 탭이 `items`에서 빠지고 렌더링도 막힘. `activeTab`이 `eval`이면 `voyage`로 되돌림 |
+| `app/teacher/page.tsx` | `evalFeedbackVisible = canSeeEvalFeedback(teacherRole)`. 거짓이면 `평가피드백` 탭이 `items`에서 빠지고 렌더링도 막힘, `activeTab`이 `eval`이면 `dashboard`로 되돌림 |
+| `app/student/page.tsx` | 서버가 내려준 `evalFeedbackEnabled`. 거짓이면 `포트폴리오` 탭이 `items`에서 빠지고 렌더링도 막힘, `activeTab`이 `eval`이면 `voyage`로 되돌림 |
+| `components/teacher/StatsDashboard.tsx` | `showEval` prop. 거짓이면 평가 요약 타일·섹션과 PDF 내보내기의 평가 블록이 빠지고, `/api/eval/**`도 호출하지 않음 |
+| `lib/eval-access.ts` | 라우트용 가드 — `denyEvalTeacher(teacher)` · `denyEvalStudent(classes.teacher_id)` |
+| `app/api/eval/**` | 모든 라우트가 인증 직후 위 가드로 403을 돌려줌 |
 
-플래그를 끈 상태에서도 **DB·Storage·API 라우트·컴포넌트는 모두 살아 있습니다.**
+**화면에서 탭을 감추는 것만으로는 라우트가 막히지 않습니다.** 이 프로젝트의 DB 접근은 대부분 service role을 거치므로, 권한 확인의 1차 책임은 라우트에 있습니다(위 RLS 섹션과 같은 이유). 그래서 `app/api/eval/**`에서 같은 조건을 한 번 더 확인합니다.
+
+노출 범위를 어떻게 두든 **DB·Storage·API 라우트·컴포넌트는 모두 살아 있습니다.**
 
 ### 성찰 뱃지 진행도 — 건드리지 말 것
 
-`lib/badges.ts`의 `loadBadgeStats`는 성찰 횟수를 **`eval_reflections` + 배움성찰 합산**으로 셉니다. 평가피드백을 내려도 학생이 이미 받은 성찰 뱃지(첫 성찰 → 성찰 마스터)와 진행도가 유지되게 하려는 의도입니다. 평가피드백을 완전히 삭제하기 전까지 이 합산을 한쪽만 남기도록 고치지 않습니다.
+`lib/badges.ts`의 `loadBadgeStats`는 성찰 횟수를 **`eval_reflections` + 배움성찰 합산**으로 셉니다. 평가피드백이 화면에서 내려가도 학생이 이미 받은 성찰 뱃지(첫 성찰 → 성찰 마스터)와 진행도가 유지되게 하려는 의도입니다. **탭이 보이지 않는 학생에게도 이 합산은 그대로 적용됩니다** — 노출 범위와 뱃지 집계는 별개입니다. 평가피드백을 완전히 삭제하기 전까지 이 합산을 한쪽만 남기도록 고치지 않습니다.
 
 ### 완전히 삭제할 때의 순서
 
@@ -157,12 +176,12 @@ design.md에 없는 **새로운 패턴·색·토큰·컴포넌트 구조를 도�
 
 1. **백업** — `eval_*` 7개 테이블과 `eval-images` 버킷을 내보내 보관합니다.
    `eval_rubrics` · `eval_reports` · `eval_report_items` · `eval_report_images` · `eval_report_links` · `eval_reflections` · `eval_parent_comments`
-2. **화면** — `components/teacher/EvalDashboard.tsx` 삭제, 두 페이지에서 `eval` 탭 분기와 플래그 참조 제거
-3. **라우트** — `app/api/eval/**` 삭제
+2. **화면** — `components/teacher/EvalDashboard.tsx` 삭제, 두 페이지에서 `eval` 탭 분기와 플래그 참조 제거, `StatsDashboard`의 `showEval` prop과 학생 세션 응답의 `evalFeedbackEnabled` 정리
+3. **라우트** — `app/api/eval/**`와 `lib/eval-access.ts` 삭제
 4. **뱃지** — `lib/badges.ts`에서 `eval_reflections` 집계를 빼고 배움성찰만 세도록 정리. **이 시점부터 과거 평가피드백 성찰이 뱃지 계산에서 사라지므로**, 이미 지급된 뱃지가 회수되지 않는지 먼저 확인합니다
 5. **문서** — 개인정보처리방침·이용약관의 수집 항목에서 평가 기록 관련 문구를 정리
 6. **데이터** — 마이그레이션으로 테이블 `drop`, Storage 버킷 비우기
-7. `lib/features.ts`에서 `EVAL_FEEDBACK_ENABLED`와 이 섹션을 함께 제거
+7. `lib/features.ts`에서 평가피드백 플래그·`canSeeEvalFeedback`와 이 섹션을 함께 제거
 
 ### 다른 기능을 내릴 때도 같은 방식으로
 

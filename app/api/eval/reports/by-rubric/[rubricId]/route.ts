@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
+import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 type Params = { params: { rubricId: string } };
@@ -7,6 +8,10 @@ type Params = { params: { rubricId: string } };
 export async function GET(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const denied = denyEvalTeacher(auth.teacher);
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const classId = searchParams.get('classId');

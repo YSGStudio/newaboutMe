@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
+import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
 
@@ -31,6 +32,10 @@ const rubricUpdateSchema = z.object({
 export async function PATCH(req: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const denied = denyEvalTeacher(auth.teacher);
+  if (denied) return denied;
 
   const body = await req.json();
   const parsed = rubricUpdateSchema.safeParse(body);
@@ -66,6 +71,10 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(_: Request, { params }: Params) {
   const auth = await requireTeacher();
   if ('error' in auth) return auth.error;
+
+  // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
+  const denied = denyEvalTeacher(auth.teacher);
+  if (denied) return denied;
 
   const { error } = await supabaseAdmin
     .from('eval_rubrics')

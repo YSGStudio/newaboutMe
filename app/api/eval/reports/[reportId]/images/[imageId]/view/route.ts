@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { requireStudentSession } from '@/lib/student-session';
+import { denyEvalStudent, denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 type Params = { params: { reportId: string; imageId: string } };
@@ -13,11 +14,16 @@ export async function GET(req: Request, { params }: Params) {
 
   let ownerFilter: { column: 'teacher_id' | 'student_id'; value: string };
 
+  // 어느 쪽이든 평가피드백이 열려 있는 계정인지 함께 확인한다(lib/features.ts).
   if (!('error' in teacherAuth)) {
+    const denied = denyEvalTeacher(teacherAuth.teacher);
+    if (denied) return denied;
     ownerFilter = { column: 'teacher_id', value: teacherAuth.teacher.id };
   } else {
     const studentAuth = await requireStudentSession();
     if ('error' in studentAuth) return studentAuth.error;
+    const denied = await denyEvalStudent(studentAuth.student.classes.teacher_id);
+    if (denied) return denied;
     ownerFilter = { column: 'student_id', value: studentAuth.student.id };
   }
 
