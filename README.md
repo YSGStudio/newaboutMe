@@ -28,7 +28,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 ## Supabase 설정
 1. Supabase 프로젝트 생성
-2. SQL Editor에서 `db/schema.sql` 실행
+2. SQL Editor에서 `supabase/schema.sql` 실행
 3. Authentication > Providers에서 Email 활성화
 
 ## 실행

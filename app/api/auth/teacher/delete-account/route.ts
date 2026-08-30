@@ -3,7 +3,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // 회원 탈퇴: 교사 계정 삭제 → teacher_profiles → classes → students → 소속 데이터 전부가
-// FK on delete cascade로 연쇄 삭제된다 (db/schema.sql 참고). 복구 불가능.
+// FK on delete cascade로 연쇄 삭제된다 (supabase/schema.sql 참고). 복구 불가능.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const password = typeof body?.password === 'string' ? body.password : '';
