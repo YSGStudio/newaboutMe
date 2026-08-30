@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import RefreshButton from '@/components/ui/RefreshButton';
 import AdminNoticeManager from '@/components/teacher/AdminNoticeManager';
 import { api } from '@/lib/api-client';
+import { todayDate } from '@/lib/date';
 
 type Role = 'general' | 'paid' | 'admin';
 
@@ -94,7 +95,7 @@ export default function OperatorDashboard() {
   const [exportClassId, setExportClassId] = useState('');
   const [resetting, setResetting] = useState(false);
 
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+  const today = todayDate();
 
   const load = useCallback(async () => {
     setLoading(true);

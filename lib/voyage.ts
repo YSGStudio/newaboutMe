@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { todayDate } from '@/lib/date';
+import { todayDate, formatDateInSeoul } from '@/lib/date';
 
 export const FUEL_RULES = {
   plan_check: { base: 5, dailyCap: 1 },
@@ -83,9 +83,7 @@ const previousSchoolDate = (date: string) => {
   const cursor = new Date(`${date}T00:00:00+09:00`);
   do cursor.setDate(cursor.getDate() - 1);
   while (cursor.getDay() === 0 || cursor.getDay() === 6);
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(cursor);
+  return formatDateInSeoul(cursor);
 };
 
 const updateStreak = (lastActiveOn: string | null, streakDays: number, earnedOn: string) => {

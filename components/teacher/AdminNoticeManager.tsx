@@ -11,6 +11,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import RefreshButton from '@/components/ui/RefreshButton';
 import { api } from '@/lib/api-client';
+import { todayDate } from '@/lib/date';
 
 type Notice = {
   id: string;
@@ -23,8 +24,7 @@ type Notice = {
   dismissedCount: number;
 };
 
-// 서울 기준 오늘 날짜(YYYY-MM-DD)
-const seoulToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+// 달력상 며칠 뒤 — 시간대와 무관한 날짜 문자열 연산이다.
 const addDays = (dateStr: string, days: number) => {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + days);
@@ -32,7 +32,7 @@ const addDays = (dateStr: string, days: number) => {
 };
 
 type FormState = { title: string; content: string; startsOn: string; endsOn: string; isActive: boolean };
-const emptyForm = (): FormState => ({ title: '', content: '', startsOn: seoulToday(), endsOn: addDays(seoulToday(), 7), isActive: true });
+const emptyForm = (): FormState => ({ title: '', content: '', startsOn: todayDate(), endsOn: addDays(todayDate(), 7), isActive: true });
 
 export default function AdminNoticeManager() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -125,7 +125,7 @@ export default function AdminNoticeManager() {
     setEditForm({ title: n.title, content: n.content, startsOn: n.startsOn, endsOn: n.endsOn, isActive: n.isActive });
   };
 
-  const today = seoulToday();
+  const today = todayDate();
   const statusOf = (n: Notice): { label: string; color: string; bg: string } => {
     if (!n.isActive) return { label: '비활성', color: '#64748b', bg: '#f1f5f9' };
     if (today < n.startsOn) return { label: '예약됨', color: '#0369a1', bg: '#e0f2fe' };
