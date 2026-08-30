@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "clarify": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/clarify/SKILL.md",
+      "computedHash": "6ebb717891d950683e674ca1207fb2c9d022a821d8272e7605a6634139845f3a"
+    },
+    "implement": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/implement/SKILL.md",
+      "computedHash": "5a73301c0e5ce9b811f8843d05ca6f846fb0b077cb347b8ab9ac0f22b06c6f76"
+    },
+    "learn": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/learn/SKILL.md",
+      "computedHash": "8e7e24e2171d6cf50ccc6299c26bfd3aaa816de32fa46e9e7b17f7bb40b53a49"
+    },
+    "pr": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/pr/SKILL.md",
+      "computedHash": "cbeea40286eca16a95c72c84edbafd5c0b65e7c73e690b521056a6290d2cc01f"
+    },
+    "prd": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/prd/SKILL.md",
+      "computedHash": "f903f891eaf32bc70c80b1405b05f27bee1c9f34e1b695f11d9d359fcedf1ad8"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
+    "verify": {
+      "source": "yansfil/vibe-engineering",
+      "sourceType": "github",
+      "skillPath": "skills/verify/SKILL.md",
+      "computedHash": "70a0ea0ea1afea5ebaaca2579227ce7d56841a8ef6da1eab6c78833c9fb63d84"
+    }
+  }
+}
