@@ -19,22 +19,6 @@ export const CATEGORY_VALENCE: Record<EmotionCategoryType, Valence> = {
   social_emotions: 'neutral',
 };
 
-/**
- * 히트맵 셀 색 — 발산형(긍정 amber ↔ 부정 blue)에 중립은 회색.
- *
- * 감정 카테고리 6색을 그대로 쓰지 않는 이유: 불안(#8b5cf6)과 슬픔(#3b82f6)이
- * 정상 시각에서도 ΔE 12, 적록색약에서는 1.3으로 사실상 구분되지 않는다.
- * 작은 셀이 촘촘히 깔리는 히트맵에서는 읽을 수 없으므로, "무슨 감정인가" 대신
- * "마음이 무거운가"를 색으로 나르고 정확한 감정은 툴팁으로 보여준다.
- * 값 자체는 design.md의 기존 감정 팔레트에서 가져왔다(새 색을 만들지 않았다).
- */
-export const VALENCE_COLOR: Record<Valence | 'none', { fill: string; label: string }> = {
-  positive: { fill: '#f59e0b', label: '밝은 기록' },
-  neutral: { fill: '#cbd5e1', label: '중립' },
-  negative: { fill: '#3b82f6', label: '무거운 기록' },
-  none: { fill: '#f1f5f9', label: '기록 없음' },
-};
-
 // ── "살펴볼 학생" 판정 ────────────────────────────────────────────
 
 export type WatchReasonCode =

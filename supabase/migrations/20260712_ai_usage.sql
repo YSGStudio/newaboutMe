@@ -1,6 +1,6 @@
 -- AI 분석 사용량 기록.
 -- 월 한도(무료 20회 / 유료 100회 / 관리자 무제한)는 등급에서 그대로 계산되는 고정값이라
--- DB 컬럼이 필요 없다 — lib/ai/usage.ts의 FREE_MONTHLY_AI_LIMIT / PAID_MONTHLY_AI_LIMIT 참고.
+-- DB 컬럼이 필요 없다 — 등급별 한도는 app_settings에 있다. lib/adminSettings.ts 참고.
 -- 사용량 자체도 이번 달 로그 개수를 그때그때 세는 방식이라 별도 잔여치 저장이 없고,
 -- 매월 1일(서울 기준) 자동으로 재계산된다 — 이월/차감 없음.
 

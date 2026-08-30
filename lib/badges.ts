@@ -362,34 +362,3 @@ export async function countPerfectPlanDays(supabase: SupabaseClient, studentId: 
   return perfectCount;
 }
 
-export async function countAllCheckedDays(supabase: SupabaseClient, studentId: string): Promise<number> {
-  const { data: plans } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('student_id', studentId)
-    .eq('is_active', true);
-
-  if (!plans || plans.length === 0) return 0;
-  const planIds = plans.map((p: { id: string }) => p.id);
-  const totalPlans = planIds.length;
-
-  const { data: checks } = await supabase
-    .from('plan_checks')
-    .select('check_date, plan_id')
-    .in('plan_id', planIds);
-
-  if (!checks || checks.length === 0) return 0;
-
-  const dateMap = new Map<string, Set<string>>();
-  for (const c of checks) {
-    if (!dateMap.has(c.check_date)) dateMap.set(c.check_date, new Set());
-    dateMap.get(c.check_date)!.add(c.plan_id);
-  }
-
-  let count = 0;
-  for (const planSet of dateMap.values()) {
-    if (planSet.size >= totalPlans) count++;
-  }
-  return count;
-}
-

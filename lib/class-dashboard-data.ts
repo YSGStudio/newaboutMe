@@ -29,8 +29,6 @@ function recentSeoulDates(days: number): string[] {
   return out;
 }
 
-export type ClassDashboardPayload = Awaited<ReturnType<typeof buildClassDashboard>>;
-
 /** 학급을 담당하지 않는 교사가 부르면 null을 돌려준다. 라우트가 403으로 바꾼다. */
 export async function buildClassDashboard(classId: string, teacherId: string) {
   const dates = recentSeoulDates(LOOKBACK_DAYS);
