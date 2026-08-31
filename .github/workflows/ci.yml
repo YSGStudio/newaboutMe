@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · lint · test · build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      # next build는 빌드 시점에 환경변수를 읽으므로 자리표시자 값을 넣어준다.
+      # 실제 Supabase·OpenAI에 붙지 않는다. .env.ci 주석 참고.
+      - name: CI용 .env.local 만들기
+        run: cp .env.ci .env.local
+
+      - name: 타입 검사
+        run: npm run typecheck
+
+      - name: 린트
+        run: npm run lint
+
+      - name: 테스트
+        run: npm test
+
+      - name: 빌드
+        run: npm run build
