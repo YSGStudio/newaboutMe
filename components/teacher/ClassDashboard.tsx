@@ -13,6 +13,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
 import { api } from '@/lib/api-client';
+import usePoll from '@/lib/use-poll';
 import {
   WATCH_REASON_META,
   WATCH_RULES,
@@ -73,19 +74,23 @@ export default function ClassDashboard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const load = async () => {
+  /** silent=true는 30초 폴링용 — 새로고침 아이콘을 돌리지 않고 실패해도 조용히 넘어간다. */
+  const load = async (silent = false) => {
     if (!classId) return;
-    setLoading(true);
-    setError('');
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       setData(
         // 학급 대시보드는 항상 최신값이어야 한다 — 브라우저 캐시를 타지 않게 한다.
         await api<ClassDashboardData>(`/api/stats/class/${classId}/dashboard`, { cache: 'no-store' }),
       );
     } catch (err) {
-      setError((err as Error).message);
+      // 배경 갱신이 실패했다고 보고 있던 화면에 오류를 띄우지 않는다.
+      if (!silent) setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -99,6 +104,9 @@ export default function ClassDashboard({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  // 학급 현황은 학생들이 지금 쓰는 값이라 30초마다 조용히 다시 읽는다.
+  usePoll(() => load(true), { enabled: Boolean(classId), busy: loading });
 
   if (!classId) {
     return (
@@ -122,7 +130,7 @@ export default function ClassDashboard({
       <section className="card">
         <div className="row space-between" style={{ marginBottom: 12 }}>
           <h2 style={{ margin: 0 }}>대시보드</h2>
-          <RefreshButton onClick={load} loading={loading} />
+          <RefreshButton onClick={() => load()} loading={loading} />
         </div>
 
         {error && <Notice type="error" message={error} />}

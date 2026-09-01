@@ -34,6 +34,7 @@ import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
 import { formatDateInSeoul } from "@/lib/date";
 import { api } from "@/lib/api-client";
+import usePoll from "@/lib/use-poll";
 import {
   EMOTION_META,
   REACTION_META,
@@ -417,18 +418,22 @@ export default function TeacherPage() {
     }
   };
 
-  const loadFeeds = useCallback(async (classId: string, date: string) => {
-    if (!classId) return;
-    setFeedLoading(true);
-    try {
-      const data = await api<{ feeds: FeedItem[] }>(
-        `/api/feeds/class/${classId}?date=${date}`
-      );
-      setFeeds(data.feeds);
-    } finally {
-      setFeedLoading(false);
-    }
-  }, []);
+  /** silent=true는 30초 폴링용 — "불러오는 중"으로 화면을 비우지 않고 그 자리에서 값만 바꾼다. */
+  const loadFeeds = useCallback(
+    async (classId: string, date: string, silent = false) => {
+      if (!classId) return;
+      if (!silent) setFeedLoading(true);
+      try {
+        const data = await api<{ feeds: FeedItem[] }>(
+          `/api/feeds/class/${classId}?date=${date}`
+        );
+        setFeeds(data.feeds);
+      } finally {
+        if (!silent) setFeedLoading(false);
+      }
+    },
+    []
+  );
 
   // 첫 진입은 부트스트랩 한 번으로 끝낸다.
   // 예전에는 classes·role·usage를 각각 부르고, 학급 목록이 와야 대시보드를 불러
@@ -519,6 +524,19 @@ export default function TeacherPage() {
       );
     }
   }, [activeTab, selectedClassId, feedDate, loadFeeds]);
+
+  // 일일계획·마음피드는 학생이 지금 쓰고 있는 화면을 옆에서 보는 성격이라,
+  // 열려 있는 동안 30초마다 조용히 다시 읽는다(usePoll이 탭이 뒤에 있으면 건너뛴다).
+  usePoll(() => loadStudents(selectedClassId), {
+    enabled: activeTab === "student" && Boolean(selectedClassId),
+    busy: studentListLoading,
+  });
+
+  // 지난 날짜를 보고 있어도 갱신한다 — 그날 기록에 친구들의 반응이 계속 붙는다.
+  usePoll(() => loadFeeds(selectedClassId, feedDate, true), {
+    enabled: activeTab === "feed" && Boolean(selectedClassId),
+    busy: feedLoading,
+  });
 
   const onTeacherAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
