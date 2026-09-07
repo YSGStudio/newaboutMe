@@ -15,12 +15,14 @@ import BookCard from '@/components/student/BookCard';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { formatDateInSeoul } from '@/lib/date';
 import { studentApi as api } from '@/lib/api-client';
+import { shrinkImageForUpload } from '@/lib/image-upload';
 import {
   LearningStatus,
   STUDENT_STATUS_LABEL,
   STATUS_COLOR,
   MAX_ANSWER_LENGTH,
   MAX_FILES_PER_SUBMISSION,
+  MAX_FILE_BYTES,
   MAX_LINKS_PER_SUBMISSION,
   checkLearningFile,
   checkLearningLink,
@@ -202,21 +204,24 @@ export default function LearningContent() {
     }
   };
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (rawFile: File) => {
     if (!detail) return;
     const currentCount = detail.submission?.files.length ?? 0;
-
-    // 서버에서도 같은 함수로 다시 검사하지만, 여기서 먼저 걸러 이유를 바로 보여줍니다.
-    const rejection = checkLearningFile({ type: file.type, size: file.size }, currentCount);
-    if (rejection) {
-      setModalError(rejection);
-      return;
-    }
 
     setUploading(true);
     setModalError('');
     setModalMsg('');
     try {
+      // 휴대폰 사진은 한 장이 용량 한도를 넘기 쉬워서, 검사 전에 먼저 줄입니다.
+      const file = await shrinkImageForUpload(rawFile, MAX_FILE_BYTES);
+
+      // 서버에서도 같은 함수로 다시 검사하지만, 여기서 먼저 걸러 이유를 바로 보여줍니다.
+      const rejection = checkLearningFile({ type: file.type, size: file.size }, currentCount);
+      if (rejection) {
+        setModalError(rejection);
+        return;
+      }
+
       const form = new FormData();
       form.append('file', file);
       await api(`/api/learning/my/${detail.activity.id}/files`, { method: 'POST', body: form });

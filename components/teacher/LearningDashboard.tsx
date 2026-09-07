@@ -17,12 +17,14 @@ import RefreshButton from '@/components/ui/RefreshButton';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { SUBJECT_LIST, SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { api } from '@/lib/api-client';
+import { shrinkImageForUpload } from '@/lib/image-upload';
 import {
   LearningStatus,
   TEACHER_STATUS_LABEL,
   STATUS_COLOR,
   MAX_FEEDBACK_LENGTH,
   MAX_FILES_PER_SUBMISSION,
+  MAX_FILE_BYTES,
   MAX_QUESTIONS_PER_ACTIVITY,
   SUGGESTED_QUESTIONS,
   MAX_LINKS_PER_SUBMISSION,
@@ -391,20 +393,22 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     proxyInputRef.current?.click();
   };
 
-  const uploadProxyFile = async (file: File) => {
+  const uploadProxyFile = async (rawFile: File) => {
     if (!proxyTarget || !selectedId) return;
     const currentCount = proxyTarget.submission?.files.length ?? 0;
-
-    const rejection = checkLearningFile({ type: file.type, size: file.size }, currentCount);
-    if (rejection) {
-      setError(rejection);
-      notifyLater();
-      return;
-    }
 
     setUploading(true);
     setError('');
     try {
+      // 휴대폰 사진은 한 장이 용량 한도를 넘기 쉬우므로 검사 전에 줄인다.
+      const file = await shrinkImageForUpload(rawFile, MAX_FILE_BYTES);
+
+      const rejection = checkLearningFile({ type: file.type, size: file.size }, currentCount);
+      if (rejection) {
+        setError(rejection);
+        return;
+      }
+
       const form = new FormData();
       form.append('studentId', proxyTarget.student.id);
       form.append('file', file);

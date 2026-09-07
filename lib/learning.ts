@@ -50,7 +50,10 @@ export const STATUS_COLOR: Record<LearningStatus, { bg: string; border: string; 
 // ── 파일 규칙 ────────────────────────────────────────────────────
 
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+// 플랫폼(Vercel 함수)이 요청 본문을 4.5MB에서 끊는다. 그보다 큰 파일은 라우트에
+// 닿지도 못하고 413으로 막혀 화면에 알 수 없는 오류가 뜬다. 그래서 앱의 한도를
+// 그 아래로 잡는다. 사진은 lib/image-upload.ts가 올리기 전에 이 크기로 줄여 준다.
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const MAX_FILES_PER_SUBMISSION = 5;
 
 /** 사람이 읽는 용량 표기 — 오류 문구에 쓴다. */
