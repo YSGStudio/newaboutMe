@@ -3,8 +3,8 @@ import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
 import { feedCreateSchema } from '@/lib/validators';
-import { checkAndAwardBadge } from '@/lib/badges';
-import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
+import { checkAndAwardBadge, type AwardedBadge } from '@/lib/badges';
+import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
 
 export async function GET(req: Request) {
   const auth = await requireStudentSession();
@@ -67,11 +67,15 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'emotion_save');
+  let newBadges: AwardedBadge[] = [];
   try {
-    if (isQualityContent(parsed.data.content, FUEL_RULES.emotion_feed.minChars)) {
-      await grantFuel(supabaseAdmin, auth.student.id, 'emotion_feed', data.id);
-    }
+    newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'emotion_save');
+  } catch (badgeError) {
+    // 뱃지 확인이 실패해도 이미 저장된 기록과 연료 지급은 이어서 처리한다.
+    console.error('[badges] 감정 기록 뱃지 확인 실패:', badgeError);
+  }
+  try {
+    await grantFuel(supabaseAdmin, auth.student.id, 'emotion_feed', data.id);
     await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
   } catch (fuelError) {
     console.error('[voyage] 감정 기록 연료 지급 실패:', fuelError);

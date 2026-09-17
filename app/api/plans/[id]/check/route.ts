@@ -3,7 +3,7 @@ import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { planCheckSchema } from '@/lib/validators';
 import { todayDate } from '@/lib/date';
-import { checkAndAwardBadge } from '@/lib/badges';
+import { checkAndAwardBadge, type AwardedBadge } from '@/lib/badges';
 import { grantBadgeFuel, grantFuel, areAllActivePlansChecked } from '@/lib/voyage';
 
 type Params = { params: { id: string } };
@@ -54,9 +54,15 @@ export async function POST(req: Request, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const newBadges = parsed.data.isCompleted === true
-    ? await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'plan_complete')
-    : [];
+  let newBadges: AwardedBadge[] = [];
+  if (parsed.data.isCompleted === true) {
+    try {
+      newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'plan_complete');
+    } catch (badgeError) {
+      // 뱃지 확인이 실패해도 이미 저장된 체크와 연료 지급은 이어서 처리한다.
+      console.error('[badges] 계획 체크 뱃지 확인 실패:', badgeError);
+    }
+  }
   try {
     if (parsed.data.isCompleted !== null && await areAllActivePlansChecked(supabaseAdmin, auth.student.id, date)) {
       await grantFuel(supabaseAdmin, auth.student.id, 'plan_check', date);

@@ -3,8 +3,8 @@ import { requireStudentSession } from '@/lib/student-session';
 import { denyEvalStudent } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
-import { checkAndAwardBadge } from '@/lib/badges';
-import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
+import { checkAndAwardBadge, type AwardedBadge } from '@/lib/badges';
+import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
 
 type Params = { params: { reportId: string } };
 
@@ -49,11 +49,15 @@ export async function POST(req: Request, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'reflection_save');
+  let newBadges: AwardedBadge[] = [];
   try {
-    if (isQualityContent(parsed.data.content, FUEL_RULES.reflection.minChars)) {
-      await grantFuel(supabaseAdmin, auth.student.id, 'reflection', data.id);
-    }
+    newBadges = await checkAndAwardBadge(supabaseAdmin, auth.student.id, 'reflection_save');
+  } catch (badgeError) {
+    // 뱃지 확인이 실패해도 이미 저장된 기록과 연료 지급은 이어서 처리한다.
+    console.error('[badges] 성찰 뱃지 확인 실패:', badgeError);
+  }
+  try {
+    await grantFuel(supabaseAdmin, auth.student.id, 'reflection', data.id);
     await grantBadgeFuel(supabaseAdmin, auth.student.id, newBadges);
   } catch (fuelError) {
     console.error('[voyage] 성찰 연료 지급 실패:', fuelError);

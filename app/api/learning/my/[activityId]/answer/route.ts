@@ -10,7 +10,7 @@ import {
 } from '@/lib/learning-access';
 import { learningAnswerSchema } from '@/lib/validators';
 import { checkAndAwardBadge } from '@/lib/badges';
-import { FUEL_RULES, grantBadgeFuel, grantFuel, isQualityContent } from '@/lib/voyage';
+import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
 
 // 학생 성찰 답변 저장 (질문별로 여러 개를 한 번에)
 // 저장 후 제출 완료 여부를 다시 판정한다 — 결과물 1개 이상 + 모든 질문에 답이 있어야 완료다.
@@ -73,13 +73,14 @@ export async function PUT(req: Request, { params }: Params) {
   let newBadges: Awaited<ReturnType<typeof checkAndAwardBadge>> = [];
 
   if (submitted) {
-    newBadges = await checkAndAwardBadge(supabaseAdmin, access.student.id, 'reflection_save');
     try {
-      // 질문이 여러 개면 답을 합쳐 분량을 본다 — 질문 수에 따라 기준이 달라지면 안 되기 때문이다.
-      const combined = rows.map((row) => row.answer).join(' ');
-      if (isQualityContent(combined, FUEL_RULES.reflection.minChars)) {
-        await grantFuel(supabaseAdmin, access.student.id, 'reflection', submission.id);
-      }
+      newBadges = await checkAndAwardBadge(supabaseAdmin, access.student.id, 'reflection_save');
+    } catch (badgeError) {
+      // 뱃지 확인이 실패해도 이미 제출된 성찰과 연료 지급은 이어서 처리한다.
+      console.error('[badges] 배움성찰 뱃지 확인 실패:', badgeError);
+    }
+    try {
+      await grantFuel(supabaseAdmin, access.student.id, 'reflection', submission.id);
       await grantBadgeFuel(supabaseAdmin, access.student.id, newBadges);
     } catch (fuelError) {
       // 연료 지급 실패가 성찰 저장을 되돌리게 두지 않는다.

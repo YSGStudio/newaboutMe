@@ -3,9 +3,10 @@ import { todayDate, formatDateInSeoul } from '@/lib/date';
 
 export const FUEL_RULES = {
   plan_check: { base: 5, dailyCap: 1 },
-  emotion_feed: { base: 8, dailyCap: 1, minChars: 20 },
-  reflection: { base: 10, dailyCap: 1, minChars: 40 },
-  letter: { base: 5, dailyCap: 2, minChars: 15 },
+  // 활동을 남긴 것 자체를 연료로 본다 — 분량으로 거르지 않고, 하루 상한(dailyCap)으로만 조절한다.
+  emotion_feed: { base: 8, dailyCap: 1 },
+  reflection: { base: 10, dailyCap: 1 },
+  letter: { base: 5, dailyCap: 2 },
   badge: { base: 50, dailyCap: null },
   weekly_streak: { base: 30, dailyCap: null },
   comeback: { base: 20, dailyCap: null },
@@ -50,7 +51,6 @@ export async function getStars(supabase: SupabaseClient): Promise<VoyageStar[]> 
 }
 
 // 학생의 활성 계획이 오늘 모두 체크(완료/미완료 판정)되었는지.
-// 계획 체크 라우트와 /voyage/me가 동일 로직을 각자 갖고 있던 것을 하나로 모은다.
 export async function areAllActivePlansChecked(
   supabase: SupabaseClient,
   studentId: string,
@@ -200,7 +200,3 @@ export async function grantBadgeFuel(
   }
 }
 
-export const isQualityContent = (content: string, minChars: number) => {
-  const compact = content.trim().replace(/\s/g, '');
-  return compact.length >= minChars && !/(.)\1{4,}/u.test(compact);
-};

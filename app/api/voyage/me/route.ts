@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getSeoulDayRange, todayDate } from '@/lib/date';
-import { getStars, areAllActivePlansChecked } from '@/lib/voyage';
+import { todayDate } from '@/lib/date';
+import { getStars } from '@/lib/voyage';
 
 export async function GET() {
   const auth = await requireStudentSession();
@@ -14,34 +14,35 @@ export async function GET() {
   );
 
   const today = todayDate();
-  const { startIso, endIso } = getSeoulDayRange(today);
   const [
     stateRes,
     stars,
     ledgerRes,
+    todayLedgerRes,
     arrivalsRes,
-    feedRes,
-    reflectionRes,
-    lettersRes,
-    allPlansChecked,
   ] = await Promise.all([
     supabaseAdmin.from('voyage_state').select('*').eq('student_id', auth.student.id).single(),
     getStars(supabaseAdmin),
     supabaseAdmin.from('fuel_ledger').select('*').eq('student_id', auth.student.id).order('created_at', { ascending: false }).limit(8),
+    // 오늘 연료와 미션 완료는 오늘 원장 전체로 판단한다.
+    // 최근 기록(8건)만 보면 뱃지 연료가 겹치는 날 합계가 빠지고,
+    // 활동 테이블을 보면 연료를 못 받은 기록도 "완료"로 표시된다.
+    supabaseAdmin.from('fuel_ledger').select('source_type,amount').eq('student_id', auth.student.id).eq('earned_on', today),
     supabaseAdmin.from('star_arrivals').select('star_level,arrived_at').eq('student_id', auth.student.id),
-    supabaseAdmin.from('emotion_feeds').select('id', { count: 'exact', head: true }).eq('student_id', auth.student.id).gte('created_at', startIso).lte('created_at', endIso),
-    supabaseAdmin.from('eval_reflections').select('id', { count: 'exact', head: true }).eq('student_id', auth.student.id).gte('created_at', startIso).lte('created_at', endIso),
-    supabaseAdmin.from('letters').select('id', { count: 'exact', head: true }).eq('sender_id', auth.student.id).gte('created_at', startIso).lte('created_at', endIso),
-    areAllActivePlansChecked(supabaseAdmin, auth.student.id, today),
   ]);
 
-  if (stateRes.error || ledgerRes.error) {
-    return NextResponse.json({ error: stateRes.error?.message ?? ledgerRes.error?.message }, { status: 500 });
+  if (stateRes.error || ledgerRes.error || todayLedgerRes.error) {
+    return NextResponse.json(
+      { error: stateRes.error?.message ?? ledgerRes.error?.message ?? todayLedgerRes.error?.message },
+      { status: 500 },
+    );
   }
 
-  const todayFuel = (ledgerRes.data ?? [])
-    .filter((entry) => entry.earned_on === today && entry.amount > 0)
+  const todayLedger = todayLedgerRes.data ?? [];
+  const todayFuel = todayLedger
+    .filter((entry) => entry.amount > 0)
     .reduce((sum, entry) => sum + entry.amount, 0);
+  const countSource = (source: string) => todayLedger.filter((entry) => entry.source_type === source).length;
 
   return NextResponse.json({
     student: { id: auth.student.id, name: auth.student.name },
@@ -51,10 +52,10 @@ export async function GET() {
     recentLog: ledgerRes.data ?? [],
     todayFuel,
     missions: {
-      plan: allPlansChecked,
-      emotion: (feedRes.count ?? 0) > 0,
-      reflection: (reflectionRes.count ?? 0) > 0,
-      letterCount: lettersRes.count ?? 0,
+      plan: countSource('plan_check') > 0,
+      emotion: countSource('emotion_feed') > 0,
+      reflection: countSource('reflection') > 0,
+      letterCount: countSource('letter'),
     },
   });
 }
