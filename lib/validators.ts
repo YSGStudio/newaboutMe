@@ -2,7 +2,17 @@ import { z } from 'zod';
 import { EMOTION_TYPES } from '@/types/domain';
 import { STUDENT_PASSWORD_REGEX } from '@/lib/password';
 import { MAX_NOMINATIONS_PER_TYPE } from '@/lib/relationship';
-import { MAX_ANSWER_LENGTH, MAX_FEEDBACK_LENGTH, MAX_QUESTIONS_PER_ACTIVITY, MAX_LINK_LABEL_LENGTH } from '@/lib/learning';
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_FEEDBACK_LENGTH,
+  MAX_QUESTIONS_PER_ACTIVITY,
+  MAX_LINK_LABEL_LENGTH,
+  MAX_CRITERION_TITLE_LENGTH,
+  MAX_LEVEL_LENGTH,
+  MAX_GRADE_COMMENT_LENGTH,
+  GRADES,
+  defaultCriterionQuestion,
+} from '@/lib/learning';
 import { SUBJECT_LIST } from '@/lib/subjects';
 
 export const teacherSignupSchema = z.object({
@@ -87,14 +97,50 @@ export const relationshipResponseSubmitSchema = z.object({
 // ── 배움성찰 ────────────────────────────────────────────────────
 // 과목은 자유 입력이 아니라 SUBJECT_LIST 안의 값만 허용한다(교사 화면도 선택형).
 
+const levelField = z
+  .string()
+  .trim()
+  .max(MAX_LEVEL_LENGTH, `수준별 기준은 ${MAX_LEVEL_LENGTH}자 이내로 입력해주세요.`)
+  .optional()
+  .transform((value) => value || null);
+
+export const learningCriterionSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, '평가요소를 입력해주세요.')
+    .max(MAX_CRITERION_TITLE_LENGTH, `평가요소는 ${MAX_CRITERION_TITLE_LENGTH}자 이내로 입력해주세요.`),
+  levelHigh: levelField,
+  levelMid: levelField,
+  levelLow: levelField,
+});
+
+export const learningQuestionSchema = z
+  .object({
+    question: z.string().trim().max(200, '성찰 질문은 200자 이내로 입력해주세요.').default(''),
+    criterion: learningCriterionSchema.nullable().optional(),
+  })
+  .transform((item, ctx) => {
+    const criterion = item.criterion ?? null;
+    const question = item.question || (criterion ? defaultCriterionQuestion(criterion.title) : '');
+    if (!question) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: '성찰 질문을 입력해주세요.' });
+      return z.NEVER;
+    }
+    return { question, criterion };
+  });
+
+export type LearningQuestionInput = z.output<typeof learningQuestionSchema>;
+
 export const learningActivityCreateSchema = z.object({
   classId: z.string().uuid(),
   subject: z.enum(SUBJECT_LIST),
   unit: z.string().trim().min(1, '단원을 입력해주세요.').max(60, '단원은 60자 이내로 입력해주세요.'),
   title: z.string().trim().min(1, '활동명을 입력해주세요.').max(80, '활동명은 80자 이내로 입력해주세요.'),
   // 성찰 질문은 여러 개를 등록할 수 있다. 최소 1개는 있어야 한다.
+  // 질문마다 평가요소를 겸할 수 있다(criterion). 요소가 있고 질문 칸이 비었으면 기본 질문으로 채운다.
   reflectionQuestions: z
-    .array(z.string().trim().min(1, '성찰 질문을 입력해주세요.').max(200, '성찰 질문은 200자 이내로 입력해주세요.'))
+    .array(learningQuestionSchema)
     .min(1, '성찰 질문을 하나 이상 입력해주세요.')
     .max(MAX_QUESTIONS_PER_ACTIVITY, `성찰 질문은 최대 ${MAX_QUESTIONS_PER_ACTIVITY}개까지 만들 수 있습니다.`)
 });
@@ -108,7 +154,38 @@ export const learningAnswerSchema = z.object({
       questionId: z.string().uuid(),
       answer: z.string().max(MAX_ANSWER_LENGTH, `성찰은 ${MAX_ANSWER_LENGTH}자 이내로 써주세요.`)
     }))
+    .max(MAX_QUESTIONS_PER_ACTIVITY),
+  // 평가요소 질문의 자기평가. 교사 등급·코멘트 필드는 받지 않는다(스키마에 없으면 버려진다).
+  selfGrades: z
+    .array(z.object({
+      questionId: z.string().uuid(),
+      grade: z.enum(GRADES).nullable()
+    }))
     .max(MAX_QUESTIONS_PER_ACTIVITY)
+    .optional()
+});
+
+// 교사 요소별 등급·코멘트. grade를 null로 보내면 그 요소의 교사 등급을 지운다.
+export const learningGradesSchema = z.object({
+  grades: z
+    .array(z.object({
+      questionId: z.string().uuid(),
+      grade: z.enum(GRADES).nullable(),
+      comment: z
+        .string()
+        .trim()
+        .max(MAX_GRADE_COMMENT_LENGTH, `코멘트는 ${MAX_GRADE_COMMENT_LENGTH}자 이내로 입력해주세요.`)
+        .nullable()
+        .optional()
+        .transform((value) => value || null)
+    }))
+    .min(1)
+    .max(MAX_QUESTIONS_PER_ACTIVITY)
+});
+
+// AI생성 탭 — 교과발달상황을 만들 과목
+export const learningSubjectReportSchema = z.object({
+  subjects: z.array(z.enum(SUBJECT_LIST)).min(1, '과목을 하나 이상 골라주세요.')
 });
 
 export const learningLinkSchema = z.object({

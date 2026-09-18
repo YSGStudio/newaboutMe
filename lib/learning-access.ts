@@ -12,7 +12,8 @@ import { NextResponse } from 'next/server';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { isSubmittable } from '@/lib/learning';
+import { isCriterionQuestion, isSubmittable, type GradingInput, type LearningQuestionRow } from '@/lib/learning';
+import type { LearningQuestionInput } from '@/lib/validators';
 
 export type LearningActivityRow = {
   id: string;
@@ -217,17 +218,16 @@ export async function recalcSubmissionStatus(submission: LearningSubmissionRow) 
   const [{ count: fileCount }, { count: linkCount }, { data: questions }, { data: answers }] = await Promise.all([
     supabaseAdmin.from('learning_submission_files').select('id', { count: 'exact', head: true }).eq('submission_id', submission.id),
     supabaseAdmin.from('learning_submission_links').select('id', { count: 'exact', head: true }).eq('submission_id', submission.id),
-    supabaseAdmin.from('learning_activity_questions').select('id').eq('activity_id', submission.activity_id),
+    supabaseAdmin.from('learning_activity_questions').select('id,criterion_title').eq('activity_id', submission.activity_id),
     supabaseAdmin.from('learning_submission_answers').select('question_id,answer').eq('submission_id', submission.id),
   ]);
 
-  const questionIds = (questions ?? []).map((q) => q.id);
+  const questionRows = questions ?? [];
   const answerMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer]));
-
   const submitted = isSubmittable(
     (fileCount ?? 0) + (linkCount ?? 0),
-    questionIds.length,
-    questionIds.map((id) => answerMap.get(id)),
+    questionRows.length,
+    questionRows.map((q) => answerMap.get(q.id)),
   );
 
   const nextStatus = submitted ? 'submitted' : 'draft';
@@ -244,9 +244,126 @@ export async function recalcSubmissionStatus(submission: LearningSubmissionRow) 
   return submitted;
 }
 
-/** 피드백이 달린 뒤에는 학생이 고칠 수 없다. UI 잠금과 별개로 라우트에서도 막는다. */
-export function lockedByFeedback(submission: { feedback_text: string | null }) {
-  return Boolean(submission.feedback_text);
+/**
+ * 서술 피드백이나 요소별 교사 등급이 하나라도 달린 뒤에는 학생이 고칠 수 없다.
+ * UI 잠금과 별개로 라우트에서도 막는다. 교사가 둘 다 지우면 잠금이 풀린다.
+ */
+export async function lockedByFeedback(submission: { id: string; feedback_text: string | null }) {
+  if (submission.feedback_text) return true;
+  const { count } = await supabaseAdmin
+    .from('learning_submission_grades')
+    .select('id', { count: 'exact', head: true })
+    .eq('submission_id', submission.id)
+    .not('teacher_grade', 'is', null);
+  return (count ?? 0) > 0;
 }
 
 export const LOCKED_MESSAGE = '선생님 피드백이 등록되어 더 이상 고칠 수 없어요.';
+
+/**
+ * 이 활동에 자기평가나 교사 등급이 하나라도 저장됐는지.
+ * 그 뒤로는 질문 목록(평가요소 포함)을 바꿀 수 없다 — 등급이 가리키는 질문이 사라지면 안 된다.
+ */
+export async function hasAnyGrade(activityId: string) {
+  const { data: questions } = await supabaseAdmin
+    .from('learning_activity_questions')
+    .select('id')
+    .eq('activity_id', activityId);
+  const questionIds = (questions ?? []).map((q) => q.id);
+  if (questionIds.length === 0) return false;
+
+  const { count } = await supabaseAdmin
+    .from('learning_submission_grades')
+    .select('id', { count: 'exact', head: true })
+    .in('question_id', questionIds)
+    .or('self_grade.not.is.null,teacher_grade.not.is.null');
+  return (count ?? 0) > 0;
+}
+
+/**
+ * 상태 판정에 필요한 "활동별 평가요소 수"와 "제출물별 교사 등급 수"를 한 번에 모은다.
+ * 목록·대시보드·통계에서 활동이나 학생마다 따로 조회하지 않게 하려는 것이다(N+1 방지).
+ */
+export async function loadGradingStats(activityIds: string[], submissionIds: string[]) {
+  const criteriaByActivity = new Map<string, number>();
+  const gradedBySubmission = new Map<string, number>();
+  // 자기평가나 교사 등급이 하나라도 저장된 활동 — 질문 목록 잠금 표시에 쓴다.
+  const startedActivities = new Set<string>();
+  if (activityIds.length === 0) return { criteriaByActivity, gradedBySubmission, startedActivities };
+
+  const { data: questions } = await supabaseAdmin
+    .from('learning_activity_questions')
+    .select('id,activity_id,criterion_title')
+    .in('activity_id', activityIds);
+
+  const criterionIds = new Set<string>();
+  const activityOfQuestion = new Map<string, string>();
+  (questions ?? []).forEach((q) => {
+    if (!isCriterionQuestion(q)) return;
+    criterionIds.add(q.id);
+    activityOfQuestion.set(q.id, q.activity_id);
+    criteriaByActivity.set(q.activity_id, (criteriaByActivity.get(q.activity_id) ?? 0) + 1);
+  });
+
+  if (criterionIds.size > 0 && submissionIds.length > 0) {
+    // 제출물이 많으면 in() 목록이 URL 길이를 넘을 수 있어 나눠서 읽는다.
+    const CHUNK = 200;
+    const chunks = Array.from({ length: Math.ceil(submissionIds.length / CHUNK) }, (_, i) =>
+      submissionIds.slice(i * CHUNK, (i + 1) * CHUNK));
+    const results = await Promise.all(chunks.map((ids) => supabaseAdmin
+      .from('learning_submission_grades')
+      .select('submission_id,question_id,self_grade,teacher_grade')
+      .in('submission_id', ids)));
+    const grades = results.flatMap((res) => res.data ?? []);
+
+    grades.forEach((g) => {
+      if (!criterionIds.has(g.question_id)) return;
+      if (g.self_grade || g.teacher_grade) startedActivities.add(activityOfQuestion.get(g.question_id)!);
+      if (!g.teacher_grade) return;
+      gradedBySubmission.set(g.submission_id, (gradedBySubmission.get(g.submission_id) ?? 0) + 1);
+    });
+  }
+
+  return { criteriaByActivity, gradedBySubmission, startedActivities };
+}
+
+export type GradingStats = Awaited<ReturnType<typeof loadGradingStats>>;
+
+/** loadGradingStats 결과에서 한 제출물의 판정 입력을 꺼낸다. */
+export function gradingFor(stats: GradingStats, activityId: string, submissionId: string | null | undefined): GradingInput {
+  const criteriaCount = stats.criteriaByActivity.get(activityId) ?? 0;
+  if (criteriaCount === 0) return null;
+  return { criteriaCount, gradedCount: submissionId ? stats.gradedBySubmission.get(submissionId) ?? 0 : 0 };
+}
+
+/** 검증을 통과한 질문 입력을 learning_activity_questions 행으로 바꾼다. */
+export function toQuestionRows(activityId: string, items: LearningQuestionInput[]) {
+  return items.map((item, index) => ({
+    activity_id: activityId,
+    question: item.question,
+    sort_order: index,
+    criterion_title: item.criterion?.title ?? null,
+    level_high: item.criterion?.levelHigh ?? null,
+    level_mid: item.criterion?.levelMid ?? null,
+    level_low: item.criterion?.levelLow ?? null,
+  }));
+}
+
+/**
+ * 저장된 질문 목록과 새 입력이 같은지 — 순서·문구·평가요소·기준까지 본다.
+ * 같으면 질문을 갈아끼우지 않는다(갈아끼우면 답과 등급이 cascade로 지워진다).
+ */
+export function sameQuestions(existing: LearningQuestionRow[], items: LearningQuestionInput[]) {
+  if (existing.length !== items.length) return false;
+  const sorted = [...existing].sort((a, b) => a.sort_order - b.sort_order);
+  return toQuestionRows('', items).every((next, index) => {
+    const prev = sorted[index];
+    return (
+      prev.question === next.question &&
+      (prev.criterion_title ?? null) === next.criterion_title &&
+      (prev.level_high ?? null) === next.level_high &&
+      (prev.level_mid ?? null) === next.level_mid &&
+      (prev.level_low ?? null) === next.level_low
+    );
+  });
+}

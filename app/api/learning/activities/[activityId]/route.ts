@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireTeacherActivity } from '@/lib/learning-access';
+import { hasAnyGrade, requireTeacherActivity, sameQuestions, toQuestionRows } from '@/lib/learning-access';
+import { ACTIVITY_LOCKED_MESSAGE, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { learningActivityUpdateSchema } from '@/lib/validators';
 import { LEARNING_BUCKET } from '@/lib/learning-storage';
 
@@ -17,6 +18,20 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? '입력값을 확인해주세요.' }, { status: 400 });
   }
 
+  const { data: existingRows } = await supabaseAdmin
+    .from('learning_activity_questions')
+    .select(QUESTION_COLUMNS)
+    .eq('activity_id', params.activityId)
+    .order('sort_order', { ascending: true });
+  const existing = (existingRows ?? []) as LearningQuestionRow[];
+  const questionsChanged = !sameQuestions(existing, parsed.data.reflectionQuestions);
+
+  // 평가요소 질문이 있는 활동에 자기평가·교사 등급이 생긴 뒤에는 질문을 바꿀 수 없다.
+  // 질문을 갈아끼우면 등급이 가리키는 질문이 사라지기 때문이다. 활동명 등은 계속 고칠 수 있다.
+  if (questionsChanged && existing.some(isCriterionQuestion) && (await hasAnyGrade(params.activityId))) {
+    return NextResponse.json({ error: ACTIVITY_LOCKED_MESSAGE }, { status: 409 });
+  }
+
   const { data, error } = await supabaseAdmin
     .from('learning_activities')
     .update({
@@ -30,18 +45,19 @@ export async function PATCH(req: Request, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // 질문이 그대로면 건드리지 않는다.
+  if (!questionsChanged) {
+    return NextResponse.json({ activity: { ...data, learning_activity_questions: existing } });
+  }
+
   // 질문은 통째로 갈아끼운다. 지워진 질문에 달린 답도 cascade로 함께 사라지므로,
   // 이미 답이 달린 활동의 질문을 고치면 그 답을 잃는다는 점을 화면에서 미리 알린다.
   await supabaseAdmin.from('learning_activity_questions').delete().eq('activity_id', params.activityId);
 
   const { data: questions, error: questionError } = await supabaseAdmin
     .from('learning_activity_questions')
-    .insert(parsed.data.reflectionQuestions.map((question, index) => ({
-      activity_id: params.activityId,
-      question,
-      sort_order: index,
-    })))
-    .select('id,question,sort_order');
+    .insert(toQuestionRows(params.activityId, parsed.data.reflectionQuestions))
+    .select(QUESTION_COLUMNS);
 
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireTeacherActivity } from '@/lib/learning-access';
-import { getLearningStatus } from '@/lib/learning';
+import { getLearningStatus, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { signPaths } from '@/lib/learning-storage';
 
 // 활동 상세 — 학생 카드 그리드용 데이터 (교사 전용)
@@ -17,7 +17,7 @@ export async function GET(_: Request, { params }: Params) {
 
   const { data: questions } = await supabaseAdmin
     .from('learning_activity_questions')
-    .select('id,question,sort_order')
+    .select(QUESTION_COLUMNS)
     .eq('activity_id', activity.id)
     .order('sort_order', { ascending: true });
 
@@ -69,9 +69,11 @@ export async function GET(_: Request, { params }: Params) {
   // 링크와 질문별 답변도 함께 모은다 — 교사가 카드를 열 때 추가 요청 없이 바로 보이게 한다.
   const linksBySubmission = new Map<string, { id: string; url: string; label: string | null; sort_order: number }[]>();
   const answersBySubmission = new Map<string, Map<string, string>>();
+  type GradeRow = { self_grade: string | null; teacher_grade: string | null; teacher_comment: string | null };
+  const gradesBySubmission = new Map<string, Map<string, GradeRow>>();
 
   if (submissionIds.length > 0) {
-    const [linksRes, answersRes] = await Promise.all([
+    const [linksRes, answersRes, gradesRes] = await Promise.all([
       supabaseAdmin
         .from('learning_submission_links')
         .select('id,submission_id,url,label,sort_order')
@@ -81,7 +83,17 @@ export async function GET(_: Request, { params }: Params) {
         .from('learning_submission_answers')
         .select('submission_id,question_id,answer')
         .in('submission_id', submissionIds),
+      supabaseAdmin
+        .from('learning_submission_grades')
+        .select('submission_id,question_id,self_grade,teacher_grade,teacher_comment')
+        .in('submission_id', submissionIds),
     ]);
+
+    (gradesRes.data ?? []).forEach(({ submission_id, question_id, ...grade }) => {
+      const bucket = gradesBySubmission.get(submission_id) ?? new Map<string, GradeRow>();
+      bucket.set(question_id, grade);
+      gradesBySubmission.set(submission_id, bucket);
+    });
 
     (linksRes.data ?? []).forEach(({ submission_id, ...link }) => {
       const bucket = linksBySubmission.get(submission_id) ?? [];
@@ -96,7 +108,8 @@ export async function GET(_: Request, { params }: Params) {
     });
   }
 
-  const questionRows = questions ?? [];
+  const questionRows = (questions ?? []) as LearningQuestionRow[];
+  const criterionIds = questionRows.filter(isCriterionQuestion).map((q) => q.id);
 
   return NextResponse.json({
     activity,
@@ -104,19 +117,42 @@ export async function GET(_: Request, { params }: Params) {
     students: roster.map((student) => {
       const submission = byStudent.get(student.id) ?? null;
       const answerMap = submission ? answersBySubmission.get(submission.id) : undefined;
+      const gradeMap = submission ? gradesBySubmission.get(submission.id) : undefined;
+      const gradedCount = criterionIds.filter((id) => gradeMap?.get(id)?.teacher_grade).length;
+      const status = getLearningStatus(submission, { criteriaCount: criterionIds.length, gradedCount });
+      // 미제출이지만 무언가 남긴 학생 — 카드에 "작성 중"으로 보여 준다(판정·집계는 미제출 그대로).
+      const inProgress = status === 'none' && Boolean(submission) && (
+        (filesBySubmission.get(submission!.id)?.length ?? 0) > 0
+        || (linksBySubmission.get(submission!.id)?.length ?? 0) > 0
+        || [...(answerMap?.values() ?? [])].some((answer) => answer.trim().length > 0)
+        || [...(gradeMap?.values() ?? [])].some((grade) => Boolean(grade.self_grade))
+      );
       return {
         student,
-        status: getLearningStatus(submission),
+        status,
+        inProgress,
         submission: submission
           ? {
               ...submission,
               files: filesBySubmission.get(submission.id) ?? [],
               links: linksBySubmission.get(submission.id) ?? [],
               // 질문 순서대로 답을 붙여 보낸다 — 교사 화면에서 질문·답을 짝지어 그리기 위해서다.
+              // 평가요소 질문에는 요소·기준·자기평가·교사 등급을 함께 붙인다.
               answers: questionRows.map((q) => ({
                 questionId: q.id,
                 question: q.question,
                 answer: answerMap?.get(q.id) ?? '',
+                criterion: isCriterionQuestion(q)
+                  ? {
+                      title: q.criterion_title,
+                      levelHigh: q.level_high,
+                      levelMid: q.level_mid,
+                      levelLow: q.level_low,
+                      selfGrade: gradeMap?.get(q.id)?.self_grade ?? null,
+                      teacherGrade: gradeMap?.get(q.id)?.teacher_grade ?? null,
+                      teacherComment: gradeMap?.get(q.id)?.teacher_comment ?? null,
+                    }
+                  : null,
               })),
             }
           : null,

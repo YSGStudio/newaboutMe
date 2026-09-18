@@ -7,6 +7,7 @@ import {
   recalcSubmissionStatus,
   LOCKED_MESSAGE,
 } from '@/lib/learning-access';
+import { rewardLearningSubmission } from '@/lib/learning-rewards';
 import { checkLearningLink } from '@/lib/learning';
 import { learningLinkSchema } from '@/lib/validators';
 
@@ -27,7 +28,7 @@ export async function POST(req: Request, { params }: Params) {
   const submission = await getOrCreateSubmission(access.activity.id, access.student.id);
   if (!submission) return NextResponse.json({ error: '제출물을 만들지 못했습니다.' }, { status: 500 });
 
-  if (lockedByFeedback(submission)) {
+  if (await lockedByFeedback(submission)) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
 
@@ -56,6 +57,8 @@ export async function POST(req: Request, { params }: Params) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const submitted = await recalcSubmissionStatus(submission);
+  // 결과물을 마지막으로 채워 제출이 끝났을 수 있다 — 그때도 연료·뱃지를 준다.
+  const newBadges = submitted ? await rewardLearningSubmission(access.student.id, submission.id) : [];
 
-  return NextResponse.json({ link: linkRow, submitted }, { status: 201 });
+  return NextResponse.json({ link: linkRow, submitted, newBadges }, { status: 201 });
 }

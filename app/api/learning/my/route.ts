@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getLearningStatus } from '@/lib/learning';
+import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 
 // 학생 배움성찰 목록 — 내 학급 활동 + 내 제출 상태
 // 다른 학생의 제출물은 조회 자체를 하지 않는다(student_id로 먼저 좁힌다).
@@ -30,6 +31,7 @@ export async function GET() {
   const byActivity = new Map((submissions ?? []).map((row) => [row.activity_id, row]));
 
   const submissionIds = (submissions ?? []).map((row) => row.id);
+  const stats = await loadGradingStats(rows.map((row) => row.id), submissionIds);
   // 결과물 개수 = 파일 + 링크. 카드에 "몇 개 냈는지" 보여주는 용도다.
   const materialCounts = new Map<string, number>();
 
@@ -50,7 +52,7 @@ export async function GET() {
       const { learning_activity_questions: questions, ...rest } = activity;
       return {
         ...rest,
-        status: getLearningStatus(submission),
+        status: getLearningStatus(submission, gradingFor(stats, activity.id, submission?.id)),
         submittedByTeacher: submission?.submitted_by === 'teacher',
         materialCount: submission ? materialCounts.get(submission.id) ?? 0 : 0,
         questionCount: questions?.length ?? 0,

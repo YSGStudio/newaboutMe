@@ -9,11 +9,11 @@ import {
   SUBMISSION_COLUMNS,
 } from '@/lib/learning-access';
 import { learningAnswerSchema } from '@/lib/validators';
-import { checkAndAwardBadge } from '@/lib/badges';
-import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
+import { isCriterionQuestion } from '@/lib/learning';
+import { rewardLearningSubmission } from '@/lib/learning-rewards';
 
 // 학생 성찰 답변 저장 (질문별로 여러 개를 한 번에)
-// 저장 후 제출 완료 여부를 다시 판정한다 — 결과물 1개 이상 + 모든 질문에 답이 있어야 완료다.
+// 저장 후 제출 완료 여부를 다시 판정한다 — 결과물 1개 이상 + 모든 질문에 답하면 완료다.
 
 type Params = { params: { activityId: string } };
 
@@ -30,17 +30,24 @@ export async function PUT(req: Request, { params }: Params) {
   if (!submission) return NextResponse.json({ error: '제출물을 만들지 못했습니다.' }, { status: 500 });
 
   // 피드백이 달린 뒤에는 화면 잠금과 별개로 여기서도 막는다.
-  if (lockedByFeedback(submission)) {
+  if (await lockedByFeedback(submission)) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
 
   // 이 활동의 질문만 받아들인다 — 다른 활동의 question_id를 섞어 보내도 저장되지 않는다.
   const { data: questions } = await supabaseAdmin
     .from('learning_activity_questions')
-    .select('id')
+    .select('id,criterion_title')
     .eq('activity_id', access.activity.id);
 
   const validIds = new Set((questions ?? []).map((q) => q.id));
+  const criterionIds = new Set((questions ?? []).filter(isCriterionQuestion).map((q) => q.id));
+
+  // 이전 화면에서 보낸 자기평가는 과거 클라이언트 호환을 위해서만 받아 저장한다.
+  const selfGrades = parsed.data.selfGrades ?? [];
+  if (selfGrades.some((item) => !criterionIds.has(item.questionId))) {
+    return NextResponse.json({ error: '이 활동의 평가요소가 아니에요.' }, { status: 400 });
+  }
   const rows = parsed.data.answers
     .filter((item) => validIds.has(item.questionId))
     .map((item) => ({
@@ -58,6 +65,23 @@ export async function PUT(req: Request, { params }: Params) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // 자기평가만 쓴다 — 교사 등급·코멘트 컬럼은 upsert 대상에 넣지 않으므로 기존 값이 그대로 남는다.
+  if (selfGrades.length > 0) {
+    const { error } = await supabaseAdmin
+      .from('learning_submission_grades')
+      .upsert(
+        selfGrades.map((item) => ({
+          submission_id: submission.id,
+          question_id: item.questionId,
+          self_grade: item.grade,
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: 'submission_id,question_id' },
+      );
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   const submitted = await recalcSubmissionStatus(submission);
 
   const { data: refreshed } = await supabaseAdmin
@@ -66,27 +90,8 @@ export async function PUT(req: Request, { params }: Params) {
     .eq('id', submission.id)
     .maybeSingle();
 
-  // 별빛 퀘스트(뱃지)와 별빛 여행(연료) 연결.
-  // 평가피드백의 성찰일기와 같은 규칙을 쓴다 — 성찰을 남기면 reflection 연료와 성찰 뱃지를 받는다.
-  // 제출이 완료된 순간에만 지급하고, source_id로 제출물 id를 써서 활동당 한 번만 쌓이게 한다
-  // (fuel_ledger의 unique 제약이 중복을 막는다).
-  let newBadges: Awaited<ReturnType<typeof checkAndAwardBadge>> = [];
-
-  if (submitted) {
-    try {
-      newBadges = await checkAndAwardBadge(supabaseAdmin, access.student.id, 'reflection_save');
-    } catch (badgeError) {
-      // 뱃지 확인이 실패해도 이미 제출된 성찰과 연료 지급은 이어서 처리한다.
-      console.error('[badges] 배움성찰 뱃지 확인 실패:', badgeError);
-    }
-    try {
-      await grantFuel(supabaseAdmin, access.student.id, 'reflection', submission.id);
-      await grantBadgeFuel(supabaseAdmin, access.student.id, newBadges);
-    } catch (fuelError) {
-      // 연료 지급 실패가 성찰 저장을 되돌리게 두지 않는다.
-      console.error('[voyage] 배움성찰 연료 지급 실패:', fuelError);
-    }
-  }
+  // 별빛 퀘스트(뱃지)와 별빛 여행(연료) 연결 — 제출이 완료됐을 때만 지급한다(lib/learning-rewards.ts).
+  const newBadges = submitted ? await rewardLearningSubmission(access.student.id, submission.id) : [];
 
   return NextResponse.json({ submission: refreshed, submitted, newBadges });
 }

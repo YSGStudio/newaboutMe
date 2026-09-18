@@ -80,7 +80,8 @@ const getReportSubject = (r: EvalReportSummary): string | null =>
  * 평가피드백이 내려가면서(lib/features.ts) 비어 있던 "학습 활동" 축을 이 자료가 이어받습니다.
  */
 type LearningReport = {
-  summary: { total: number; submitted: number; reviewed: number; none: number; rate: number };
+  // grading(평가 대기)은 평가요소가 있는 활동에서만 생긴다. 옛 응답에는 없을 수 있다.
+  summary: { total: number; submitted: number; grading?: number; reviewed: number; none: number; rate: number };
   activities: {
     id: string;
     subject: string;
@@ -92,10 +93,10 @@ type LearningReport = {
   }[];
 };
 
-const EMPTY_LEARNING_SUMMARY: LearningReport['summary'] = { total: 0, submitted: 0, reviewed: 0, none: 0, rate: 0 };
+const EMPTY_LEARNING_SUMMARY: LearningReport['summary'] = { total: 0, submitted: 0, grading: 0, reviewed: 0, none: 0, rate: 0 };
 
 /** 낸 건수 — 피드백까지 받은 것도 낸 것이다. 요약 타일 값으로 쓴다. */
-const learningSubmittedCount = (summary: LearningReport['summary']) => summary.submitted + summary.reviewed;
+const learningSubmittedCount = (summary: LearningReport['summary']) => summary.submitted + (summary.grading ?? 0) + summary.reviewed;
 
 /** 배움성찰 블록 강조색 — 평가피드백이 쓰던 주황 계열 자리를 그대로 물려받는다. */
 const LEARNING_ACCENT = '#ea580c';
@@ -255,10 +256,11 @@ const buildStudentHtmlBlock = (
   const learningCount: Record<LearningStatus, number> = {
     none: learningSummary.none,
     submitted: learningSummary.submitted,
+    grading: learningSummary.grading ?? 0,
     reviewed: learningSummary.reviewed,
   };
 
-  const learningChipsHtml = (['submitted', 'reviewed', 'none'] as const)
+  const learningChipsHtml = (['submitted', 'grading', 'reviewed', 'none'] as const)
     .filter((status) => learningCount[status] > 0)
     .map((status) => `<span style="flex:1;text-align:center;font-size:12px;font-weight:800;padding:6px 0;border-radius:8px;background:${STATUS_COLOR[status].bg};color:${STATUS_COLOR[status].text}">${TEACHER_STATUS_LABEL[status]} ${learningCount[status]}</span>`)
     .join('');
@@ -538,6 +540,7 @@ function LearningSection({ report }: { report: LearningReport | null }) {
   const count: Record<LearningStatus, number> = {
     none: summary.none,
     submitted: summary.submitted,
+    grading: summary.grading ?? 0,
     reviewed: summary.reviewed,
   };
 
@@ -565,7 +568,7 @@ function LearningSection({ report }: { report: LearningReport | null }) {
             <span style={{ fontSize: 11, color: '#94a3b8' }}>활동 {summary.total}개 중 {learningSubmittedCount(summary)}개 제출</span>
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            {(['submitted', 'reviewed', 'none'] as const).filter((status) => count[status] > 0).map((status) => (
+            {(['submitted', 'grading', 'reviewed', 'none'] as const).filter((status) => count[status] > 0).map((status) => (
               <span
                 key={status}
                 style={{

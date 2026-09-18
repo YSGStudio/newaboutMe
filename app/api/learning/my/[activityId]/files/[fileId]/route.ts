@@ -27,7 +27,7 @@ export async function DELETE(_: Request, { params }: Params) {
 
   if (!submission) return NextResponse.json({ error: '제출물을 찾을 수 없어요.' }, { status: 404 });
 
-  if (lockedByFeedback(submission)) {
+  if (await lockedByFeedback(submission)) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
 

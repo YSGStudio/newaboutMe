@@ -28,6 +28,7 @@ import ClassDashboard, { type ClassDashboardData } from "@/components/teacher/Cl
 import { canSeeEvalFeedback } from "@/lib/features";
 import EvalDashboard from "@/components/teacher/EvalDashboard";
 import LearningDashboard from "@/components/teacher/LearningDashboard";
+import AiReportTab from "@/components/teacher/AiReportTab";
 import ClassSettings from "@/components/teacher/ClassSettings";
 import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
@@ -125,6 +126,7 @@ export default function TeacherPage() {
     | "learning"
     | "eval"
     | "stats"
+    | "ai"
     | "relationship"
     | "letters"
     | "voyage"
@@ -1445,6 +1447,13 @@ export default function TeacherPage() {
                   icon: "📊",
                   disabled: isOverClassLimit,
                 },
+                // 배움성찰 기록으로 과목별 교과발달상황을 만든다. 모든 교사에게 보인다.
+                {
+                  key: "ai",
+                  label: "AI생성",
+                  icon: "🤖",
+                  disabled: isOverClassLimit,
+                },
                 {
                   key: "voyage",
                   label: "우주여행",
@@ -2302,6 +2311,10 @@ export default function TeacherPage() {
               showEval={evalFeedbackVisible}
               onAiUsageChanged={loadAiUsage}
             />
+          )}
+
+          {activeTab === "ai" && (
+            <AiReportTab classId={selectedClassId} onAiUsageChanged={loadAiUsage} />
           )}
 
           {activeTab === "relationship" && (

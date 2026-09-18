@@ -3,6 +3,7 @@ import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate, type Period } from '@/lib/stats';
 import { getLearningStatus, type LearningStatus } from '@/lib/learning';
+import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 
 // 성장리포트용 — 한 학생의 배움성찰 현황을 활동을 가로질러 모은다 (교사 전용).
 //
@@ -49,7 +50,7 @@ export async function GET(req: Request, { params }: Params) {
   if (rows.length === 0) {
     return NextResponse.json({
       range,
-      summary: { total: 0, submitted: 0, reviewed: 0, none: 0, rate: 0 },
+      summary: { total: 0, submitted: 0, grading: 0, reviewed: 0, none: 0, rate: 0 },
       activities: [],
     });
   }
@@ -57,17 +58,19 @@ export async function GET(req: Request, { params }: Params) {
   // 다른 학생의 제출물은 조회하지 않는다(student_id로 먼저 좁힌다).
   const { data: submissions, error: submissionError } = await supabaseAdmin
     .from('learning_submissions')
-    .select('activity_id,status,submitted_at,feedback_text')
+    .select('id,activity_id,status,submitted_at,feedback_text')
     .eq('student_id', student.id)
     .in('activity_id', rows.map((row) => row.id));
 
   if (submissionError) return NextResponse.json({ error: submissionError.message }, { status: 500 });
 
   const byActivity = new Map((submissions ?? []).map((row) => [row.activity_id, row]));
+  // 평가 대기 판정에 필요한 요소 수·등급 수를 한 번에 모은다(학급 PDF가 학생마다 부르므로 N+1 금지).
+  const stats = await loadGradingStats(rows.map((row) => row.id), (submissions ?? []).map((row) => row.id));
 
   const items = rows.map((activity) => {
     const submission = byActivity.get(activity.id) ?? null;
-    const status = getLearningStatus(submission);
+    const status = getLearningStatus(submission, gradingFor(stats, activity.id, submission?.id));
     return {
       id: activity.id,
       subject: activity.subject,
@@ -82,6 +85,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const count = (status: LearningStatus) => items.filter((item) => item.status === status).length;
   const submitted = count('submitted');
+  const grading = count('grading');
   const reviewed = count('reviewed');
 
   return NextResponse.json({
@@ -89,10 +93,11 @@ export async function GET(req: Request, { params }: Params) {
     summary: {
       total: items.length,
       submitted,
+      grading,
       reviewed,
       none: count('none'),
-      // 제출률 — 피드백까지 받은 것도 낸 것이다.
-      rate: safeRate(submitted + reviewed, items.length),
+      // 제출률 — 평가 대기·피드백까지 받은 것도 낸 것이다.
+      rate: safeRate(submitted + grading + reviewed, items.length),
     },
     activities: items,
   });

@@ -211,7 +211,7 @@ export default function ClassDashboard({
             </div>
             <div className="class-dashboard-task-list">
               <button type="button" onClick={() => onNavigate?.('learning')}>
-                <span aria-hidden="true">📚</span><span><strong>배움성찰 확인</strong><small>제출 후 피드백을 기다리는 기록</small></span><b>{kpi.pendingReview}건</b><i aria-hidden="true">›</i>
+                <span aria-hidden="true">📚</span><span><strong>배움성찰 확인</strong><small>피드백·평가를 기다리는 기록</small></span><b>{kpi.pendingReview}건</b><i aria-hidden="true">›</i>
               </button>
               <button type="button" onClick={() => onNavigate?.('letters')}>
                 <span aria-hidden="true">💌</span><span><strong>새 별빛메일</strong><small>아직 정리하지 않은 편지</small></span><b>{kpi.unreadLetters}통</b><i aria-hidden="true">›</i>

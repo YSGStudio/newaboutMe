@@ -5,6 +5,8 @@
  *
  * 선생님이 연 활동을 책 카드로 보여주고, 책을 누르면 상세에서
  * 결과물(사진·PDF)을 올리고 성찰 질문에 답을 씁니다. 선생님 피드백이 오면 함께 보입니다.
+ * 선생님이 적은 평가요소는 여기서 그대로 "선생님 질문"으로 보입니다. 질문 아래에 잘함/보통/노력요함
+ * 기준을 보여주고, 선생님이 모든 요소를 평가하면 등급과 코멘트가 나타납니다.
  *
  * 문구는 모두 해요체입니다. 상태 판정과 파일 규칙은 lib/learning.ts 한 곳에서 가져옵니다.
  */
@@ -27,7 +29,11 @@ import {
   checkLearningFile,
   checkLearningLink,
   isPreviewableImage,
+  isCriterionQuestion,
+  GRADE_LABEL,
+  type Grade,
 } from '@/lib/learning';
+import { CriterionGuide, GradeChip } from '@/components/learning/GradeParts';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -45,7 +51,19 @@ type ActivityRow = {
 
 type SubmissionFile = { id: string; file_name: string; mime_type: string; sort_order: number; url: string | null };
 type SubmissionLink = { id: string; url: string; label: string | null; sort_order: number };
-type QuestionRow = { id: string; question: string; sort_order: number; answer: string };
+type QuestionRow = {
+  id: string;
+  question: string;
+  sort_order: number;
+  answer: string;
+  criterion_title: string | null;
+  level_high: string | null;
+  level_mid: string | null;
+  level_low: string | null;
+  /** 선생님이 모든 요소를 평가한 뒤에만 내려온다 */
+  teacherGrade?: Grade | null;
+  teacherComment?: string | null;
+};
 
 type Detail = {
   activity: { id: string; subject: string; unit: string; title: string; created_at: string };
@@ -61,6 +79,19 @@ type Detail = {
     links: SubmissionLink[];
   } | null;
   status: LearningStatus;
+  /** 선생님 피드백이나 평가가 있어 더 고칠 수 없는지 */
+  locked: boolean;
+};
+
+/** 제출 판정을 하는 학생 라우트(답변·결과물·링크)의 공통 응답 */
+type SubmitResult = { submitted: boolean; newBadges?: { badge: { name: string } }[] };
+
+/** 제출이 끝났으면 연료·뱃지 소식을, 아니면 기본 문구를 돌려준다. */
+const rewardMessage = (result: SubmitResult, fallback: string) => {
+  const badgeNames = (result.newBadges ?? []).map((b) => b.badge.name);
+  if (badgeNames.length > 0) return `성찰을 냈어요! 새 뱃지를 받았어요 — ${badgeNames.join(', ')} 🏅`;
+  if (result.submitted) return '성찰을 냈어요! 별빛 연료가 쌓였어요 ⛽';
+  return fallback;
 };
 
 /** 서울 시각 기준 'YYYY-MM' — 월별 탭 그룹 키. 평가기록 탭과 같은 방식입니다. */
@@ -169,7 +200,19 @@ export default function LearningContent() {
     await load();
   };
 
-  const locked = Boolean(detail?.submission?.feedback_text);
+  const locked = Boolean(detail?.locked);
+  /** 제출이 끝나려면 아직 무엇이 빠졌는지 — 저장 버튼 아래에 쉬운 말로 알려줍니다. */
+  const missingItems = (() => {
+    if (!detail || locked) return [];
+    const items: string[] = [];
+    const materialCount = (detail.submission?.files.length ?? 0) + (detail.submission?.links.length ?? 0);
+    if (materialCount === 0) items.push('결과물(사진·PDF·링크)을 1개 이상 올려요.');
+    const unanswered = detail.questions
+      .map((q, index) => ((answers[q.id] ?? '').trim() ? null : index + 1))
+      .filter((n): n is number => n !== null);
+    if (unanswered.length > 0) items.push(`${unanswered.join(', ')}번 질문에 답을 써요.`);
+    return items;
+  })();
 
   const saveAnswer = async () => {
     if (!detail) return;
@@ -177,7 +220,7 @@ export default function LearningContent() {
     setModalError('');
     setModalMsg('');
     try {
-      const result = await api<{ submitted: boolean; newBadges?: { name: string }[] }>(
+      const result = await api<SubmitResult>(
         `/api/learning/my/${detail.activity.id}/answer`,
         {
           method: 'PUT',
@@ -189,14 +232,7 @@ export default function LearningContent() {
       await refreshDetail(detail.activity.id);
 
       // 성찰을 내면 별빛 여행 연료와 별빛 퀘스트 뱃지가 함께 쌓입니다.
-      const badgeNames = (result.newBadges ?? []).map((badge) => badge.name);
-      if (badgeNames.length > 0) {
-        setModalMsg(`성찰을 냈어요! 새 뱃지를 받았어요 — ${badgeNames.join(', ')} 🏅`);
-      } else if (result.submitted) {
-        setModalMsg('성찰을 냈어요! 별빛 연료가 쌓였어요 ⛽');
-      } else {
-        setModalMsg('성찰을 저장했어요.');
-      }
+      setModalMsg(rewardMessage(result, '성찰을 저장했어요.'));
     } catch (err) {
       setModalError((err as Error).message);
     } finally {
@@ -224,9 +260,10 @@ export default function LearningContent() {
 
       const form = new FormData();
       form.append('file', file);
-      await api(`/api/learning/my/${detail.activity.id}/files`, { method: 'POST', body: form });
+      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/files`, { method: 'POST', body: form });
       await refreshDetail(detail.activity.id);
-      setModalMsg('결과물을 올렸어요.');
+      // 결과물이 마지막 조건이었다면 이때 제출이 끝나고 연료·뱃지가 쌓인다.
+      setModalMsg(rewardMessage(result, '결과물을 올렸어요.'));
     } catch (err) {
       setModalError((err as Error).message);
     } finally {
@@ -262,7 +299,7 @@ export default function LearningContent() {
     setModalError('');
     setModalMsg('');
     try {
-      await api(`/api/learning/my/${detail.activity.id}/links`, {
+      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/links`, {
         method: 'POST',
         body: JSON.stringify({ url: linkUrl, label: linkLabel || undefined }),
       });
@@ -270,7 +307,7 @@ export default function LearningContent() {
       setLinkUrl('');
       setLinkLabel('');
       setLinkOpen(false);
-      setModalMsg('링크를 등록했어요.');
+      setModalMsg(rewardMessage(result, '링크를 등록했어요.'));
     } catch (err) {
       setModalError((err as Error).message);
     } finally {
@@ -411,19 +448,21 @@ export default function LearningContent() {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="learning-reflection-title"
+          className="learning-reflection-backdrop"
           onClick={(e) => { if (e.target === e.currentTarget) setDetail(null); }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16 }}
         >
-          <div style={{ width: 'min(600px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+          <div className="learning-reflection-modal">
 
-            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="row space-between">
-                <div>
-                  <p style={{ margin: '0 0 2px', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+            <div className="learning-reflection-header">
+              <div className="row space-between learning-reflection-header-row">
+                <div className="learning-reflection-heading">
+                  <span className="learning-reflection-kicker">나의 배움 기록</span>
+                  <p className="learning-reflection-meta">
                     {detail.activity.subject} · {detail.activity.unit}
                   </p>
-                  <h3 style={{ margin: '0 0 4px', fontSize: 18 }}>{detail.activity.title}</h3>
-                  <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+                  <h3 id="learning-reflection-title">{detail.activity.title}</h3>
+                  <p className="learning-reflection-date">
                     올라온 날 {formatDay(detail.activity.created_at)}
                     {detail.submission?.submitted_at && ` · 낸 날 ${formatDay(detail.submission.submitted_at)}`}
                   </p>
@@ -432,7 +471,7 @@ export default function LearningContent() {
               </div>
             </div>
 
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="learning-reflection-body">
               {modalError && <Notice type="error" message={modalError} />}
               {modalMsg && <Notice type="success" message={modalMsg} />}
 
@@ -442,16 +481,19 @@ export default function LearningContent() {
                   background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857',
                   fontSize: 13, lineHeight: 1.6,
                 }}>
-                  선생님 피드백이 도착해서 이제 고칠 수 없어요. 피드백을 읽어보세요.
+                  {detail.submission?.feedback_text || detail.status === 'reviewed'
+                    ? '선생님 피드백이 도착해서 이제 고칠 수 없어요. 피드백을 읽어보세요.'
+                    : '선생님이 평가하고 있어서 이제 고칠 수 없어요.'}
                 </p>
               )}
 
               {/* 내 결과물 */}
-              <div>
+              <section className="learning-reflection-section" aria-labelledby="learning-material-title">
                 <div className="row space-between" style={{ marginBottom: 8, gap: 6 }}>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#374151' }}>
-                    나의 결과물
-                  </p>
+                  <div className="learning-reflection-section-title">
+                    <span aria-hidden="true">1</span>
+                    <div><h4 id="learning-material-title">나의 결과물</h4><p>활동한 사진·PDF나 링크를 올려요.</p></div>
+                  </div>
                   {!locked && (
                     <div className="row" style={{ gap: 6, flexShrink: 0 }}>
                       <button
@@ -627,22 +669,33 @@ export default function LearningContent() {
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
 
               {/* 선생님 질문마다 바로 아래에 내 답을 붙여, 무엇에 답하는지 헷갈리지 않게 합니다 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <section className="learning-reflection-section learning-reflection-answers" aria-labelledby="learning-answer-title">
+                <div className="learning-reflection-section-title">
+                  <span aria-hidden="true">2</span>
+                  <div><h4 id="learning-answer-title">자기점검</h4><p>선생님 질문을 읽고 내 생각을 남겨요.</p></div>
+                </div>
                 {detail.questions.map((question, index) => (
-                  <div key={question.id} style={{ borderRadius: 12, border: '1px solid #ddd6fe', overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 14px', background: '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
+                  <div key={question.id} className="learning-reflection-question">
+                    <div className="learning-reflection-question-prompt">
                       <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 800, color: '#7c6bd6', letterSpacing: '0.02em' }}>
                         선생님 질문 {detail.questions.length > 1 ? index + 1 : ''}
                       </p>
                       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: '#312e81', fontWeight: 600 }}>
                         {question.question}
                       </p>
+                      {/* 평가요소 질문 — 어떤 모습이 잘함·보통·노력요함인지 먼저 보여줍니다 */}
+                      {isCriterionQuestion(question) && (
+                        <CriterionGuide
+                          levels={{ high: question.level_high, mid: question.level_mid, low: question.level_low }}
+                          labels={GRADE_LABEL}
+                        />
+                      )}
                     </div>
-                    <div style={{ padding: '12px 14px' }}>
-                      <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 13, color: '#374151' }}>나의 성찰</p>
+                    <div className="learning-reflection-response">
+                      <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 13, color: '#374151' }}>자기점검</p>
                       {locked ? (
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: '#1f2937', whiteSpace: 'pre-wrap' }}>
                           {(answers[question.id] ?? '').trim() || '쓴 내용이 없어요.'}
@@ -664,12 +717,13 @@ export default function LearningContent() {
                           </span>
                         </>
                       )}
+
                     </div>
                   </div>
                 ))}
 
                 {!locked && detail.questions.length > 0 && (
-                  <div>
+                  <div className="learning-reflection-submit">
                     <button
                       type="button"
                       className="ghost"
@@ -682,25 +736,46 @@ export default function LearningContent() {
                     <p className="hint" style={{ margin: '6px 0 0' }}>
                       결과물 1개 이상을 올리고 질문에 모두 답하면 제출이 끝나요.
                     </p>
+                    {missingItems.length > 0 && (
+                      <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: '#b45309' }}>
+                        {missingItems.map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    )}
                   </div>
                 )}
-              </div>
+              </section>
 
-              {/* 선생님 피드백 */}
-              <div>
-                <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 14, color: '#374151' }}>선생님 피드백</p>
-                {detail.submission?.feedback_text ? (
-                  <p style={{
-                    margin: 0, padding: '12px 14px', borderRadius: 12,
-                    background: '#f5f3ff', border: '1px solid #ddd6fe',
-                    fontSize: 14, lineHeight: 1.7, color: '#312e81', whiteSpace: 'pre-wrap',
-                  }}>
-                    {detail.submission.feedback_text}
-                  </p>
-                ) : (
-                  <p className="hint" style={{ margin: 0 }}>선생님 피드백을 기다리고 있어요.</p>
+              {/* 선생님 평가와 피드백 — 자기점검과 분리해 한곳에 모아 보여줍니다 */}
+              <section className="learning-reflection-feedback">
+                <div className="learning-reflection-section-title">
+                  <span aria-hidden="true">3</span>
+                  <div><h4>선생님 평가와 피드백</h4><p>선생님이 남긴 등급과 도움말을 확인해요.</p></div>
+                </div>
+                {detail.questions.some((question) => question.teacherGrade !== undefined) && (
+                  <div className="learning-reflection-teacher-grades">
+                    {detail.questions.filter((question) => question.teacherGrade !== undefined).map((question, index) => (
+                      <div key={question.id} className="learning-reflection-teacher-grade">
+                        <div>
+                          <small>평가요소 {index + 1}</small>
+                          <strong>{question.question}</strong>
+                        </div>
+                        <GradeChip grade={question.teacherGrade ?? null} labels={GRADE_LABEL} />
+                        {question.teacherComment && <p>{question.teacherComment}</p>}
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </div>
+                {detail.submission?.feedback_text ? (
+                  <div className="learning-reflection-overall-feedback">
+                    <strong>종합 피드백</strong>
+                    <p>{detail.submission.feedback_text}</p>
+                  </div>
+                ) : (
+                  !detail.questions.some((question) => question.teacherGrade !== undefined) && (
+                    <p className="hint" style={{ margin: '12px 0 0' }}>선생님 평가와 피드백을 기다리고 있어요.</p>
+                  )
+                )}
+              </section>
 
               {detail.submission?.submitted_by === 'teacher' && (
                 <p className="hint" style={{ margin: 0 }}>선생님이 결과물을 대신 올려주셨어요.</p>

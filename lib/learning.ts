@@ -5,8 +5,11 @@
  * 브라우저와 API 라우트가 같은 함수를 쓴다. 두 곳에서 조건을 다시 쓰지 않는다.
  */
 
-/** 제출물의 화면 상태. DB 컬럼이 아니라 status + feedback_text 조합에서 파생된다. */
-export type LearningStatus = 'none' | 'submitted' | 'reviewed';
+/**
+ * 제출물의 화면 상태. DB 컬럼이 아니라 status + feedback_text (+ 요소별 교사 등급) 조합에서 파생된다.
+ * grading(평가 대기)은 평가요소 질문이 있는 활동에서만 나온다.
+ */
+export type LearningStatus = 'none' | 'submitted' | 'grading' | 'reviewed';
 
 /** 판정에 필요한 최소 정보. 교사·학생 양쪽 조회 결과가 이 모양을 만족하면 된다. */
 export type SubmissionStatusInput = {
@@ -14,12 +17,21 @@ export type SubmissionStatusInput = {
   feedback_text: string | null;
 } | null | undefined;
 
+/** 평가요소 질문 수와 그중 교사 등급이 매겨진 수. 요소가 없는 활동은 넘기지 않아도 된다. */
+export type GradingInput = { criteriaCount: number; gradedCount: number } | null | undefined;
+
 /**
- * 미제출 / 제출 완료 / 피드백 완료를 가른다.
- * 행이 없거나 draft면 미제출, 제출됐고 피드백이 없으면 제출 완료, 피드백이 있으면 피드백 완료.
+ * 미제출 / 제출 완료 / 평가 대기 / 피드백 완료를 가른다.
+ * - 행이 없거나 draft면 미제출.
+ * - 평가요소 질문이 있는 활동: 모든 요소에 교사 등급이 있으면 피드백 완료, 아니면 평가 대기.
+ *   서술 피드백 유무는 보지 않는다.
+ * - 평가요소 질문이 없는 활동: 피드백이 없으면 제출 완료, 있으면 피드백 완료(기존 규칙).
  */
-export function getLearningStatus(submission: SubmissionStatusInput): LearningStatus {
+export function getLearningStatus(submission: SubmissionStatusInput, grading?: GradingInput): LearningStatus {
   if (!submission || submission.status !== 'submitted') return 'none';
+  if (grading && grading.criteriaCount > 0) {
+    return grading.gradedCount >= grading.criteriaCount ? 'reviewed' : 'grading';
+  }
   return submission.feedback_text ? 'reviewed' : 'submitted';
 }
 
@@ -27,6 +39,7 @@ export function getLearningStatus(submission: SubmissionStatusInput): LearningSt
 export const TEACHER_STATUS_LABEL: Record<LearningStatus, string> = {
   none: '미제출',
   submitted: '제출 완료',
+  grading: '평가 대기',
   reviewed: '피드백 완료',
 };
 
@@ -34,6 +47,8 @@ export const TEACHER_STATUS_LABEL: Record<LearningStatus, string> = {
 export const STUDENT_STATUS_LABEL: Record<LearningStatus, string> = {
   none: '아직이에요',
   submitted: '냈어요',
+  // 평가 대기는 학생에게는 제출 완료와 같다 — 교사 등급은 모두 매겨진 뒤에 보여준다.
+  grading: '냈어요',
   reviewed: '피드백 왔어요',
 };
 
@@ -44,8 +59,16 @@ export const STUDENT_STATUS_LABEL: Record<LearningStatus, string> = {
 export const STATUS_COLOR: Record<LearningStatus, { bg: string; border: string; text: string }> = {
   none: { bg: '#f1f5f9', border: '#cbd5e1', text: '#64748b' },
   submitted: { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8' },
+  grading: { bg: '#fef9c3', border: '#fde68a', text: '#a16207' },
   reviewed: { bg: '#ecfdf5', border: '#6ee7b7', text: '#047857' },
 };
+
+/**
+ * "작성 중" — 미제출(draft)이지만 학생이 답·결과물 또는 과거 자기평가를 남긴 경우.
+ * 상태(LearningStatus)가 아니라 교사 학생 카드에만 쓰는 보조 표시다. 제출 수·통계에서는 미제출로 센다.
+ */
+export const TEACHER_IN_PROGRESS_LABEL = '작성 중';
+export const IN_PROGRESS_COLOR = { bg: '#f5f3ff', border: '#c4b5fd', text: '#6d28d9' };
 
 // ── 파일 규칙 ────────────────────────────────────────────────────
 
@@ -145,3 +168,66 @@ export const isPreviewableImage = (mimeType: string) => mimeType.startsWith('ima
 /** 입력 길이 상한 — DB의 char_length 체크와 같은 값을 유지한다. */
 export const MAX_ANSWER_LENGTH = 500;
 export const MAX_FEEDBACK_LENGTH = 500;
+
+// ── 평가요소 · 등급 ──────────────────────────────────────────────
+// 성찰 질문이 평가요소를 겸한다. criterion_title이 있으면 평가요소 질문이다.
+
+export const GRADES = ['high', 'mid', 'low'] as const;
+export type Grade = (typeof GRADES)[number];
+
+export const isGrade = (value: unknown): value is Grade =>
+  typeof value === 'string' && (GRADES as readonly string[]).includes(value);
+
+/** 교사 화면 등급 문구 */
+export const GRADE_LABEL: Record<Grade, string> = {
+  high: '잘함',
+  mid: '보통',
+  low: '노력요함',
+};
+
+/** 학생 자기평가 문구 — 해요체 */
+export const STUDENT_GRADE_LABEL: Record<Grade, string> = {
+  high: '잘했어요',
+  mid: '보통이에요',
+  low: '더 노력할래요',
+};
+
+/** 등급 칩 색. 평가피드백(EvalDashboard)에서 쓰던 값을 그대로 옮겼다(design.md 2.4). */
+export const GRADE_COLOR: Record<Grade, { bg: string; text: string }> = {
+  high: { bg: '#dcfce7', text: '#16a34a' },
+  mid: { bg: '#fef9c3', text: '#a16207' },
+  low: { bg: '#fee2e2', text: '#dc2626' },
+};
+
+/** 질문 조회에 쓰는 컬럼 — 평가요소 정보까지 함께 가져온다. */
+export const QUESTION_COLUMNS = 'id,question,sort_order,criterion_title,level_high,level_mid,level_low';
+
+export type LearningQuestionRow = {
+  id: string;
+  question: string;
+  sort_order: number;
+  criterion_title: string | null;
+  level_high: string | null;
+  level_mid: string | null;
+  level_low: string | null;
+};
+
+export const isCriterionQuestion = (question: { criterion_title?: string | null }) =>
+  Boolean(question.criterion_title && question.criterion_title.trim());
+
+/** 등급에 해당하는 수준 기준 문장 */
+export function levelText(question: Pick<LearningQuestionRow, 'level_high' | 'level_mid' | 'level_low'>, grade: Grade) {
+  const text = grade === 'high' ? question.level_high : grade === 'mid' ? question.level_mid : question.level_low;
+  return text?.trim() || null;
+}
+
+/** 평가요소로 지정한 질문의 질문 칸이 비어 있을 때 채우는 기본 질문 */
+export const defaultCriterionQuestion = (title: string) =>
+  `'${title.trim()}'에서 나는 어떻게 했나요? 그렇게 생각한 까닭도 적어 보세요.`;
+
+/** 입력 길이 상한 — DB의 char_length 체크와 같은 값을 유지한다. */
+export const MAX_CRITERION_TITLE_LENGTH = 60;
+export const MAX_LEVEL_LENGTH = 200;
+export const MAX_GRADE_COMMENT_LENGTH = 200;
+
+export const ACTIVITY_LOCKED_MESSAGE = '이미 평가가 시작된 활동은 성찰 질문과 평가요소를 바꿀 수 없습니다.';

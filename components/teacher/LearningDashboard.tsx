@@ -4,10 +4,13 @@
  * LearningDashboard — 교사 "배움성찰" 탭.
  *
  * 왼쪽에서 활동을 만들고 고르면, 오른쪽에 학급 전체 학생이 카드로 깔립니다.
- * 카드 색이 상태(미제출·제출 완료·피드백 완료)를 나타내되, 색만으로 구분하지 않도록
+ * 카드 색이 상태(미제출·제출 완료·평가 대기·피드백 완료)를 나타내되, 색만으로 구분하지 않도록
  * 카드마다 상태 라벨을 함께 씁니다.
  *
- * 피드백은 선택 사항입니다. 쓰지 않은 학생에게 미완료 경고를 표시하지 않습니다.
+ * 교사는 활동마다 평가요소(문장 + 잘함/보통/노력요함 기준)를 적습니다. 교사가 적은 평가요소 문장이
+ * 학생 화면에서는 그대로 성찰 질문이 됩니다. 제출물마다 요소별 등급을 매기고, 모두 매기면 피드백 완료가 됩니다.
+ * 이 방식 전에 만든 활동의 일반 성찰 질문은 수정할 때 "기존 성찰 질문"으로 그대로 남습니다.
+ * 서술 피드백은 선택 사항입니다. 쓰지 않은 학생에게 미완료 경고를 표시하지 않습니다.
  * 상태 판정과 파일 규칙은 lib/learning.ts 한 곳에서 가져옵니다.
  */
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
@@ -21,21 +24,37 @@ import { shrinkImageForUpload } from '@/lib/image-upload';
 import {
   LearningStatus,
   TEACHER_STATUS_LABEL,
+  TEACHER_IN_PROGRESS_LABEL,
   STATUS_COLOR,
+  IN_PROGRESS_COLOR,
   MAX_FEEDBACK_LENGTH,
   MAX_FILES_PER_SUBMISSION,
   MAX_FILE_BYTES,
   MAX_QUESTIONS_PER_ACTIVITY,
-  SUGGESTED_QUESTIONS,
   MAX_LINKS_PER_SUBMISSION,
   checkLearningFile,
   checkLearningLink,
   isPreviewableImage,
+  isCriterionQuestion,
+  GRADE_LABEL,
+  GRADE_COLOR,
+  MAX_CRITERION_TITLE_LENGTH,
+  MAX_LEVEL_LENGTH,
+  type Grade,
 } from '@/lib/learning';
+import { GradePicker } from '@/components/learning/GradeParts';
 
 // ── Types ──────────────────────────────────────────────────────────
 
-type Question = { id: string; question: string; sort_order: number };
+type Question = {
+  id: string;
+  question: string;
+  sort_order: number;
+  criterion_title: string | null;
+  level_high: string | null;
+  level_mid: string | null;
+  level_low: string | null;
+};
 
 type Activity = {
   id: string;
@@ -45,12 +64,24 @@ type Activity = {
   created_at: string;
   learning_activity_questions: Question[];
   submittedCount: number;
+  gradingCount: number;
   reviewedCount: number;
+  /** 자기평가·교사 등급이 생겨 질문·평가요소를 바꿀 수 없는 활동 */
+  gradingStarted: boolean;
 };
 
 type SubmissionFile = { id: string; file_name: string; mime_type: string; sort_order: number; url: string | null };
 type SubmissionLink = { id: string; url: string; label: string | null; sort_order: number };
-type AnswerRow = { questionId: string; question: string; answer: string };
+type AnswerCriterion = {
+  title: string;
+  levelHigh: string | null;
+  levelMid: string | null;
+  levelLow: string | null;
+  selfGrade: Grade | null;
+  teacherGrade: Grade | null;
+  teacherComment: string | null;
+};
+type AnswerRow = { questionId: string; question: string; answer: string; criterion: AnswerCriterion | null };
 
 type Submission = {
   id: string;
@@ -67,6 +98,8 @@ type Submission = {
 type StudentCell = {
   student: { id: string; name: string; student_number: number };
   status: LearningStatus;
+  /** 미제출이지만 답·결과물·자기평가 중 하나라도 남겼는지 */
+  inProgress?: boolean;
   submission: Submission | null;
 };
 
@@ -76,20 +109,58 @@ const POLL_INTERVAL_MS = 15_000;
 /**
  * 학생 카드에서 활동 카드의 집계를 다시 센다.
  * 서버(app/api/learning/activities/route.ts)와 같은 셈법이라야 새로고침 결과와 어긋나지 않는다.
- * submitted = 제출 + 피드백 완료, reviewed = 피드백 완료.
+ * submitted = 제출 + 평가 대기 + 피드백 완료, grading = 평가 대기, reviewed = 피드백 완료.
  */
 const countCells = (students: StudentCell[]) => ({
   submittedCount: students.filter((cell) => cell.status !== 'none').length,
+  gradingCount: students.filter((cell) => cell.status === 'grading').length,
   reviewedCount: students.filter((cell) => cell.status === 'reviewed').length,
 });
+
+/**
+ * 폼의 평가요소 한 줄. 교사가 적은 문장(text)이 평가요소 이름이자 학생에게 보이는 성찰 질문이다.
+ * legacy는 이 방식 전에 만든 일반 성찰 질문 — 수정할 때 평가요소로 바꾸지 않고 그대로 둔다.
+ */
+type FormItem = { text: string; levelHigh: string; levelMid: string; levelLow: string; legacy: boolean };
+
+const EMPTY_ITEM: FormItem = { text: '', levelHigh: '', levelMid: '', levelLow: '', legacy: false };
 
 const EMPTY_FORM = {
   subject: SUBJECT_LIST[0] as string,
   unit: '',
   title: '',
-  // 처음에는 기본 질문 하나로 시작하고, 교사가 "질문 추가"로 늘린다.
-  reflectionQuestions: [SUGGESTED_QUESTIONS[0]],
+  // 처음에는 빈 평가요소 하나로 시작하고, 교사가 "평가요소 추가"로 늘린다.
+  items: [EMPTY_ITEM] as FormItem[],
 };
+
+/** 저장된 질문을 폼 값으로 바꾼다 — 수정·지난 활동 불러오기에서 쓴다. */
+const toFormItems = (questions: Question[]): FormItem[] =>
+  [...questions]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((q) => ({
+      text: q.question,
+      levelHigh: q.level_high ?? '',
+      levelMid: q.level_mid ?? '',
+      levelLow: q.level_low ?? '',
+      legacy: !isCriterionQuestion(q),
+    }));
+
+/** 폼 값을 API 입력으로 바꾼다. 평가요소는 문장 하나를 질문과 요소 이름에 함께 쓴다. */
+const toQuestionPayload = (items: FormItem[]) =>
+  items.map((item) => (item.legacy
+    ? { question: item.text, criterion: null }
+    : {
+        question: item.text,
+        criterion: { title: item.text, levelHigh: item.levelHigh, levelMid: item.levelMid, levelLow: item.levelLow },
+      }));
+
+const LEVEL_FIELDS = [
+  { key: 'levelHigh', grade: 'high' },
+  { key: 'levelMid', grade: 'mid' },
+  { key: 'levelLow', grade: 'low' },
+] as const;
+
+type GradeDraft = Record<string, { grade: Grade | null; comment: string }>;
 
 /** 교사 화면 날짜 표기 — 간결한 명사형에 맞춰 짧게 씁니다. */
 const formatDay = (iso: string) => new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -118,6 +189,8 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const [openCell, setOpenCell] = useState<StudentCell | null>(null);
   const [feedback, setFeedback] = useState('');
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [gradeDraft, setGradeDraft] = useState<GradeDraft>({});
+  const [gradesSaving, setGradesSaving] = useState(false);
   const [modalError, setModalError] = useState('');
   const proxyInputRef = useRef<HTMLInputElement>(null);
   const [proxyTarget, setProxyTarget] = useState<StudentCell | null>(null);
@@ -205,7 +278,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const pollBusyRef = useRef(false);
   pollBusyRef.current =
     Boolean(openCell) || formOpen || Boolean(proxyTarget) || proxyLinkOpen
-    || saving || feedbackSaving || uploading || proxyLinkSaving;
+    || saving || feedbackSaving || gradesSaving || uploading || proxyLinkSaving;
   const pollRunningRef = useRef(false);
 
   useEffect(() => {
@@ -270,12 +343,14 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     e.preventDefault();
     setSaving(true);
     setError('');
+    const { items, ...rest } = form;
+    const payload = { ...rest, reflectionQuestions: toQuestionPayload(items) };
     try {
       if (editingId) {
-        await api(`/api/learning/activities/${editingId}`, { method: 'PATCH', body: JSON.stringify(form) });
+        await api(`/api/learning/activities/${editingId}`, { method: 'PATCH', body: JSON.stringify(payload) });
         setMessage('활동을 수정했습니다.');
       } else {
-        await api('/api/learning/activities', { method: 'POST', body: JSON.stringify({ ...form, classId }) });
+        await api('/api/learning/activities', { method: 'POST', body: JSON.stringify({ ...payload, classId }) });
         setMessage('활동을 만들었습니다.');
       }
       setForm(EMPTY_FORM);
@@ -297,11 +372,22 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       subject: activity.subject,
       unit: activity.unit,
       title: activity.title,
-      reflectionQuestions: [...activity.learning_activity_questions]
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((q) => q.question),
+      items: toFormItems(activity.learning_activity_questions),
     });
     setFormOpen(true);
+  };
+
+  /** 평가요소 한 줄을 바꾼다 — 폼의 평가요소 카드들이 같이 쓴다. */
+  const updateItem = (index: number, patch: Partial<FormItem>) => setForm((f) => ({
+    ...f,
+    items: f.items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+  }));
+
+  /** 같은 학급의 지난 활동에서 평가요소를 복사해 온다(원본과 연결되지 않는 복사본). */
+  const importQuestions = (activityId: string) => {
+    const source = activities.find((a) => a.id === activityId);
+    if (!source) return;
+    setForm((f) => ({ ...f, items: toFormItems(source.learning_activity_questions) }));
   };
 
   const removeActivity = async (activity: Activity) => {
@@ -332,31 +418,15 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const openDetail = (cell: StudentCell) => {
     setOpenCell(cell);
     setFeedback(cell.submission?.feedback_text ?? '');
+    const draft: GradeDraft = {};
+    (cell.submission?.answers ?? []).forEach((row) => {
+      if (row.criterion) draft[row.questionId] = { grade: row.criterion.teacherGrade, comment: row.criterion.teacherComment ?? '' };
+    });
+    setGradeDraft(draft);
     setModalError('');
     setProxyLinkOpen(false);
     setProxyLinkUrl('');
     setProxyLinkLabel('');
-  };
-
-  const saveFeedback = async () => {
-    if (!openCell?.submission) return;
-    setFeedbackSaving(true);
-    setModalError('');
-    try {
-      await api(`/api/learning/submissions/${openCell.submission.id}/feedback`, {
-        method: 'POST',
-        body: JSON.stringify({ feedback }),
-      });
-      await loadCells(selectedId);
-      await loadActivities();
-      setOpenCell(null);
-      setMessage('피드백을 저장했습니다.');
-      notifyLater();
-    } catch (err) {
-      setModalError((err as Error).message);
-    } finally {
-      setFeedbackSaving(false);
-    }
   };
 
   const removeFeedback = async () => {
@@ -374,6 +444,38 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       setModalError((err as Error).message);
     } finally {
       setFeedbackSaving(false);
+    }
+  };
+
+  /** 요소별 등급과 최종 피드백을 한 번의 동작으로 저장한다. 과거 요소별 코멘트는 그대로 보존한다. */
+  const saveEvaluation = async () => {
+    if (!openCell?.submission) return;
+    setGradesSaving(true);
+    setModalError('');
+    try {
+      await api(`/api/learning/submissions/${openCell.submission.id}/grades`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          grades: Object.entries(gradeDraft).map(([questionId, item]) => ({
+            questionId,
+            grade: item.grade,
+            comment: item.comment.trim() || null,
+          })),
+        }),
+      });
+      await api(`/api/learning/submissions/${openCell.submission.id}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ feedback }),
+      });
+      await loadCells(selectedId);
+      await loadActivities();
+      setOpenCell(null);
+      setMessage('등급과 최종 피드백을 저장했습니다.');
+      notifyLater();
+    } catch (err) {
+      setModalError((err as Error).message);
+    } finally {
+      setGradesSaving(false);
     }
   };
 
@@ -476,6 +578,12 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const subjectsInUse = [...new Set(activities.map((a) => a.subject))];
   const selected = activities.find((a) => a.id === selectedId) ?? null;
   const activityQuestions = [...(selected?.learning_activity_questions ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const editingActivity = activities.find((a) => a.id === editingId) ?? null;
+  // 평가가 시작된 활동은 질문·평가요소를 잠근다(라우트도 409로 막는다).
+  const questionsLocked = Boolean(
+    editingActivity?.gradingStarted && editingActivity.learning_activity_questions.some(isCriterionQuestion),
+  );
+  const importSources = activities.filter((a) => a.id !== editingId && a.learning_activity_questions.length > 0);
 
   if (!classId) {
     return (
@@ -516,11 +624,11 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       <div className="learning-summary" aria-label="배움성찰 현황">
         <div><span aria-hidden="true">📚</span><small>전체 활동</small><strong>{activities.length}</strong></div>
         <div><span aria-hidden="true">✍️</span><small>선택 활동 제출</small><strong>{selected ? `${selected.submittedCount}/${totalStudents}` : '—'}</strong></div>
-        <div><span aria-hidden="true">💬</span><small>선택 활동 피드백</small><strong>{selected?.reviewedCount ?? '—'}</strong></div>
+        <div><span aria-hidden="true">💬</span><small>선택 활동 평가 대기·완료</small><strong>{selected ? `${selected.gradingCount} · ${selected.reviewedCount}` : '—'}</strong></div>
       </div>
 
       <div className="notice info learning-dashboard-guide">
-        활동을 열면 학생이 결과물과 성찰을 남깁니다. 피드백은 필요한 학생에게만 선택적으로 남길 수 있습니다.
+        활동을 열면 학생이 결과물과 성찰을 남깁니다. 교사가 적은 평가요소는 학생에게 성찰 질문으로 보이고, 교사는 요소별 등급을 남깁니다. 서술 피드백은 필요한 학생에게만 선택적으로 남길 수 있습니다.
       </div>
 
       {/* 활동 생성·수정 폼 */}
@@ -528,109 +636,164 @@ export default function LearningDashboard({ classId }: { classId: string }) {
         <form className="student-add-form learning-activity-form" onSubmit={submitForm}>
           <div className="learning-form-heading">
             <span aria-hidden="true">✦</span>
-            <div><strong>{editingId ? '활동 수정' : '새 배움 활동'}</strong><p>학생에게 제시할 활동과 성찰 질문을 입력합니다.</p></div>
+            <div><strong>{editingId ? '활동 수정' : '새 배움 활동'}</strong><p>학생에게 제시할 활동과 평가요소를 입력합니다. 평가요소 문장은 학생에게 성찰 질문으로 보입니다.</p></div>
           </div>
-          <div className="grid two" style={{ gap: 10 }}>
+          <div className="learning-form-section">
+            <div className="learning-form-section-heading">
+              <span aria-hidden="true">1</span>
+              <div><strong>활동 기본 정보</strong><p>학생이 활동을 쉽게 찾을 수 있도록 과목과 제목을 입력합니다.</p></div>
+            </div>
+            <div className="grid two learning-form-basics">
+              <label>
+                과목
+                <select
+                  value={form.subject}
+                  onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+                >
+                  {SUBJECT_LIST.map((subject) => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                단원
+                <input
+                  value={form.unit}
+                  onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                  placeholder="예: 3. 소수의 나눗셈"
+                  maxLength={60}
+                />
+              </label>
+            </div>
             <label>
-              과목
-              <select
-                value={form.subject}
-                onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-              >
-                {SUBJECT_LIST.map((subject) => (
-                  <option key={subject} value={subject}>{subject}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              단원
+              활동명
               <input
-                value={form.unit}
-                onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                placeholder="예: 3. 소수의 나눗셈"
-                maxLength={60}
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="예: 소수 나눗셈 문제 만들기"
+                maxLength={80}
               />
             </label>
           </div>
-          <label>
-            활동명
-            <input
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="예: 소수 나눗셈 문제 만들기"
-              maxLength={80}
-            />
-          </label>
-          {/* 성찰 질문 — 필요한 만큼 추가할 수 있다 */}
-          <div>
-            <div className="row space-between" style={{ marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
-                성찰 질문 ({form.reflectionQuestions.length}/{MAX_QUESTIONS_PER_ACTIVITY})
-              </span>
-              <button
-                type="button"
-                className="outline"
-                style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }}
-                onClick={() => setForm((f) => ({
-                  ...f,
-                  reflectionQuestions: [
-                    ...f.reflectionQuestions,
-                    SUGGESTED_QUESTIONS[f.reflectionQuestions.length] ?? '',
-                  ],
-                }))}
-                disabled={form.reflectionQuestions.length >= MAX_QUESTIONS_PER_ACTIVITY}
-              >
-                + 질문 추가
-              </button>
+          {/* 평가요소 — 교사가 적은 문장이 학생에게는 그대로 성찰 질문이 된다 */}
+          <div className="learning-form-section">
+            <div className="learning-form-section-heading learning-form-section-heading-actions">
+              <span aria-hidden="true">2</span>
+              <div><strong>평가요소</strong><p>학생에게는 성찰 질문으로 표시됩니다. ({form.items.length}/{MAX_QUESTIONS_PER_ACTIVITY})</p></div>
+              <div className="row" style={{ gap: 6 }}>
+                {importSources.length > 0 && !questionsLocked && (
+                  <select
+                    value=""
+                    onChange={(e) => importQuestions(e.target.value)}
+                    aria-label="지난 활동에서 평가요소 불러오기"
+                    style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }}
+                  >
+                    <option value="">지난 활동에서 불러오기</option>
+                    {importSources.map((a) => (
+                      <option key={a.id} value={a.id}>{a.subject} · {a.title}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }}
+                  onClick={() => setForm((f) => ({ ...f, items: [...f.items, { ...EMPTY_ITEM }] }))}
+                  disabled={questionsLocked || form.items.length >= MAX_QUESTIONS_PER_ACTIVITY}
+                >
+                  + 평가요소 추가
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {form.reflectionQuestions.map((question, index) => (
-                <div key={index} className="row" style={{ gap: 6, alignItems: 'center' }}>
-                  <span style={{
-                    flexShrink: 0, width: 22, height: 22, borderRadius: 999,
-                    display: 'grid', placeItems: 'center',
-                    background: '#ede9fe', color: '#6d5bc5', fontSize: 11, fontWeight: 800,
-                  }}>
-                    {index + 1}
-                  </span>
+            <p className="hint" style={{ margin: '0 0 6px' }}>
+              학생에게는 평가요소 문장이 그대로 성찰 질문으로 보입니다. 학생이 읽고 답할 수 있는 문장으로 적어주세요.
+            </p>
+
+            {questionsLocked && (
+              <p className="hint" style={{ margin: '0 0 6px', color: '#b45309' }}>
+                이미 평가가 시작된 활동은 평가요소를 바꿀 수 없습니다.
+              </p>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {form.items.map((item, index) => (
+                <fieldset
+                  key={index}
+                  disabled={questionsLocked}
+                  className={`learning-question-card${item.legacy ? '' : ' is-criterion'}`}
+                  style={{ margin: 0, minWidth: 0 }}
+                >
+                  <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+                    <span style={{
+                      flexShrink: 0, width: 22, height: 22, borderRadius: 999,
+                      display: 'grid', placeItems: 'center',
+                      background: '#ede9fe', color: '#6d5bc5', fontSize: 11, fontWeight: 800,
+                    }}>
+                      {index + 1}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: item.legacy ? '#64748b' : '#6d5bc5' }}>
+                      {item.legacy ? '기존 성찰 질문 (평가요소 아님)' : '평가요소'}
+                    </span>
+                    {/* 하나뿐일 땐 지울 수 없다 — 질문 없는 활동은 만들 수 없기 때문 */}
+                    <button
+                      type="button"
+                      className="outline"
+                      style={{ width: 'auto', flexShrink: 0, marginLeft: 'auto', fontSize: 12, padding: '4px 9px' }}
+                      onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== index) }))}
+                      disabled={form.items.length <= 1}
+                      aria-label={`${index + 1}번 평가요소 삭제`}
+                    >
+                      삭제
+                    </button>
+                  </div>
+
                   <input
-                    value={question}
-                    onChange={(e) => setForm((f) => ({
-                      ...f,
-                      reflectionQuestions: f.reflectionQuestions.map((q, i) => (i === index ? e.target.value : q)),
-                    }))}
-                    placeholder="예: 이번 활동에서 잘한 점은 무엇인가요?"
-                    maxLength={200}
-                    style={{ flex: 1 }}
+                    value={item.text}
+                    onChange={(e) => updateItem(index, { text: e.target.value })}
+                    placeholder={item.legacy ? '예: 이번 활동에서 잘한 점은 무엇인가요?' : '예: 소수의 나눗셈을 정확히 계산했나요?'}
+                    maxLength={item.legacy ? 200 : MAX_CRITERION_TITLE_LENGTH}
+                    aria-label={`${index + 1}번 ${item.legacy ? '성찰 질문' : '평가요소'}`}
                   />
-                  {/* 질문이 하나뿐일 땐 지울 수 없다 — 질문 없는 활동은 만들 수 없기 때문 */}
-                  <button
-                    type="button"
-                    className="outline"
-                    style={{ width: 'auto', flexShrink: 0, fontSize: 12, padding: '4px 9px' }}
-                    onClick={() => setForm((f) => ({
-                      ...f,
-                      reflectionQuestions: f.reflectionQuestions.filter((_, i) => i !== index),
-                    }))}
-                    disabled={form.reflectionQuestions.length <= 1}
-                    aria-label={`${index + 1}번 질문 삭제`}
-                  >
-                    삭제
-                  </button>
-                </div>
+
+                  {!item.legacy && (
+                    <div className="learning-criterion-levels">
+                      {LEVEL_FIELDS.map(({ key, grade }) => (
+                        <label
+                          key={key}
+                          className="learning-criterion-level"
+                          style={{
+                            '--grade-color': GRADE_COLOR[grade].text,
+                            '--grade-soft': GRADE_COLOR[grade].bg,
+                          } as CSSProperties}
+                        >
+                          <span className="learning-criterion-level-badge">{GRADE_LABEL[grade]} 기준</span>
+                          <input
+                            value={item[key]}
+                            onChange={(e) => updateItem(index, { [key]: e.target.value })}
+                            placeholder="선택"
+                            maxLength={MAX_LEVEL_LENGTH}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
               ))}
             </div>
 
-            {editingId && (
+            {editingId && !questionsLocked && (
               <p className="hint" style={{ margin: '6px 0 0', color: '#b45309' }}>
-                질문을 수정하면 학생이 이미 쓴 답변이 함께 지워집니다.
+                평가요소를 수정하면 학생이 이미 쓴 답변이 함께 지워집니다.
               </p>
             )}
           </div>
-          <button type="submit" disabled={saving}>
-            {saving ? '저장 중...' : editingId ? '활동 수정' : '활동 만들기'}
-          </button>
+          <div className="learning-form-submit">
+            <p><span aria-hidden="true">✦</span> 입력한 내용은 학생의 배움성찰 화면에 바로 표시됩니다.</p>
+            <button type="submit" disabled={saving}>
+              {saving ? '저장 중...' : editingId ? '활동 수정' : '활동 만들기'}
+            </button>
+          </div>
         </form>
       )}
 
@@ -660,7 +823,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       ) : activities.length === 0 ? (
         <EmptyState
           title="아직 활동이 없습니다"
-          description="새 활동 만들기를 눌러 과목·단원·활동명·성찰 질문을 등록하세요."
+          description="새 활동 만들기를 눌러 과목·단원·활동명·평가요소를 등록하세요."
         />
       ) : (
         <div className="learning-activity-list">
@@ -690,7 +853,10 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     </span>
                     <span className="learning-activity-metrics">
                       <span><small>제출</small><strong>{activity.submittedCount}/{totalStudents}</strong></span>
-                      <span><small>피드백</small><strong>{activity.reviewedCount}</strong></span>
+                      {activity.learning_activity_questions.some(isCriterionQuestion) && (
+                        <span><small>평가 대기</small><strong>{activity.gradingCount}</strong></span>
+                      )}
+                      <span><small>완료</small><strong>{activity.reviewedCount}</strong></span>
                     </span>
                     <span className={`learning-activity-chevron${isSelected ? ' is-open' : ''}`} aria-hidden="true">⌄</span>
                   </button>
@@ -714,7 +880,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     ) : (
                       <div className="learning-student-grid">
                         {cells.map((cell) => {
-                          const tone = STATUS_COLOR[cell.status];
+                          const tone = cell.inProgress ? IN_PROGRESS_COLOR : STATUS_COLOR[cell.status];
                           return (
                             <button
                               key={cell.student.id}
@@ -736,7 +902,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                               </span>
                               {/* 색만으로 구분하지 않도록 상태 라벨을 항상 함께 표시 */}
                               <span style={{ fontSize: 11, fontWeight: 700, color: tone.text }}>
-                                {TEACHER_STATUS_LABEL[cell.status]}
+                                {cell.inProgress ? TEACHER_IN_PROGRESS_LABEL : TEACHER_STATUS_LABEL[cell.status]}
                               </span>
                               {cell.submission?.submitted_by === 'teacher' && (
                                 <span style={{ fontSize: 10, color: '#78350f' }}>교사 대리 업로드</span>
@@ -929,13 +1095,13 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
               {/* 질문마다 그 아래에 답을 붙여, 무엇에 답한 것인지 바로 보이게 한다 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(openCell.submission?.answers ?? activityQuestions.map((q) => ({
-                  questionId: q.id, question: q.question, answer: '',
+                {(openCell.submission?.answers ?? activityQuestions.map((q): AnswerRow => ({
+                  questionId: q.id, question: q.question, answer: '', criterion: null,
                 }))).map((row, index) => (
                   <div key={row.questionId} style={{ borderRadius: 12, border: '1px solid #ddd6fe', overflow: 'hidden' }}>
                     <div style={{ padding: '9px 13px', background: '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
                       <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 800, color: '#7c6bd6', letterSpacing: '0.02em' }}>
-                        성찰 질문 {index + 1}
+                        {row.criterion ? '평가요소' : '성찰 질문'} {index + 1}
                       </p>
                       <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#312e81', fontWeight: 600 }}>
                         {row.question}
@@ -950,8 +1116,43 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                 ))}
               </div>
 
-              <div>
-                <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 14, color: '#374151' }}>피드백 (선택)</p>
+              {Object.keys(gradeDraft).length > 0 && openCell.submission && openCell.status !== 'none' && (
+                <section className="learning-teacher-review-section" aria-label="교사 평가">
+                  <div className="learning-teacher-review-heading">
+                    <span aria-hidden="true">✦</span>
+                    <div><strong>교사 평가</strong><p>학생의 자기점검을 확인한 뒤 평가요소별 등급을 선택합니다.</p></div>
+                  </div>
+                  <div className="learning-teacher-review-list">
+                    {(openCell.submission.answers ?? []).filter((row) => row.criterion).map((row, index) => (
+                      <div key={row.questionId} className="learning-teacher-evaluation">
+                        <div className="learning-teacher-evaluation-heading">
+                          <strong>{index + 1}. {row.criterion!.title}</strong>
+                          <span>잘함·보통·노력요함 중 하나를 선택하세요.</span>
+                        </div>
+                        <GradePicker
+                          value={gradeDraft[row.questionId]?.grade ?? null}
+                          onChange={(grade) => setGradeDraft((d) => ({
+                            ...d,
+                            [row.questionId]: { comment: d[row.questionId]?.comment ?? '', grade },
+                          }))}
+                          labels={GRADE_LABEL}
+                          levels={{ high: row.criterion!.levelHigh, mid: row.criterion!.levelMid, low: row.criterion!.levelLow }}
+                          ariaLabel={`${row.criterion!.title} 교사 등급`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {Object.keys(gradeDraft).length > 0 && openCell.submission && openCell.status === 'none' && (
+                <p className="hint" style={{ margin: 0 }}>제출이 끝나면 요소별 평가를 할 수 있습니다.</p>
+              )}
+              <div className="learning-teacher-feedback">
+                <div className="learning-teacher-feedback-heading">
+                  <strong>종합 피드백</strong>
+                  <span>등급 평가를 마친 뒤 학생에게 전할 최종 의견을 입력합니다.</span>
+                </div>
                 {!openCell.submission ? (
                   <p className="hint" style={{ margin: 0 }}>제출물이 있어야 피드백을 남길 수 있습니다.</p>
                 ) : (
@@ -960,21 +1161,26 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value.slice(0, MAX_FEEDBACK_LENGTH))}
                       rows={4}
-                      placeholder="학생에게 전할 의견을 적어주세요. 남기지 않아도 됩니다."
+                      placeholder="등급 평가를 종합해 학생에게 전할 최종 피드백을 적어주세요."
                       style={{ width: '100%' }}
                     />
                     <p className="hint" style={{ margin: '4px 0 8px' }}>
-                      {feedback.length}/{MAX_FEEDBACK_LENGTH}자 · 피드백을 저장하면 학생은 결과물과 성찰을 고칠 수 없습니다.
+                      {feedback.length}/{MAX_FEEDBACK_LENGTH}자 · 모든 등급과 최종 피드백을 함께 저장합니다.
                     </p>
                     <div className="row" style={{ gap: 8 }}>
                       <button
                         type="button"
                         className="ghost"
                         style={{ width: 'auto' }}
-                        onClick={saveFeedback}
-                        disabled={feedbackSaving || feedback.trim().length === 0}
+                        onClick={saveEvaluation}
+                        disabled={
+                          gradesSaving
+                          || feedbackSaving
+                          || feedback.trim().length === 0
+                          || Object.values(gradeDraft).some((item) => !item.grade)
+                        }
                       >
-                        {feedbackSaving ? '저장 중...' : '피드백 저장'}
+                        {gradesSaving ? '전체 저장 중...' : '등급과 최종 피드백 저장'}
                       </button>
                       {openCell.submission.feedback_text && (
                         <button

@@ -75,6 +75,11 @@
 | 별빛 금색 (텍스트/아이콘) | `#ffe47b` `#ffe68b` `#ffec9c` `#c98208`(진한 대비용) |
 | 연료/시안 (우주여행) | `#4fd1e5` `#087d91` `#e7fbff` |
 | 종이 크림 (피드·클래스메일) | `#fffdf5` `#fff7d8` / 테두리 `#e8dcb9` |
+| 배움성찰 "평가 대기" 상태 (`STATUS_COLOR.grading`) | 배경 `#fef9c3` / 테두리 `#fde68a` / 텍스트 `#a16207` |
+| 배움성찰 "작성 중" 카드 (`IN_PROGRESS_COLOR`, 미제출이지만 쓰기 시작함) | 배경 `#f5f3ff` / 테두리 `#c4b5fd` / 텍스트 `#6d28d9` |
+| 평가 등급 칩 (`GRADE_COLOR`, 잘함·보통·노력요함) | 잘함 `#16a34a`/`#dcfce7` · 보통 `#a16207`/`#fef9c3` · 노력요함 `#dc2626`/`#fee2e2` |
+
+> 등급 색은 `lib/learning.ts`의 `GRADE_COLOR`에 한 번만 정의하고, `components/learning/GradeParts.tsx`가 `--grade-color` / `--grade-soft` CSS 변수로 넘깁니다(globals.css "배움성찰 평가요소 · 등급" 섹션). 평가피드백(`EvalDashboard`)에서 쓰던 값을 그대로 옮긴 것입니다.
 
 ### 2.5 감정 카테고리 팔레트
 

@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate, formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { CATEGORY_VALENCE, WATCH_RULES, WatchReasonCode, Valence } from '@/lib/class-dashboard';
+import { getLearningStatus } from '@/lib/learning';
+import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 
 /**
  * 학급 대시보드 집계.
@@ -78,7 +80,7 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('learning_submissions')
-      .select('activity_id,student_id,status,feedback_text,submitted_at,students!inner(class_id)')
+      .select('id,activity_id,student_id,status,feedback_text,submitted_at,students!inner(class_id)')
       .eq('students.class_id', classId),
     // 설문과 지명을 한 번에 가져온다. 최신 설문 id를 받은 뒤 다시 조회하면 왕복이 하나 늘어난다.
     supabaseAdmin
@@ -158,6 +160,10 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
   const learningActivities = learningActRes.data ?? [];
   const activityIds = learningActivities.map((a) => a.id);
   const learningSubmissions = learningSubRes.data ?? [];
+  // 평가 대기 판정용 — 활동별 요소 수와 제출물별 교사 등급 수를 한 번에 모은다.
+  const gradingStats = await loadGradingStats(activityIds, learningSubmissions.map((s) => s.id));
+  const statusOf = (submission: (typeof learningSubmissions)[number] | undefined) =>
+    submission ? getLearningStatus(submission, gradingFor(gradingStats, submission.activity_id, submission.id)) : 'none';
   const submittedPairs = new Set(
     learningSubmissions
       .filter((s) => s.status === 'submitted')
@@ -276,18 +282,13 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       && studentPlans.every((plan) => typeof todayCheckByPlan.get(plan.id) === 'boolean');
     const planRate = studentPlans.length > 0 ? Math.round((completedPlans / studentPlans.length) * 100) : null;
     const submission = latestSubmissionByStudent.get(student.id);
-    const learningStatus = !latestActivity
-      ? 'no_activity'
-      : submission?.status !== 'submitted'
-        ? 'none'
-        : submission.feedback_text
-          ? 'reviewed'
-          : 'submitted';
+    const learningStatus = !latestActivity ? 'no_activity' : statusOf(submission);
     const reasons: string[] = [];
     if (!recordedTodayIds.has(student.id)) reasons.push('오늘 마음 기록 없음');
     if (studentPlans.length > 0 && completedPlans < studentPlans.length) reasons.push('오늘 계획 미완료');
     if (learningStatus === 'none') reasons.push('최근 배움성찰 미제출');
     if (learningStatus === 'submitted') reasons.push('배움성찰 확인 필요');
+    if (learningStatus === 'grading') reasons.push('배움성찰 평가 대기');
     return {
       student,
       emotionRecorded: recordedTodayIds.has(student.id),
@@ -302,8 +303,9 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
 
   const planParticipants = studentStatus.filter((row) => row.planTotal > 0);
   const planCheckedStudents = studentStatus.filter((row) => row.planChecked).length;
-  const latestSubmitted = studentStatus.filter((row) => row.learningStatus === 'submitted' || row.learningStatus === 'reviewed').length;
-  const pendingReview = studentStatus.filter((row) => row.learningStatus === 'submitted').length;
+  const latestSubmitted = studentStatus.filter((row) => ['submitted', 'grading', 'reviewed'].includes(row.learningStatus)).length;
+  // 확인이 필요한 기록 — 피드백을 기다리는 제출과 요소 평가가 덜 끝난 제출(평가 대기).
+  const pendingReview = studentStatus.filter((row) => row.learningStatus === 'submitted' || row.learningStatus === 'grading').length;
   const safeRate = (value: number, total: number) => total > 0 ? Math.round((value / total) * 100) : 0;
 
   const activityProgress = learningActivities.slice(0, 5).map((activity) => {
@@ -313,7 +315,7 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       title: activity.title,
       subject: activity.subject,
       submitted: rows.length,
-      reviewed: rows.filter((row) => Boolean(row.feedback_text)).length,
+      reviewed: rows.filter((row) => statusOf(row) === 'reviewed').length,
       total: students.length,
       rate: safeRate(rows.length, students.length),
     };
