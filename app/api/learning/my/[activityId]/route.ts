@@ -33,7 +33,7 @@ export async function GET(_: Request, { params }: Params) {
   let files: { id: string; file_name: string; mime_type: string; sort_order: number; url: string | null }[] = [];
   let links: { id: string; url: string; label: string | null; sort_order: number }[] = [];
   let answers: { question_id: string; answer: string }[] = [];
-  let grades: { question_id: string; self_grade: string | null; teacher_grade: string | null; teacher_comment: string | null }[] = [];
+  let grades: { question_id: string; teacher_grade: string | null; teacher_comment: string | null }[] = [];
 
   if (submission) {
     const [filesRes, linksRes, answersRes, gradesRes] = await Promise.all([
@@ -53,7 +53,7 @@ export async function GET(_: Request, { params }: Params) {
         .eq('submission_id', submission.id),
       supabaseAdmin
         .from('learning_submission_grades')
-        .select('question_id,self_grade,teacher_grade,teacher_comment')
+        .select('question_id,teacher_grade,teacher_comment')
         .eq('submission_id', submission.id),
     ]);
 
@@ -75,13 +75,12 @@ export async function GET(_: Request, { params }: Params) {
   });
   return NextResponse.json({
     activity,
-    // 질문마다 내 답(과 자기평가)을 붙여 내려보낸다 — 화면에서 질문과 답을 짝지어 그리기 위해서다.
+    // 질문마다 내 답을 붙여 내려보낸다 — 화면에서 질문과 답을 짝지어 그리기 위해서다.
     questions: questionRows.map((q) => {
       const grade = gradeMap.get(q.id);
       return {
         ...q,
         answer: answerMap.get(q.id) ?? '',
-        selfGrade: grade?.self_grade ?? null,
         // 교사가 저장한 등급과 요소별 피드백은 평가가 일부만 진행됐어도 학생에게 보여준다.
         ...(isCriterionQuestion(q) && (grade?.teacher_grade || grade?.teacher_comment)
           ? { teacherGrade: grade?.teacher_grade ?? null, teacherComment: grade?.teacher_comment ?? null }

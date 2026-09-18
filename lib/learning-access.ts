@@ -261,7 +261,7 @@ export async function lockedByFeedback(submission: { id: string; feedback_text: 
 export const LOCKED_MESSAGE = '선생님 피드백이 등록되어 더 이상 고칠 수 없어요.';
 
 /**
- * 이 활동에 자기평가나 교사 등급이 하나라도 저장됐는지.
+ * 이 활동에 교사 등급이 하나라도 저장됐는지.
  * 그 뒤로는 질문 목록(평가요소 포함)을 바꿀 수 없다 — 등급이 가리키는 질문이 사라지면 안 된다.
  */
 export async function hasAnyGrade(activityId: string) {
@@ -276,7 +276,7 @@ export async function hasAnyGrade(activityId: string) {
     .from('learning_submission_grades')
     .select('id', { count: 'exact', head: true })
     .in('question_id', questionIds)
-    .or('self_grade.not.is.null,teacher_grade.not.is.null');
+    .not('teacher_grade', 'is', null);
   return (count ?? 0) > 0;
 }
 
@@ -287,7 +287,7 @@ export async function hasAnyGrade(activityId: string) {
 export async function loadGradingStats(activityIds: string[], submissionIds: string[]) {
   const criteriaByActivity = new Map<string, number>();
   const gradedBySubmission = new Map<string, number>();
-  // 자기평가나 교사 등급이 하나라도 저장된 활동 — 질문 목록 잠금 표시에 쓴다.
+  // 교사 등급이 하나라도 저장된 활동 — 질문 목록 잠금 표시에 쓴다.
   const startedActivities = new Set<string>();
   if (activityIds.length === 0) return { criteriaByActivity, gradedBySubmission, startedActivities };
 
@@ -312,13 +312,13 @@ export async function loadGradingStats(activityIds: string[], submissionIds: str
       submissionIds.slice(i * CHUNK, (i + 1) * CHUNK));
     const results = await Promise.all(chunks.map((ids) => supabaseAdmin
       .from('learning_submission_grades')
-      .select('submission_id,question_id,self_grade,teacher_grade')
+      .select('submission_id,question_id,teacher_grade')
       .in('submission_id', ids)));
     const grades = results.flatMap((res) => res.data ?? []);
 
     grades.forEach((g) => {
       if (!criterionIds.has(g.question_id)) return;
-      if (g.self_grade || g.teacher_grade) startedActivities.add(activityOfQuestion.get(g.question_id)!);
+      if (g.teacher_grade) startedActivities.add(activityOfQuestion.get(g.question_id)!);
       if (!g.teacher_grade) return;
       gradedBySubmission.set(g.submission_id, (gradedBySubmission.get(g.submission_id) ?? 0) + 1);
     });

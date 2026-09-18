@@ -1,6 +1,7 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, type Period } from '@/lib/stats';
+import { GRADE_LABEL, isGrade, type Grade } from '@/lib/learning';
 
 /**
  * AI 분석용 배움성찰 데이터 수집.
@@ -8,6 +9,8 @@ import { getPeriodRange, type Period } from '@/lib/stats';
  * 근거 유형을 섞지 않는 것이 이 파일의 목적입니다(기획서 8.3).
  *   - 학생 성찰(answers) — 학생이 스스로 인식한 것. 자기보고다.
  *   - 교사 피드백(teacherFeedback) — 교사가 관찰해 쓴 것. 관찰 근거로 쓸 수 있다.
+ *   - 요소별 교사 평가(criterionGrades) — 평가요소마다 교사가 매긴 등급과 코멘트. 교사 관찰 근거다.
+ *     배움성찰과 평가가 한 활동 안에 있으므로 성장 리포트에서도 함께 보낸다.
  * 둘을 한 덩어리로 합쳐 보내면 AI가 학생의 자기평가를 교사 관찰인 것처럼 단정한다.
  * 그래서 필드를 따로 두고, 프롬프트에서도 따로 표시한다.
  *
@@ -26,6 +29,8 @@ export type LearningActivityRecord = {
   answers: LearningAnswer[];
   /** 교사가 남긴 피드백. null이면 교사가 쓰지 않은 것이며, 피드백 없음이 곧 부정 신호는 아니다. */
   teacherFeedback: string | null;
+  /** 평가요소별 교사 등급·코멘트. 교사가 매긴 것만 담는다(학생 자기평가는 담지 않는다). */
+  criterionGrades: { criterion: string; grade: Grade; comment: string | null }[];
   /** 결과물 개수만 센다. 파일 내용은 보내지 않는다. */
   materialCount: number;
 };
@@ -82,10 +87,10 @@ export async function gatherLearningReportData(
 
   const submissionIds = submitted.map((row) => row.id);
 
-  const [questionsRes, answersRes, filesRes, linksRes] = await Promise.all([
+  const [questionsRes, answersRes, filesRes, linksRes, gradesRes] = await Promise.all([
     supabaseAdmin
       .from('learning_activity_questions')
-      .select('id,activity_id,question,sort_order')
+      .select('id,activity_id,question,sort_order,criterion_title')
       .in('activity_id', activityRows.map((row) => row.id))
       .order('sort_order', { ascending: true }),
     supabaseAdmin
@@ -100,18 +105,32 @@ export async function gatherLearningReportData(
       .from('learning_submission_links')
       .select('submission_id')
       .in('submission_id', submissionIds),
+    supabaseAdmin
+      .from('learning_submission_grades')
+      .select('submission_id,question_id,teacher_grade,teacher_comment')
+      .in('submission_id', submissionIds)
+      .not('teacher_grade', 'is', null),
   ]);
 
-  const questionsByActivity = new Map<string, { id: string; question: string }[]>();
+  const questionsByActivity = new Map<string, { id: string; question: string; criterion: string | null }[]>();
   (questionsRes.data ?? []).forEach((row) => {
     const bucket = questionsByActivity.get(row.activity_id) ?? [];
-    bucket.push({ id: row.id, question: row.question });
+    bucket.push({ id: row.id, question: row.question, criterion: row.criterion_title?.trim() || null });
     questionsByActivity.set(row.activity_id, bucket);
   });
 
   const answerByKey = new Map<string, string>();
   (answersRes.data ?? []).forEach((row) => {
     answerByKey.set(`${row.submission_id}|${row.question_id}`, row.answer);
+  });
+
+  const gradeByKey = new Map<string, { grade: Grade; comment: string | null }>();
+  (gradesRes.data ?? []).forEach((row) => {
+    if (!isGrade(row.teacher_grade)) return;
+    gradeByKey.set(`${row.submission_id}|${row.question_id}`, {
+      grade: row.teacher_grade,
+      comment: row.teacher_comment?.trim() || null,
+    });
   });
 
   const materialCounts = new Map<string, number>();
@@ -133,6 +152,11 @@ export async function gatherLearningReportData(
       }))
       .filter((item) => item.answer.length > 0);
 
+    const criterionGrades = (questionsByActivity.get(activity.id) ?? []).flatMap((question) => {
+      const grade = question.criterion ? gradeByKey.get(`${submission.id}|${question.id}`) : undefined;
+      return grade ? [{ criterion: question.criterion!, grade: grade.grade, comment: grade.comment }] : [];
+    });
+
     records.push({
       dateIso: activity.created_at,
       subject: activity.subject,
@@ -140,6 +164,7 @@ export async function gatherLearningReportData(
       title: activity.title,
       answers,
       teacherFeedback: submission.feedback_text?.trim() || null,
+      criterionGrades,
       materialCount: materialCounts.get(submission.id) ?? 0,
     });
   }
@@ -184,7 +209,12 @@ export function buildLearningPromptBlock(
         ? `  · 교사 피드백(교사 관찰): "${activity.teacherFeedback}"`
         : '  · 교사 피드백: (없음)';
 
-      return `${header}\n${answerLines}\n${feedbackLine}`;
+      // 요소별 교사 평가 — 평가요소가 있는 활동에서만 붙는다.
+      const gradeLines = activity.criterionGrades
+        .map((item) => `  · 교사 요소 평가(교사 관찰): ${item.criterion} — ${GRADE_LABEL[item.grade]}${item.comment ? ` ("${item.comment}")` : ''}`)
+        .join('\n');
+
+      return [header, answerLines, gradeLines, feedbackLine].filter(Boolean).join('\n');
     })
     .join('\n\n');
 
@@ -195,6 +225,7 @@ export function buildLearningPromptBlock(
 export const LEARNING_EVIDENCE_RULES = `배움성찰 데이터를 쓸 때의 규칙:
 - "학생 성찰(자기보고)"은 학생이 스스로 인식한 내용입니다. "스스로 ~라고 돌아봄"처럼 자기인식으로 서술하고, 사실로 단정하지 마세요.
 - "교사 피드백(교사 관찰)"은 교사가 직접 관찰해 쓴 것이므로 관찰 근거로 활용할 수 있습니다.
+- "교사 요소 평가(교사 관찰)"는 교사가 평가요소마다 잘함·보통·노력요함으로 매긴 등급입니다. 관찰 근거로 활용하되, 등급을 점수처럼 나열하지 말고 강점과 성장할 점을 설명하는 데 쓰세요.
 - 교사 피드백이 없는 활동은 "교사가 확인하지 않았다"는 뜻이 아닙니다. 피드백은 선택 사항이므로 없다는 사실로 부정적 판단을 하지 마세요.
 - 결과물은 개수만 제공됩니다. 파일 내용을 보지 않았으므로 무엇을 만들었는지 추측하지 마세요.
 - 성찰이 없거나 기록이 적으면 억지로 결론을 만들지 말고, 근거가 부족하다고 쓰세요.`;

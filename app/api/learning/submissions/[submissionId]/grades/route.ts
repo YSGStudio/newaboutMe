@@ -52,7 +52,7 @@ export async function PUT(req: Request, { params }: Params) {
 
   const { data: grades } = await supabaseAdmin
     .from('learning_submission_grades')
-    .select('question_id,self_grade,teacher_grade,teacher_comment')
+    .select('question_id,teacher_grade,teacher_comment')
     .eq('submission_id', access.submission.id);
 
   return NextResponse.json({ grades: grades ?? [] });

@@ -126,28 +126,19 @@ describe('learningActivityCreateSchema — 평가요소 질문', () => {
   });
 });
 
-describe('learningAnswerSchema — 자기평가', () => {
+describe('learningAnswerSchema', () => {
   const questionId = '22222222-2222-4222-8222-222222222222';
 
-  it('자기평가 등급을 받는다', () => {
-    const parsed = learningAnswerSchema.safeParse({ answers: [], selfGrades: [{ questionId, grade: 'mid' }] });
-    expect(parsed.success).toBe(true);
-  });
-
-  it('교사 등급 필드는 버린다', () => {
+  it('학생 요청에 섞인 등급 필드는 버린다', () => {
     const parsed = learningAnswerSchema.safeParse({
-      answers: [],
-      selfGrades: [{ questionId, grade: 'high', teacherGrade: 'low' }],
+      answers: [{ questionId, answer: '답' }],
+      selfGrades: [{ questionId, grade: 'high' }],
       teacherGrade: 'low'
     });
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     expect(parsed.data).not.toHaveProperty('teacherGrade');
-    expect(parsed.data.selfGrades?.[0]).not.toHaveProperty('teacherGrade');
-  });
-
-  it('등급이 아닌 값은 거부한다', () => {
-    expect(learningAnswerSchema.safeParse({ answers: [], selfGrades: [{ questionId, grade: 'great' }] }).success).toBe(false);
+    expect(parsed.data).not.toHaveProperty('selfGrades');
   });
 });
 

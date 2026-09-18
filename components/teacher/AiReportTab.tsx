@@ -39,7 +39,6 @@ type ViewQuestion = {
     levelHigh: string | null;
     levelMid: string | null;
     levelLow: string | null;
-    selfGrade: Grade | null;
     teacherGrade: Grade | null;
     teacherComment: string | null;
   } | null;

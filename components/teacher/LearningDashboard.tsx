@@ -66,7 +66,7 @@ type Activity = {
   submittedCount: number;
   gradingCount: number;
   reviewedCount: number;
-  /** 자기평가·교사 등급이 생겨 질문·평가요소를 바꿀 수 없는 활동 */
+  /** 교사 등급이 생겨 평가요소를 바꿀 수 없는 활동 */
   gradingStarted: boolean;
 };
 
@@ -77,7 +77,6 @@ type AnswerCriterion = {
   levelHigh: string | null;
   levelMid: string | null;
   levelLow: string | null;
-  selfGrade: Grade | null;
   teacherGrade: Grade | null;
   teacherComment: string | null;
 };
@@ -98,7 +97,7 @@ type Submission = {
 type StudentCell = {
   student: { id: string; name: string; student_number: number };
   status: LearningStatus;
-  /** 미제출이지만 답·결과물·자기평가 중 하나라도 남겼는지 */
+  /** 미제출이지만 답·결과물 중 하나라도 남겼는지 */
   inProgress?: boolean;
   submission: Submission | null;
 };

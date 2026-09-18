@@ -9,7 +9,6 @@ import {
   SUBMISSION_COLUMNS,
 } from '@/lib/learning-access';
 import { learningAnswerSchema } from '@/lib/validators';
-import { isCriterionQuestion } from '@/lib/learning';
 import { rewardLearningSubmission } from '@/lib/learning-rewards';
 
 // 학생 성찰 답변 저장 (질문별로 여러 개를 한 번에)
@@ -37,17 +36,10 @@ export async function PUT(req: Request, { params }: Params) {
   // 이 활동의 질문만 받아들인다 — 다른 활동의 question_id를 섞어 보내도 저장되지 않는다.
   const { data: questions } = await supabaseAdmin
     .from('learning_activity_questions')
-    .select('id,criterion_title')
+    .select('id')
     .eq('activity_id', access.activity.id);
 
   const validIds = new Set((questions ?? []).map((q) => q.id));
-  const criterionIds = new Set((questions ?? []).filter(isCriterionQuestion).map((q) => q.id));
-
-  // 이전 화면에서 보낸 자기평가는 과거 클라이언트 호환을 위해서만 받아 저장한다.
-  const selfGrades = parsed.data.selfGrades ?? [];
-  if (selfGrades.some((item) => !criterionIds.has(item.questionId))) {
-    return NextResponse.json({ error: '이 활동의 평가요소가 아니에요.' }, { status: 400 });
-  }
   const rows = parsed.data.answers
     .filter((item) => validIds.has(item.questionId))
     .map((item) => ({
@@ -61,23 +53,6 @@ export async function PUT(req: Request, { params }: Params) {
     const { error } = await supabaseAdmin
       .from('learning_submission_answers')
       .upsert(rows, { onConflict: 'submission_id,question_id' });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // 자기평가만 쓴다 — 교사 등급·코멘트 컬럼은 upsert 대상에 넣지 않으므로 기존 값이 그대로 남는다.
-  if (selfGrades.length > 0) {
-    const { error } = await supabaseAdmin
-      .from('learning_submission_grades')
-      .upsert(
-        selfGrades.map((item) => ({
-          submission_id: submission.id,
-          question_id: item.questionId,
-          self_grade: item.grade,
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: 'submission_id,question_id' },
-      );
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }

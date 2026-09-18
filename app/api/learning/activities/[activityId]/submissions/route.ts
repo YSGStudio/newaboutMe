@@ -69,7 +69,7 @@ export async function GET(_: Request, { params }: Params) {
   // 링크와 질문별 답변도 함께 모은다 — 교사가 카드를 열 때 추가 요청 없이 바로 보이게 한다.
   const linksBySubmission = new Map<string, { id: string; url: string; label: string | null; sort_order: number }[]>();
   const answersBySubmission = new Map<string, Map<string, string>>();
-  type GradeRow = { self_grade: string | null; teacher_grade: string | null; teacher_comment: string | null };
+  type GradeRow = { teacher_grade: string | null; teacher_comment: string | null };
   const gradesBySubmission = new Map<string, Map<string, GradeRow>>();
 
   if (submissionIds.length > 0) {
@@ -85,7 +85,7 @@ export async function GET(_: Request, { params }: Params) {
         .in('submission_id', submissionIds),
       supabaseAdmin
         .from('learning_submission_grades')
-        .select('submission_id,question_id,self_grade,teacher_grade,teacher_comment')
+        .select('submission_id,question_id,teacher_grade,teacher_comment')
         .in('submission_id', submissionIds),
     ]);
 
@@ -125,7 +125,6 @@ export async function GET(_: Request, { params }: Params) {
         (filesBySubmission.get(submission!.id)?.length ?? 0) > 0
         || (linksBySubmission.get(submission!.id)?.length ?? 0) > 0
         || [...(answerMap?.values() ?? [])].some((answer) => answer.trim().length > 0)
-        || [...(gradeMap?.values() ?? [])].some((grade) => Boolean(grade.self_grade))
       );
       return {
         student,
@@ -137,7 +136,7 @@ export async function GET(_: Request, { params }: Params) {
               files: filesBySubmission.get(submission.id) ?? [],
               links: linksBySubmission.get(submission.id) ?? [],
               // 질문 순서대로 답을 붙여 보낸다 — 교사 화면에서 질문·답을 짝지어 그리기 위해서다.
-              // 평가요소 질문에는 요소·기준·자기평가·교사 등급을 함께 붙인다.
+              // 평가요소 질문에는 요소·기준·교사 등급을 함께 붙인다.
               answers: questionRows.map((q) => ({
                 questionId: q.id,
                 question: q.question,
@@ -148,7 +147,6 @@ export async function GET(_: Request, { params }: Params) {
                       levelHigh: q.level_high,
                       levelMid: q.level_mid,
                       levelLow: q.level_low,
-                      selfGrade: gradeMap?.get(q.id)?.self_grade ?? null,
                       teacherGrade: gradeMap?.get(q.id)?.teacher_grade ?? null,
                       teacherComment: gradeMap?.get(q.id)?.teacher_comment ?? null,
                     }

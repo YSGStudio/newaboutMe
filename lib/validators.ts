@@ -154,15 +154,7 @@ export const learningAnswerSchema = z.object({
       questionId: z.string().uuid(),
       answer: z.string().max(MAX_ANSWER_LENGTH, `성찰은 ${MAX_ANSWER_LENGTH}자 이내로 써주세요.`)
     }))
-    .max(MAX_QUESTIONS_PER_ACTIVITY),
-  // 평가요소 질문의 자기평가. 교사 등급·코멘트 필드는 받지 않는다(스키마에 없으면 버려진다).
-  selfGrades: z
-    .array(z.object({
-      questionId: z.string().uuid(),
-      grade: z.enum(GRADES).nullable()
-    }))
     .max(MAX_QUESTIONS_PER_ACTIVITY)
-    .optional()
 });
 
 // 교사 요소별 등급·코멘트. grade를 null로 보내면 그 요소의 교사 등급을 지운다.

@@ -1,7 +1,7 @@
 /**
  * GradeParts — 배움성찰 평가요소 등급 조각 모음
  *
- * 교사 평가 화면(LearningDashboard)과 학생 자기평가 화면(LearningContent)이 같이 씁니다.
+ * 교사 평가 화면(LearningDashboard)과 학생 배움성찰 화면(LearningContent)이 같이 씁니다.
  * - GradePicker: 잘함/보통/노력요함 중 하나를 고르는 버튼 줄. 다시 누르면 선택을 풉니다.
  * - GradeChip: 고른 등급을 작은 알약 모양으로 보여줍니다.
  * - CriterionGuide: 요소의 수준별 기준 문장을 세 칸으로 보여줍니다.
@@ -20,7 +20,7 @@ type Levels = { high?: string | null; mid?: string | null; low?: string | null }
 type PickerProps = {
   value: Grade | null;
   onChange: (grade: Grade | null) => void;
-  /** 등급 문구 — 교사는 GRADE_LABEL, 학생은 STUDENT_GRADE_LABEL */
+  /** 등급 문구 — 보통 GRADE_LABEL */
   labels: Record<Grade, string>;
   /** 버튼 안에 기준 문장을 함께 보여줄 때 */
   levels?: Levels;

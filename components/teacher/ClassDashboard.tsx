@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice';
 import RefreshButton from '@/components/ui/RefreshButton';
 import { api } from '@/lib/api-client';
 import usePoll from '@/lib/use-poll';
+import { GRADES, GRADE_COLOR, GRADE_LABEL, type Grade } from '@/lib/learning';
 import {
   WATCH_REASON_META,
   WATCH_RULES,
@@ -53,6 +54,8 @@ export type ClassDashboardData = {
     subject: string;
     submitted: number;
     reviewed: number;
+    /** 요소별 교사 평가 수 — 평가요소가 없는 활동은 모두 0 */
+    grades?: Record<Grade, number>;
     total: number;
     rate: number;
   }>;
@@ -232,7 +235,7 @@ export default function ClassDashboard({
       {data && data.activityProgress.length > 0 && (
         <section className="card class-dashboard-activities">
           <div className="class-dashboard-section-heading">
-            <div><span aria-hidden="true">✦</span><div><h3>최근 배움성찰 참여</h3><p>최근 등록한 활동 5개의 제출률입니다.</p></div></div>
+            <div><span aria-hidden="true">✦</span><div><h3>최근 배움성찰 참여</h3><p>최근 등록한 활동 5개의 제출률과 요소별 평가입니다.</p></div></div>
             <button type="button" className="outline" onClick={() => onNavigate?.('learning')}>배움성찰 열기</button>
           </div>
           <div className="class-dashboard-activity-bars">
@@ -240,6 +243,15 @@ export default function ClassDashboard({
               <div key={activity.id}>
                 <div><span><b>{activity.subject}</b>{activity.title}</span><strong>{activity.submitted}/{activity.total} · {activity.rate}%</strong></div>
                 <div className="progress-track"><div className="progress-fill" style={{ width: `${activity.rate}%` }} /></div>
+                {GRADES.some((g) => (activity.grades?.[g] ?? 0) > 0) && (
+                  <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                    {GRADES.filter((g) => (activity.grades?.[g] ?? 0) > 0).map((g) => (
+                      <span key={g} className="learning-grade-chip" style={{ '--grade-color': GRADE_COLOR[g].text, '--grade-soft': GRADE_COLOR[g].bg } as CSSProperties}>
+                        {GRADE_LABEL[g]} {activity.grades![g]}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -185,13 +185,6 @@ export const GRADE_LABEL: Record<Grade, string> = {
   low: '노력요함',
 };
 
-/** 학생 자기평가 문구 — 해요체 */
-export const STUDENT_GRADE_LABEL: Record<Grade, string> = {
-  high: '잘했어요',
-  mid: '보통이에요',
-  low: '더 노력할래요',
-};
-
 /** 등급 칩 색. 평가피드백(EvalDashboard)에서 쓰던 값을 그대로 옮겼다(design.md 2.4). */
 export const GRADE_COLOR: Record<Grade, { bg: string; text: string }> = {
   high: { bg: '#dcfce7', text: '#16a34a' },

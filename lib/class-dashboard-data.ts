@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate, formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { CATEGORY_VALENCE, WATCH_RULES, WatchReasonCode, Valence } from '@/lib/class-dashboard';
-import { getLearningStatus } from '@/lib/learning';
+import { getLearningStatus, isGrade, type Grade } from '@/lib/learning';
 import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 
 /**
@@ -308,7 +308,29 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
   const pendingReview = studentStatus.filter((row) => row.learningStatus === 'submitted' || row.learningStatus === 'grading').length;
   const safeRate = (value: number, total: number) => total > 0 ? Math.round((value / total) * 100) : 0;
 
-  const activityProgress = learningActivities.slice(0, 5).map((activity) => {
+  // 최근 활동 5개의 요소별 교사 평가 분포 — 성찰 제출률과 함께 보여준다.
+  const recentActivities = learningActivities.slice(0, 5);
+  const recentSubmissionIds = learningSubmissions
+    .filter((s) => recentActivities.some((a) => a.id === s.activity_id) && s.status === 'submitted')
+    .map((s) => s.id);
+  const gradesByActivity = new Map<string, Record<Grade, number>>();
+  if (recentSubmissionIds.length > 0) {
+    const activityOf = new Map(learningSubmissions.map((s) => [s.id, s.activity_id]));
+    const { data: gradeRows } = await supabaseAdmin
+      .from('learning_submission_grades')
+      .select('submission_id,teacher_grade')
+      .in('submission_id', recentSubmissionIds)
+      .not('teacher_grade', 'is', null);
+    (gradeRows ?? []).forEach((row) => {
+      const activityId = activityOf.get(row.submission_id);
+      if (!activityId || !isGrade(row.teacher_grade)) return;
+      const bucket = gradesByActivity.get(activityId) ?? { high: 0, mid: 0, low: 0 };
+      bucket[row.teacher_grade] += 1;
+      gradesByActivity.set(activityId, bucket);
+    });
+  }
+
+  const activityProgress = recentActivities.map((activity) => {
     const rows = learningSubmissions.filter((submission) => submission.activity_id === activity.id && submission.status === 'submitted');
     return {
       id: activity.id,
@@ -316,6 +338,7 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       subject: activity.subject,
       submitted: rows.length,
       reviewed: rows.filter((row) => statusOf(row) === 'reviewed').length,
+      grades: gradesByActivity.get(activity.id) ?? { high: 0, mid: 0, low: 0 },
       total: students.length,
       rate: safeRate(rows.length, students.length),
     };

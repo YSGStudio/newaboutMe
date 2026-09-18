@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate, type Period } from '@/lib/stats';
-import { getLearningStatus, type LearningStatus } from '@/lib/learning';
+import { getLearningStatus, isGrade, type Grade, type LearningStatus } from '@/lib/learning';
 import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 
-// 성장리포트용 — 한 학생의 배움성찰 현황을 활동을 가로질러 모은다 (교사 전용).
+// 성장리포트용 — 한 학생의 배움성찰 현황과 요소별 교사 평가를 활동을 가로질러 모은다 (교사 전용).
 //
 // 기존 조회는 활동 기준(activities/[activityId]/submissions)이거나 학생 본인 기준(my)이라
 // "이 학생이 이번 달에 무엇을 냈는가"를 볼 수 있는 경로가 없었다.
@@ -51,6 +51,7 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({
       range,
       summary: { total: 0, submitted: 0, grading: 0, reviewed: 0, none: 0, rate: 0 },
+      grades: { high: 0, mid: 0, low: 0 },
       activities: [],
     });
   }
@@ -66,7 +67,25 @@ export async function GET(req: Request, { params }: Params) {
 
   const byActivity = new Map((submissions ?? []).map((row) => [row.activity_id, row]));
   // 평가 대기 판정에 필요한 요소 수·등급 수를 한 번에 모은다(학급 PDF가 학생마다 부르므로 N+1 금지).
-  const stats = await loadGradingStats(rows.map((row) => row.id), (submissions ?? []).map((row) => row.id));
+  const submissionIds = (submissions ?? []).map((row) => row.id);
+  const stats = await loadGradingStats(rows.map((row) => row.id), submissionIds);
+
+  // 요소별 교사 등급 — 보고서에서 배움성찰과 평가를 한 블록으로 보여주기 위해 활동마다 등급 수를 센다.
+  // 교사 화면 전용 라우트이므로 평가 대기 중인 등급도 그대로 센다.
+  const gradesBySubmission = new Map<string, Record<Grade, number>>();
+  if (submissionIds.length > 0) {
+    const { data: gradeRows } = await supabaseAdmin
+      .from('learning_submission_grades')
+      .select('submission_id,teacher_grade')
+      .in('submission_id', submissionIds)
+      .not('teacher_grade', 'is', null);
+    (gradeRows ?? []).forEach((row) => {
+      if (!isGrade(row.teacher_grade)) return;
+      const bucket = gradesBySubmission.get(row.submission_id) ?? { high: 0, mid: 0, low: 0 };
+      bucket[row.teacher_grade] += 1;
+      gradesBySubmission.set(row.submission_id, bucket);
+    });
+  }
 
   const items = rows.map((activity) => {
     const submission = byActivity.get(activity.id) ?? null;
@@ -80,6 +99,7 @@ export async function GET(req: Request, { params }: Params) {
       // 미제출이면 낸 적이 없으므로 날짜도 없다.
       submittedAt: status === 'none' ? null : submission?.submitted_at ?? null,
       status,
+      grades: (submission && gradesBySubmission.get(submission.id)) ?? { high: 0, mid: 0, low: 0 },
     };
   });
 
@@ -99,6 +119,10 @@ export async function GET(req: Request, { params }: Params) {
       // 제출률 — 평가 대기·피드백까지 받은 것도 낸 것이다.
       rate: safeRate(submitted + grading + reviewed, items.length),
     },
+    grades: items.reduce(
+      (sum, item) => ({ high: sum.high + item.grades.high, mid: sum.mid + item.grades.mid, low: sum.low + item.grades.low }),
+      { high: 0, mid: 0, low: 0 },
+    ),
     activities: items,
   });
 }

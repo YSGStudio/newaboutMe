@@ -13,7 +13,7 @@ import Notice from '@/components/ui/Notice';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { EMOTION_META, EmotionType } from '@/types/domain';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
-import { STATUS_COLOR, TEACHER_STATUS_LABEL, type LearningStatus } from '@/lib/learning';
+import { GRADES, GRADE_COLOR as LEARNING_GRADE_COLOR, GRADE_LABEL as LEARNING_GRADE_LABEL, STATUS_COLOR, TEACHER_STATUS_LABEL, type Grade, type LearningStatus } from '@/lib/learning';
 import { api, apiPost } from '@/lib/api-client';
 
 type StudentItem = {
@@ -90,8 +90,15 @@ type LearningReport = {
     createdAt: string;
     submittedAt: string | null;
     status: LearningStatus;
+    /** 요소별 교사 등급 수 — 평가요소가 없는 활동은 모두 0 */
+    grades?: Record<Grade, number>;
   }[];
+  /** 기간 안 요소별 교사 등급 합계 */
+  grades?: Record<Grade, number>;
 };
+
+/** 배움성찰 요소별 평가 칩에 쓸 등급 목록 — 수가 0인 등급은 뺀다. */
+const presentGrades = (grades?: Record<Grade, number>) => GRADES.filter((g) => (grades?.[g] ?? 0) > 0);
 
 const EMPTY_LEARNING_SUMMARY: LearningReport['summary'] = { total: 0, submitted: 0, grading: 0, reviewed: 0, none: 0, rate: 0 };
 
@@ -277,6 +284,11 @@ const buildStudentHtmlBlock = (
       <span style="font-size:11px;color:#94a3b8">활동 ${learningSummary.total}개 중 ${learningSubmittedCount(learningSummary)}개 제출</span>
     </div>`;
 
+  // 요소별 교사 평가 합계 — 배움성찰 활동 안의 평가요소 등급을 모은다.
+  const learningGradeHtml = presentGrades(learning?.grades).length === 0 ? '' : `
+    <p style="margin:8px 0 4px;font-size:12px;font-weight:700;color:#9a3412">요소별 평가</p>
+    <div style="display:flex;gap:6px;margin:0 0 8px">${presentGrades(learning?.grades).map((g) => `<span style="flex:1;text-align:center;font-size:12px;font-weight:800;padding:6px 0;border-radius:8px;background:${LEARNING_GRADE_COLOR[g].bg};color:${LEARNING_GRADE_COLOR[g].text}">${LEARNING_GRADE_LABEL[g]} ${learning!.grades![g]}</span>`).join('')}</div>`;
+
   const learningListHtml = (learning?.activities ?? []).map((item) => {
     const accent = SUBJECT_COLOR[item.subject] ?? DEFAULT_SUBJECT_COLOR;
     const statusColor = STATUS_COLOR[item.status];
@@ -287,6 +299,7 @@ const buildStudentHtmlBlock = (
         <span style="font-size:11px;font-weight:700;color:${accent};background:${accent}1a;border-radius:5px;padding:2px 6px;flex-shrink:0">${escapeHtml(item.subject)}</span>
         <span style="font-size:13px;color:#1e293b;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.title)}</span>
         <span style="font-size:11px;color:#94a3b8;flex-shrink:0">${escapeHtml(item.unit)}</span>
+        <span style="display:flex;gap:4px;flex-shrink:0">${presentGrades(item.grades).map((g) => `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${LEARNING_GRADE_COLOR[g].bg};color:${LEARNING_GRADE_COLOR[g].text}">${LEARNING_GRADE_LABEL[g]} ${item.grades![g]}</span>`).join('')}</span>
         <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${statusColor.bg};color:${statusColor.text};flex-shrink:0">${TEACHER_STATUS_LABEL[item.status]}</span>
         <span style="font-size:12px;color:#94a3b8;flex-shrink:0">${dateLabel}</span>
       </div>`;
@@ -294,7 +307,7 @@ const buildStudentHtmlBlock = (
 
   const learningInnerHtml = learningSummary.total === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">이 기간에 열린 배움성찰 활동이 없어요.</p>'
-    : `${learningRateHtml}<div style="display:flex;gap:6px;margin:8px 0 6px">${learningChipsHtml}</div>${learningListHtml}`;
+    : `${learningRateHtml}<div style="display:flex;gap:6px;margin:8px 0 6px">${learningChipsHtml}</div>${learningGradeHtml}${learningListHtml}`;
 
   const summaryTile = (icon: string, value: string, label: string, accent: string) => `
     <div style="flex:1;background:${accent}0d;border:1px solid ${accent}26;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px">
@@ -531,7 +544,8 @@ const AI_SUGGESTION_ACCENT = '#0284c7';
 
 /**
  * LearningSection — 성장리포트의 "배움성찰 현황" 블록
- * 기간 안에 열린 활동 대비 제출률과, 활동별 상태(미제출·제출 완료·피드백 완료)를 보여줍니다.
+ * 기간 안에 열린 활동 대비 제출률, 활동별 상태, 그리고 활동 안의 요소별 교사 평가(잘함·보통·노력요함)를 보여줍니다.
+ * 배움성찰의 성찰과 요소별 평가는 한 활동에 함께 있으므로 한 블록에서 같이 보여줍니다.
  * 상태 판정과 색·문구는 lib/learning.ts를 그대로 쓰므로 교사 카드·학생 책배지와 어긋나지 않습니다.
  */
 function LearningSection({ report }: { report: LearningReport | null }) {
@@ -580,6 +594,18 @@ function LearningSection({ report }: { report: LearningReport | null }) {
               </span>
             ))}
           </div>
+          {presentGrades(report?.grades).length > 0 && (
+            <>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#9a3412' }}>요소별 평가</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                {presentGrades(report?.grades).map((g) => (
+                  <span key={g} style={{ flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 800, padding: '6px 0', borderRadius: 8, background: LEARNING_GRADE_COLOR[g].bg, color: LEARNING_GRADE_COLOR[g].text }}>
+                    {LEARNING_GRADE_LABEL[g]} {report!.grades![g]}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ display: 'grid', gap: 6, maxHeight: 360, overflowY: 'auto', paddingRight: 2 }}>
             {activities.map((item) => {
               const accent = SUBJECT_COLOR[item.subject] ?? DEFAULT_SUBJECT_COLOR;
@@ -591,6 +617,11 @@ function LearningSection({ report }: { report: LearningReport | null }) {
                   <span style={{ fontSize: 11, fontWeight: 700, color: accent, background: `${accent}1a`, borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>{item.subject}</span>
                   <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                   <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.unit}</span>
+                  {presentGrades(item.grades).map((g) => (
+                    <span key={g} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: LEARNING_GRADE_COLOR[g].bg, color: LEARNING_GRADE_COLOR[g].text, flexShrink: 0 }}>
+                      {LEARNING_GRADE_LABEL[g]} {item.grades![g]}
+                    </span>
+                  ))}
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: statusColor.bg, color: statusColor.text, flexShrink: 0 }}>
                     {TEACHER_STATUS_LABEL[item.status]}
                   </span>

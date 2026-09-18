@@ -15,8 +15,8 @@ import {
 //
 // 두 갈래로 나눠 돌려준다.
 //   · ai    : AI에 보낼 교사 판단만(요소 이름·교사 등급·그 등급의 기준 문장·요소 코멘트·서술 피드백)
-//   · view  : 교사 화면에 보여줄 전체 기록(학생 답변·자기평가 포함)
-// 프롬프트 빌더는 ai 쪽만 받는다. 학생 답변·자기평가·이름은 AI로 가지 않는다.
+//   · view  : 교사 화면에 보여줄 전체 기록(학생 답변 포함)
+// 프롬프트 빌더는 ai 쪽만 받는다. 학생 답변·이름은 AI로 가지 않는다.
 //
 // 기간을 거르지 않는다 — 이 기능 전에 쌓인 배움성찰 기록(서술 피드백)도 함께 쓴다.
 // 과거 평가피드백(eval_reports)은 쓰지 않는다.
@@ -48,7 +48,6 @@ export type ViewQuestion = {
     levelHigh: string | null;
     levelMid: string | null;
     levelLow: string | null;
-    selfGrade: Grade | null;
     teacherGrade: Grade | null;
     teacherComment: string | null;
   } | null;
@@ -71,7 +70,6 @@ export type ViewSubject = { subject: string; activities: ViewActivity[]; sendabl
 type GradeRow = {
   submission_id: string;
   question_id: string;
-  self_grade: string | null;
   teacher_grade: string | null;
   teacher_comment: string | null;
 };
@@ -106,7 +104,7 @@ export async function gatherLearningSubjectRecords(studentId: string, classId: s
       supabaseAdmin.from('learning_submission_answers').select('submission_id,question_id,answer').in('submission_id', submissionIds),
       supabaseAdmin
         .from('learning_submission_grades')
-        .select('submission_id,question_id,self_grade,teacher_grade,teacher_comment')
+        .select('submission_id,question_id,teacher_grade,teacher_comment')
         .in('submission_id', submissionIds),
     ]);
     (answersRes.data ?? []).forEach((a) => answerMap.set(`${a.submission_id}|${a.question_id}`, a.answer));
@@ -165,7 +163,6 @@ export async function gatherLearningSubjectRecords(studentId: string, classId: s
                 levelHigh: q.level_high,
                 levelMid: q.level_mid,
                 levelLow: q.level_low,
-                selfGrade: asGrade(grade?.self_grade),
                 teacherGrade: asGrade(grade?.teacher_grade),
                 teacherComment: grade?.teacher_comment ?? null,
               }
