@@ -17,14 +17,14 @@
 import { useEffect, useRef } from 'react';
 
 /** 기본 갱신 주기. */
-const DEFAULT_POLL_INTERVAL_MS = 30_000;
+const DEFAULT_POLL_INTERVAL_MS = 15_000;
 
 type Options = {
   /** 이 조건이 참일 때만 폴링한다(예: 해당 탭이 열려 있고 학급이 선택됨). */
   enabled: boolean;
   /** 참이면 이번 주기를 건너뛴다(모달을 보는 중, 저장·업로드 중, 수동 새로고침 중). */
   busy?: boolean;
-  /** 주기(ms). 기본 30초. */
+  /** 주기(ms). 기본 15초 — 교사 화면 폴링은 모두 이 간격으로 맞춘다. */
   intervalMs?: number;
 };
 

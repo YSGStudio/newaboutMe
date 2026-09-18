@@ -293,9 +293,10 @@ export default function TeacherPage() {
     setStudents(data.students);
   }, []);
 
-  const loadClassLetters = useCallback(async (classId: string) => {
+  /** silent=true는 15초 폴링용 — "불러오는 중"으로 목록을 비우지 않고 그 자리에서 값만 바꾼다. */
+  const loadClassLetters = useCallback(async (classId: string, silent = false) => {
     if (!classId) return;
-    setLettersLoading(true);
+    if (!silent) setLettersLoading(true);
     try {
       // 읽음처리한 편지까지 함께 불러온다 — 목록에는 새 편지만 보여주되, 검색은 지난 편지까지 훑기 위함
       const data = await api<{ letters: LetterRow[] }>(
@@ -304,7 +305,7 @@ export default function TeacherPage() {
       setClassLetters(data.letters);
       setLettersLoaded(true);
     } finally {
-      setLettersLoading(false);
+      if (!silent) setLettersLoading(false);
     }
   }, []);
 
@@ -418,7 +419,7 @@ export default function TeacherPage() {
     }
   };
 
-  /** silent=true는 30초 폴링용 — "불러오는 중"으로 화면을 비우지 않고 그 자리에서 값만 바꾼다. */
+  /** silent=true는 15초 폴링용 — "불러오는 중"으로 화면을 비우지 않고 그 자리에서 값만 바꾼다. */
   const loadFeeds = useCallback(
     async (classId: string, date: string, silent = false) => {
       if (!classId) return;
@@ -526,7 +527,7 @@ export default function TeacherPage() {
   }, [activeTab, selectedClassId, feedDate, loadFeeds]);
 
   // 일일계획·마음피드는 학생이 지금 쓰고 있는 화면을 옆에서 보는 성격이라,
-  // 열려 있는 동안 30초마다 조용히 다시 읽는다(usePoll이 탭이 뒤에 있으면 건너뛴다).
+  // 열려 있는 동안 15초마다 조용히 다시 읽는다(usePoll이 탭이 뒤에 있으면 건너뛴다).
   usePoll(() => loadStudents(selectedClassId), {
     enabled: activeTab === "student" && Boolean(selectedClassId),
     busy: studentListLoading,
@@ -536,6 +537,18 @@ export default function TeacherPage() {
   usePoll(() => loadFeeds(selectedClassId, feedDate, true), {
     enabled: activeTab === "feed" && Boolean(selectedClassId),
     busy: feedLoading,
+  });
+
+  // 별빛메일도 학생들이 수업 중에 주고받는 것이라 열려 있는 동안 15초마다 새 편지를 반영한다.
+  // 편지를 고치거나 지우거나 모두 읽음 처리하는 중에는 건너뛴다 — 방금 바꾼 목록을 되돌리지 않도록.
+  usePoll(() => loadClassLetters(selectedClassId, true), {
+    enabled: activeTab === "letters" && Boolean(selectedClassId),
+    busy:
+      lettersLoading ||
+      letterSaving ||
+      isEditingLetter ||
+      archivingAll ||
+      Boolean(deletingLetterId),
   });
 
   const onTeacherAuth = async (event: FormEvent<HTMLFormElement>) => {

@@ -74,7 +74,7 @@ export default function ClassDashboard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  /** silent=true는 30초 폴링용 — 새로고침 아이콘을 돌리지 않고 실패해도 조용히 넘어간다. */
+  /** silent=true는 15초 폴링용 — 새로고침 아이콘을 돌리지 않고 실패해도 조용히 넘어간다. */
   const load = async (silent = false) => {
     if (!classId) return;
     if (!silent) {
@@ -94,18 +94,27 @@ export default function ClassDashboard({
     }
   };
 
-  // 부트스트랩이 이 학급 데이터를 이미 줬으면 다시 부르지 않는다.
-  // 학급을 바꿨을 때만 새로 불러온다.
   const [loadedClassId, setLoadedClassId] = useState(initialData ? classId : '');
 
+  // 이 컴포넌트는 대시보드 탭에서만 렌더되므로 탭을 옮겼다 돌아올 때마다 다시 마운트되고,
+  // 그때 state가 initialData(= 로그인 시점 부트스트랩 스냅샷)로 되돌아간다.
+  // 예전에는 여기서 "부트스트랩이 줬으니 부르지 않는다"며 요청을 건너뛰어,
+  // 탭을 오갈 때마다 로그인 시점의 숫자가 다시 올라왔다.
+  //
+  //   같은 학급으로 다시 들어온 것 → 보던 숫자를 그대로 두고 조용히 최신값으로 맞춘다
+  //   학급을 바꾼 것             → 로딩 표시를 켜고 새로 그린다
+  //
+  // 첫 마운트에서도 배경 요청이 한 번 나가지만, 화면은 스냅샷으로 이미 채워져 있으므로
+  // 부트스트랩이 없애려던 "첫 화면 왕복 대기"는 그대로 없는 상태다.
   useEffect(() => {
-    if (!classId || classId === loadedClassId) return;
+    if (!classId) return;
+    const sameClass = classId === loadedClassId;
     setLoadedClassId(classId);
-    load();
+    load(sameClass);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
-  // 학급 현황은 학생들이 지금 쓰는 값이라 30초마다 조용히 다시 읽는다.
+  // 학급 현황은 학생들이 지금 쓰는 값이라 15초마다 조용히 다시 읽는다.
   usePoll(() => load(true), { enabled: Boolean(classId), busy: loading });
 
   if (!classId) {
