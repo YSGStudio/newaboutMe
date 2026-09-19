@@ -40,7 +40,7 @@ export async function PATCH(req: Request, { params }: Params) {
       title: parsed.data.title,
     })
     .eq('id', params.activityId)
-    .select('id,class_id,subject,unit,title,created_at')
+    .select('id,class_id,subject,unit,title,created_at,archived_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

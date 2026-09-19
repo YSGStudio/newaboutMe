@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   const { data: activities, error } = await supabaseAdmin
     .from('learning_activities')
-    .select(`id,class_id,subject,unit,title,created_at,learning_activity_questions(${QUESTION_COLUMNS})`)
+    .select(`id,class_id,subject,unit,title,created_at,archived_at,learning_activity_questions(${QUESTION_COLUMNS})`)
     .eq('class_id', classId)
     .order('created_at', { ascending: false });
 
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       unit: parsed.data.unit,
       title: parsed.data.title,
     })
-    .select('id,class_id,subject,unit,title,created_at')
+    .select('id,class_id,subject,unit,title,created_at,archived_at')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

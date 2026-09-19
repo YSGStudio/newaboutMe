@@ -11,6 +11,7 @@
  * 학생 화면에서는 그대로 성찰 질문이 됩니다. 제출물마다 요소별 등급을 매기고, 모두 매기면 피드백 완료가 됩니다.
  * 이 방식 전에 만든 활동의 일반 성찰 질문은 수정할 때 "기존 성찰 질문"으로 그대로 남습니다.
  * 서술 피드백은 선택 사항입니다. 쓰지 않은 학생에게 미완료 경고를 표시하지 않습니다.
+ * 평가를 마친 활동은 "완료"를 눌러 보관함으로 옮기고, 보관함에서 "되돌리기"로 다시 꺼낼 수 있습니다.
  * 상태 판정과 파일 규칙은 lib/learning.ts 한 곳에서 가져옵니다.
  */
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
@@ -68,6 +69,8 @@ type Activity = {
   reviewedCount: number;
   /** 교사 등급이 생겨 평가요소를 바꿀 수 없는 활동 */
   gradingStarted: boolean;
+  /** 완료해서 보관함으로 옮긴 시각. null이면 진행 중 */
+  archived_at: string | null;
 };
 
 type SubmissionFile = { id: string; file_name: string; mime_type: string; sort_order: number; url: string | null };
@@ -175,6 +178,9 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const [error, setError] = useState('');
 
   const [subjectFilter, setSubjectFilter] = useState('all');
+  /** 진행 중 목록과 보관함(완료한 활동) 중 무엇을 보는지 */
+  const [view, setView] = useState<'active' | 'archive'>('active');
+  const [archivingId, setArchivingId] = useState('');
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [formOpen, setFormOpen] = useState(false);
@@ -389,6 +395,35 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     setForm((f) => ({ ...f, items: toFormItems(source.learning_activity_questions) }));
   };
 
+  /** 완료 → 보관함으로 옮기거나, 보관함에서 진행 중으로 되돌린다. */
+  const toggleArchive = async (activity: Activity) => {
+    const archiving = !activity.archived_at;
+    setArchivingId(activity.id);
+    try {
+      await api(`/api/learning/activities/${activity.id}/archive`, { method: archiving ? 'POST' : 'DELETE' });
+      if (selectedId === activity.id) {
+        setSelectedId('');
+        setCells([]);
+      }
+      await loadActivities();
+      setMessage(archiving ? `"${activity.title}" 활동을 보관함으로 옮겼습니다.` : `"${activity.title}" 활동을 진행 중 목록으로 되돌렸습니다.`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setArchivingId('');
+      notifyLater();
+    }
+  };
+
+  /** 진행 중 ↔ 보관함 전환. 펼친 활동과 과목 필터는 새 목록에 맞게 비운다. */
+  const switchView = (next: 'active' | 'archive') => {
+    setView(next);
+    setSubjectFilter('all');
+    setSelectedId('');
+    setCells([]);
+    if (next === 'archive') setFormOpen(false);
+  };
+
   const removeActivity = async (activity: Activity) => {
     const ok = await confirm({
       title: '활동을 삭제할까요?',
@@ -570,11 +605,14 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
   // ── 렌더 ────────────────────────────────────────────────────────
 
+  const activeActivities = activities.filter((a) => !a.archived_at);
+  const archivedActivities = activities.filter((a) => a.archived_at);
+  const listActivities = view === 'archive' ? archivedActivities : activeActivities;
   const visibleActivities = subjectFilter === 'all'
-    ? activities
-    : activities.filter((a) => a.subject === subjectFilter);
+    ? listActivities
+    : listActivities.filter((a) => a.subject === subjectFilter);
 
-  const subjectsInUse = [...new Set(activities.map((a) => a.subject))];
+  const subjectsInUse = [...new Set(listActivities.map((a) => a.subject))];
   const selected = activities.find((a) => a.id === selectedId) ?? null;
   const activityQuestions = [...(selected?.learning_activity_questions ?? [])].sort((a, b) => a.sort_order - b.sort_order);
   const editingActivity = activities.find((a) => a.id === editingId) ?? null;
@@ -600,19 +638,30 @@ export default function LearningDashboard({ classId }: { classId: string }) {
           <h2>배움성찰</h2>
           <p>학생의 결과물과 생각을 모아 배움의 과정을 살펴봅니다.</p>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <RefreshButton onClick={refreshNow} />
           <button
             type="button"
             className="ghost"
             style={{ width: 'auto' }}
             onClick={() => {
+              switchView('active');
               setEditingId('');
               setForm(EMPTY_FORM);
               setFormOpen((open) => !open);
             }}
           >
             {formOpen ? '닫기' : '새 활동 만들기'}
+          </button>
+          {/* 보관함 — 완료한 활동만 모아 본다. 다시 누르면 진행 중 목록으로 돌아간다. */}
+          <button
+            type="button"
+            className={view === 'archive' ? 'ghost' : 'outline'}
+            style={{ width: 'auto' }}
+            aria-pressed={view === 'archive'}
+            onClick={() => switchView(view === 'archive' ? 'active' : 'archive')}
+          >
+            <span aria-hidden="true">🗄️</span> 보관함 {archivedActivities.length}
           </button>
         </div>
       </div>
@@ -621,7 +670,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       {error && <Notice type="error" message={error} />}
 
       <div className="learning-summary" aria-label="배움성찰 현황">
-        <div><span aria-hidden="true">📚</span><small>전체 활동</small><strong>{activities.length}</strong></div>
+        <div><span aria-hidden="true">📚</span><small>{view === 'archive' ? '보관한 활동' : '진행 중 활동'}</small><strong>{listActivities.length}</strong></div>
         <div><span aria-hidden="true">✍️</span><small>선택 활동 제출</small><strong>{selected ? `${selected.submittedCount}/${totalStudents}` : '—'}</strong></div>
         <div><span aria-hidden="true">💬</span><small>선택 활동 평가 대기·완료</small><strong>{selected ? `${selected.gradingCount} · ${selected.reviewedCount}` : '—'}</strong></div>
       </div>
@@ -819,10 +868,17 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
       {!loaded ? (
         <p className="hint">불러오는 중...</p>
-      ) : activities.length === 0 ? (
+      ) : view === 'archive' && listActivities.length === 0 ? (
         <EmptyState
-          title="아직 활동이 없습니다"
-          description="새 활동 만들기를 눌러 과목·단원·활동명·평가요소를 등록하세요."
+          title="보관한 활동이 없습니다"
+          description="평가를 마친 활동에서 완료를 누르면 이곳으로 옮겨집니다."
+        />
+      ) : listActivities.length === 0 ? (
+        <EmptyState
+          title={activities.length === 0 ? '아직 활동이 없습니다' : '진행 중인 활동이 없습니다'}
+          description={activities.length === 0
+            ? '새 활동 만들기를 눌러 과목·단원·활동명·평가요소를 등록하세요.'
+            : '완료한 활동은 보관함에서 볼 수 있습니다.'}
         />
       ) : (
         <div className="learning-activity-list">
@@ -848,7 +904,10 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     <span className="learning-activity-subject">{activity.subject}</span>
                     <span className="learning-activity-copy">
                       <strong>{activity.title}</strong>
-                      <span>{activity.unit || '단원 정보 없음'} · {formatShort(activity.created_at)} 등록</span>
+                      <span>
+                        {activity.unit || '단원 정보 없음'} · {formatShort(activity.created_at)} 등록
+                        {activity.archived_at && ` · ${formatShort(activity.archived_at)} 완료`}
+                      </span>
                     </span>
                     <span className="learning-activity-metrics">
                       <span><small>제출</small><strong>{activity.submittedCount}/{totalStudents}</strong></span>
@@ -860,7 +919,18 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     <span className={`learning-activity-chevron${isSelected ? ' is-open' : ''}`} aria-hidden="true">⌄</span>
                   </button>
                   <div className="learning-activity-actions">
-                    <button type="button" className="outline" style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }} onClick={() => startEdit(activity)}>수정</button>
+                    {!activity.archived_at && (
+                      <button type="button" className="outline" style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }} onClick={() => startEdit(activity)}>수정</button>
+                    )}
+                    <button
+                      type="button"
+                      className="ghost"
+                      style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }}
+                      onClick={() => toggleArchive(activity)}
+                      disabled={archivingId === activity.id}
+                    >
+                      {activity.archived_at ? '되돌리기' : '완료'}
+                    </button>
                     <button type="button" className="outline" style={{ width: 'auto', fontSize: 12, padding: '4px 10px' }} onClick={() => removeActivity(activity)}>삭제</button>
                   </div>
                 </div>
