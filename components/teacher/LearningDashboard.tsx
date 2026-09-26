@@ -5,7 +5,8 @@
  *
  * 왼쪽에서 활동을 만들고 고르면, 오른쪽에 학급 전체 학생이 카드로 깔립니다.
  * 카드 색이 상태(미제출·제출 완료·평가 대기·피드백 완료)를 나타내되, 색만으로 구분하지 않도록
- * 카드마다 상태 라벨을 함께 씁니다.
+ * 카드마다 상태 라벨을 함께 씁니다. 등급을 매긴 학생은 카드에 요소별 등급 칩(평가요소 순서 번호 + 등급)이
+ * 함께 나와, 카드를 열지 않고도 목록에서 평가 결과를 훑을 수 있습니다.
  *
  * 교사는 활동마다 평가요소(문장 + 잘함/보통/노력요함 기준)를 적습니다. 교사가 적은 평가요소 문장이
  * 학생 화면에서는 그대로 성찰 질문이 됩니다. 제출물마다 요소별 등급을 매기고, 모두 매기면 피드백 완료가 됩니다.
@@ -940,7 +941,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                   <div className="learning-student-panel" id={`learning-students-${activity.id}`}>
                     <div className="learning-student-panel-heading">
                       <div><span aria-hidden="true">✦</span><strong>학생 배움 기록</strong></div>
-                      <small>학생 카드를 눌러 결과물과 성찰을 확인하세요.</small>
+                      <small>카드에 요소별 등급이 순서대로 표시됩니다. 카드를 눌러 결과물과 성찰을 확인하세요.</small>
                     </div>
                     {cellsLoading ? (
                       <p className="hint" style={{ margin: 0 }}>불러오는 중...</p>
@@ -950,6 +951,10 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                       <div className="learning-student-grid">
                         {cells.map((cell) => {
                           const tone = cell.inProgress ? IN_PROGRESS_COLOR : STATUS_COLOR[cell.status];
+                          // 교사가 매긴 요소별 등급 — 카드를 열지 않고도 목록에서 바로 보이게 한다.
+                          // 하나라도 매겼을 때만 줄을 그리고, 아직 안 매긴 요소는 자리를 지켜 '—'로 둔다.
+                          const criterionRows = cell.submission?.answers.filter((row) => row.criterion) ?? [];
+                          const showGrades = criterionRows.some((row) => row.criterion?.teacherGrade);
                           return (
                             <button
                               key={cell.student.id}
@@ -973,6 +978,32 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                               <span style={{ fontSize: 11, fontWeight: 700, color: tone.text }}>
                                 {cell.inProgress ? TEACHER_IN_PROGRESS_LABEL : TEACHER_STATUS_LABEL[cell.status]}
                               </span>
+                              {showGrades && (
+                                <span className="learning-student-cell-grades">
+                                  {criterionRows.map((row, index) => {
+                                    const grade = row.criterion!.teacherGrade;
+                                    return (
+                                      <span
+                                        key={row.questionId}
+                                        className={`learning-grade-chip is-compact${grade ? '' : ' is-empty'}`}
+                                        style={grade ? {
+                                          '--grade-color': GRADE_COLOR[grade].text,
+                                          '--grade-soft': GRADE_COLOR[grade].bg,
+                                        } as CSSProperties : undefined}
+                                      >
+                                        <small aria-hidden="true">{index + 1}</small>
+                                        <span className="sr-only">{row.criterion!.title ?? row.question} </span>
+                                        {grade ? GRADE_LABEL[grade] : (
+                                          <>
+                                            <span aria-hidden="true">—</span>
+                                            <span className="sr-only">미입력</span>
+                                          </>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              )}
                               {cell.submission?.submitted_by === 'teacher' && (
                                 <span style={{ fontSize: 10, color: '#78350f' }}>교사 대리 업로드</span>
                               )}

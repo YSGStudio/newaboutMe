@@ -4210,6 +4210,8 @@ button.learning-activity-toggle:hover:not(:disabled) { opacity: 1; transform: no
 .learning-student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
 button.learning-student-cell { min-height: 66px; box-shadow: none; transition: transform .16s ease, box-shadow .16s ease; }
 button.learning-student-cell:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-sm); opacity: 1; }
+/* 학생 카드에 함께 놓는 요소별 등급 줄 — 번호 + 등급 문구를 같이 써서 색만으로 구분하지 않는다. */
+.learning-student-cell-grades { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
 
 .learning-detail-modal {
   width: min(620px, 96vw);
@@ -4366,6 +4368,9 @@ button.learning-grade-option small {
   font-weight: 700;
 }
 .learning-grade-chip.is-empty { background: #f1f5f9; color: #64748b; }
+/* 학생 카드 안에 여러 개가 들어가는 작은 변형 — 앞의 작은 숫자가 평가요소 순서다. */
+.learning-grade-chip.is-compact { gap: 3px; padding: 1px 6px; font-size: 10px; }
+.learning-grade-chip.is-compact small { font-size: 9px; font-weight: 700; opacity: .65; }
 .learning-teacher-review-section { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9ff; box-shadow: var(--shadow-sm); }
 .learning-teacher-review-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .learning-teacher-review-heading > span { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 999px; background: var(--primary-soft); color: var(--primary); }
