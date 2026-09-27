@@ -63,6 +63,12 @@ export const feedCreateSchema = z.object({
   imageUrl: z.string().url().optional()
 });
 
+/** 오늘 쓴 기록의 감정과 적은 글을 고칠 때 씁니다. 규칙은 새로 쓸 때와 같습니다. */
+export const feedUpdateSchema = z.object({
+  emotionType: z.enum(EMOTION_TYPES),
+  content: z.string().min(1).max(100)
+});
+
 export const reactionSchema = z.object({
   reactionType: z.enum(['heart', 'hug', 'fighting'])
 });

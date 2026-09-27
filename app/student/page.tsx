@@ -317,6 +317,7 @@ export default function StudentPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [isEditingEmotion, setIsEditingEmotion] = useState(false);
   const [myFeedLoading, setMyFeedLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -377,6 +378,11 @@ export default function StudentPage() {
       setEmotionType(emotionOptions[0] ?? EMOTION_CATEGORIES[0].emotions[0]);
     }
   }, [emotionOptions, emotionType]);
+
+  // 날짜를 옮기거나 다른 기록을 불러오면 감정 바꾸기를 닫는다.
+  useEffect(() => {
+    setIsEditingEmotion(false);
+  }, [emotionDate, myFeed?.id]);
 
   useEffect(() => {
     if (!studentName) return;
@@ -644,8 +650,39 @@ export default function StudentPage() {
     }
   };
 
+  /** 오늘 기록 고치기를 열고, 지금 저장된 감정과 글을 미리 채워 둔다. */
+  const onStartEditEmotion = () => {
+    if (!myFeed) return;
+    setEmotionCategory(EMOTION_META[myFeed.emotion_type].category);
+    setEmotionType(myFeed.emotion_type);
+    setIsEditingEmotion(true);
+  };
+
+  const onUpdateFeedEmotion = async (content: string) => {
+    setFeedLoading(true);
+    try {
+      const data = await api<{ feed: NonNullable<MyFeedRow> }>('/api/feeds', {
+        method: 'PATCH',
+        body: JSON.stringify({ emotionType, content })
+      });
+      setMyFeed(data.feed);
+      setIsEditingEmotion(false);
+      setMessage('오늘의 기록을 고쳤어요.');
+      clearNoticeLater();
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
   const onCreateFeed = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isEditingEmotion) {
+      await onUpdateFeedEmotion(String(new FormData(event.currentTarget).get('content')));
+      return;
+    }
     setFeedLoading(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
@@ -1437,6 +1474,13 @@ export default function StudentPage() {
                       <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
                     </div>
                     <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
+                    {isEmotionEditable && !isEditingEmotion && (
+                      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
+                        <button type="button" className="ghost" style={{ width: 'auto' }} onClick={onStartEditEmotion}>
+                          기록 고치기
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : isEmotionEditable ? null : (
                   <EmptyState
@@ -1446,13 +1490,13 @@ export default function StudentPage() {
                 )
               )}
 
-              {isEmotionEditable && !myFeed && !monthlyViewMonth && (
+              {isEmotionEditable && (!myFeed || isEditingEmotion) && !monthlyViewMonth && (
                 <form className="emotion-picker" onSubmit={onCreateFeed}>
                   <div className="emotion-picker-heading">
                     <span aria-hidden="true">✦</span>
                     <div>
-                      <h3>오늘 내 마음은 어떤가요?</h3>
-                      <p>먼저 지금 마음과 가장 가까운 표정을 골라보세요.</p>
+                      <h3>{isEditingEmotion ? '오늘 기록을 고쳐볼까요?' : '오늘 내 마음은 어떤가요?'}</h3>
+                      <p>{isEditingEmotion ? '마음과 적은 글을 오늘 안에 고칠 수 있어요.' : '먼저 지금 마음과 가장 가까운 표정을 골라보세요.'}</p>
                     </div>
                   </div>
 
@@ -1515,17 +1559,26 @@ export default function StudentPage() {
                   <div className="emotion-note-field">
                     <label htmlFor="emotion-content">무슨 일이 있었나요?</label>
                     <textarea
+                      key={isEditingEmotion ? `edit-${myFeed?.id}` : 'new'}
                       id="emotion-content"
                       name="content"
                       maxLength={100}
                       required
+                      defaultValue={isEditingEmotion ? myFeed?.content ?? '' : undefined}
                       placeholder="오늘 있었던 일을 한 줄로 적어보세요."
                     />
                     <small>100자까지 쓸 수 있어요.</small>
                   </div>
                   <div className="emotion-submit">
-                    <SubmitButton loading={feedLoading} idleText="이 마음으로 기록하기 ✦" />
+                    <SubmitButton loading={feedLoading} idleText={isEditingEmotion ? '이렇게 고치기 ✦' : '이 마음으로 기록하기 ✦'} />
                   </div>
+                  {isEditingEmotion && (
+                    <div style={{ width: 'min(410px, 100%)', margin: '0 auto' }}>
+                      <button type="button" className="ghost" disabled={feedLoading} onClick={() => setIsEditingEmotion(false)}>
+                        그만두기
+                      </button>
+                    </div>
+                  )}
                 </form>
               )}
             </section>
