@@ -79,6 +79,8 @@
 | 배움성찰 "작성 중" 카드 (`IN_PROGRESS_COLOR`, 미제출이지만 쓰기 시작함) | 배경 `#f5f3ff` / 테두리 `#c4b5fd` / 텍스트 `#6d28d9` |
 | 마음일기 저장된 기록 카드 (`.emotion-record-card`) | 배경 `#fbfdff → #f8f5ff` (145deg) / 테두리 `#e6e1f7` / 본문 `#332d4f` |
 | 마음일기 "기록 고치기" 버튼 (`button.emotion-record-edit`) | 흰 배경 / 테두리 `#c4b5fd`(hover `#a78bfa`) / 텍스트 `#6039d7` / hover 배경 `#f3efff` |
+| 월별 감정 일기장 제목 (`.emotion-journal-title`) | 배경 `#2e1d75 → #5b38ba → #7353cc` (120deg) / 테두리 `#d9d0fb` / 보조 글자 `#dcd4ff` / 강조 금색 `#ffe681` |
+| 월별 감정 일기장 카드 (`.emotion-journal-entry`) | 종이 `#fffdf6` / 테두리 `#e7ddc1`(accent 24% 섞음) / 줄노트 선 `#dbeafe` / 여백선 `rgba(244,114,182,.18)` / 본문 `#46405d` / 날짜 `#3f3471`·`#9185a7` / 감정 보조 `#847a97` / 푸터 `#a197ae` / 별 `#eab308`·`#a78bfa` |
 | 평가 등급 칩 (`GRADE_COLOR`, 잘함·보통·노력요함) | 잘함 `#16a34a`/`#dcfce7` · 보통 `#a16207`/`#fef9c3` · 노력요함 `#dc2626`/`#fee2e2` |
 
 > 등급 색은 `lib/learning.ts`의 `GRADE_COLOR`에 한 번만 정의하고, `components/learning/GradeParts.tsx`가 `--grade-color` / `--grade-soft` CSS 변수로 넘깁니다(globals.css "배움성찰 평가요소 · 등급" 섹션). 평가피드백(`EvalDashboard`)에서 쓰던 값을 그대로 옮긴 것입니다.
@@ -313,6 +315,14 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 - 수정 동작은 본문 아래가 아니라 **헤더 오른쪽, 작성 시각 옆**에 둡니다. `button.emotion-record-edit`는 `✎` 아이콘(`aria-hidden`) + "기록 고치기" pill 버튼(`width: auto`)
 - 누르면 같은 `.emotion-picker` 폼이 저장된 감정·글을 채운 채 열리고, 제출 문구가 "이렇게 고치기"로 바뀝니다
 - 560px 이하에서는 `.emotion-record-actions`가 세로로 쌓여 시각 아래에 버튼이 옵니다
+
+**월별 감정 모아보기 — 별빛 일기장** (`.emotion-journal`)
+- `.emotion-journal-title` — 딥퍼플 그라디언트 배너. 금색 `✦` 아이콘 칸 + "MY STARLIGHT DIARY" 라벨 + "N월의 별빛 기록 · N개의 마음"
+- `.emotion-journal-grid` — `auto-fit, minmax(300px, 1fr)`, 560px 이하 1열
+- `.emotion-journal-entry` — §6.3 "종이 쪽지" 언어를 이어받은 카드(왼쪽이 각진 `8px 19px 19px 8px`, 크림 종이, ±.12deg 기울기, hover 시 펴지며 떠오름). 감정 카테고리 색을 `--journal-accent` / `--journal-soft`로 주입(§2.5 팔레트 재사용)
+- 장식: 위쪽 가운데 줄무늬 테이프(`.emotion-journal-tape`), 오른쪽 아래 별 두 개, 본문은 31px 간격 줄노트 + 분홍 여백선 + `Gowun Dodum` 손글씨체
+- 헤더(날짜·요일 / 감정 이모지·학생용 문구·감정 이름) → 본문 → 푸터("오늘의 마음을 별빛으로 남겼어요")
+- `prefers-reduced-motion: reduce`에서는 hover 이동과 transition을 끕니다
 
 ### 6.2 우주여행 (스타 보이저)
 
