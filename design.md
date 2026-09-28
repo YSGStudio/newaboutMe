@@ -77,7 +77,7 @@
 | 종이 크림 (피드·클래스메일) | `#fffdf5` `#fff7d8` / 테두리 `#e8dcb9` |
 | 배움성찰 "평가 대기" 상태 (`STATUS_COLOR.grading`) | 배경 `#fef9c3` / 테두리 `#fde68a` / 텍스트 `#a16207` |
 | 배움성찰 "작성 중" 카드 (`IN_PROGRESS_COLOR`, 미제출이지만 쓰기 시작함) | 배경 `#f5f3ff` / 테두리 `#c4b5fd` / 텍스트 `#6d28d9` |
-| 마음일기 저장된 기록 카드 (`.emotion-record-card`) | 배경 `#fbfdff → #f8f5ff` (145deg) / 테두리 `#e6e1f7` / 본문 `#332d4f` |
+| 마음일기 저장된 기록 카드 (`.emotion-record-card`) | 월별 일기장 카드와 같은 종이·줄노트 색을 씀 / 보조 글자 `#8b7fa5`·`#766d87` / 작성 시각 `#958ba6` / 푸터 `#9a90a8` |
 | 마음일기 "기록 고치기" 버튼 (`button.emotion-record-edit`) | 흰 배경 / 테두리 `#c4b5fd`(hover `#a78bfa`) / 텍스트 `#6039d7` / hover 배경 `#f3efff` |
 | 월별 감정 일기장 제목 (`.emotion-journal-title`) | 배경 `#2e1d75 → #5b38ba → #7353cc` (120deg) / 테두리 `#d9d0fb` / 보조 글자 `#dcd4ff` / 강조 금색 `#ffe681` |
 | 월별 감정 일기장 카드 (`.emotion-journal-entry`) | 종이 `#fffdf6` / 테두리 `#e7ddc1`(accent 24% 섞음) / 줄노트 선 `#dbeafe` / 여백선 `rgba(244,114,182,.18)` / 본문 `#46405d` / 날짜 `#3f3471`·`#9185a7` / 감정 보조 `#847a97` / 푸터 `#a197ae` / 별 `#eab308`·`#a78bfa` |
@@ -311,10 +311,11 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 6. `.emotion-selection-summary` → `.emotion-note-field` → `.emotion-submit`
 
 **저장된 기록 카드와 고치기** — 오늘 쓴 기록은 감정과 글을 고칠 수 있고, 지난 날짜는 읽기 전용입니다.
-- `.emotion-record-card` — 연보라 기운의 흰 카드. `.emotion-record-header`(좌: 감정 배지 / 우: `.emotion-record-actions`) → `.emotion-record-content`(본문)
+- `.emotion-record-card` — 아래 월별 일기장 카드와 같은 "일기장 한 장" 모양(테이프·줄노트·별 장식·손글씨체, `--journal-accent` / `--journal-soft` 주입). 한 장만 보이므로 조금 더 크게(이모지 48px, 감정 이름 19px) 그립니다
+- `.emotion-record-header`(좌: `.emotion-record-feeling` 이모지 + 날짜 라벨 + 감정 이름 + 학생용 문구 / 우: `.emotion-record-actions`) → `.emotion-record-content`(본문) → `.emotion-record-footer`
 - 수정 동작은 본문 아래가 아니라 **헤더 오른쪽, 작성 시각 옆**에 둡니다. `button.emotion-record-edit`는 `✎` 아이콘(`aria-hidden`) + "기록 고치기" pill 버튼(`width: auto`)
 - 누르면 같은 `.emotion-picker` 폼이 저장된 감정·글을 채운 채 열리고, 제출 문구가 "이렇게 고치기"로 바뀝니다
-- 560px 이하에서는 `.emotion-record-actions`가 세로로 쌓여 시각 아래에 버튼이 옵니다
+- 560px 이하에서는 `.emotion-record-actions`가 세로로 쌓여 시각 아래에 버튼이 오고, 이모지·본문 여백이 줄어듭니다
 
 **월별 감정 모아보기 — 별빛 일기장** (`.emotion-journal`)
 - `.emotion-journal-title` — 딥퍼플 그라디언트 배너. 금색 `✦` 아이콘 칸 + "MY STARLIGHT DIARY" 라벨 + "N월의 별빛 기록 · N개의 마음"

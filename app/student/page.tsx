@@ -342,6 +342,8 @@ export default function StudentPage() {
     () => EMOTION_CATEGORIES.find((category) => category.key === emotionCategory)?.emotions ?? [],
     [emotionCategory]
   );
+  const myFeedMeta = myFeed ? EMOTION_META[myFeed.emotion_type] : null;
+  const myFeedVisual = myFeedMeta ? EMOTION_CATEGORY_VISUAL[myFeedMeta.category] : null;
 
   /** 평가기록을 서울 시각 기준 월(YYYY-MM)로 묶습니다. 목록이 최신순이라 그룹 순서도 최신 월부터입니다. */
   const evalMonthGroups = useMemo(() => {
@@ -1496,17 +1498,27 @@ export default function StudentPage() {
                     <p className="hint">감정 기록을 불러오는 중입니다...</p>
                   </div>
                 ) : myFeed ? (
-                  <div className="card emotion-record-card">
+                  <article
+                    className="emotion-record-card"
+                    style={{
+                      '--journal-accent': myFeedVisual?.color,
+                      '--journal-soft': myFeedVisual?.softColor,
+                    } as CSSProperties}
+                  >
+                    <span className="emotion-record-tape" aria-hidden="true" />
+                    <span className="emotion-record-star emotion-record-star-one" aria-hidden="true">★</span>
+                    <span className="emotion-record-star emotion-record-star-two" aria-hidden="true">✦</span>
                     <div className="emotion-record-header">
-                      <div className="grid" style={{ gap: 6 }}>
-                        {emotionDate !== today ? <strong>{`${emotionDate} 감정 기록`}</strong> : null}
-                        <div className="row" style={{ flexWrap: 'wrap' }}>
-                          <span className="badge">{EMOTION_META[myFeed.emotion_type].categoryLabel}</span>
-                          <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
+                      <div className="emotion-record-feeling">
+                        <span className="emotion-record-emoji" aria-hidden="true">{myFeedVisual?.icon}</span>
+                        <div>
+                          <small>{emotionDate === today ? 'TODAY’S STARLIGHT' : emotionDate}</small>
+                          <strong>{myFeedMeta?.label}</strong>
+                          <span>{myFeedVisual?.friendlyLabel}</span>
                         </div>
                       </div>
                       <div className="emotion-record-actions">
-                        <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
+                        <span className="emotion-record-time">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
                         {isEmotionEditable && !isEditingEmotion && (
                           <button type="button" className="emotion-record-edit" onClick={onStartEditEmotion}>
                             <span aria-hidden="true">✎</span>
@@ -1516,7 +1528,11 @@ export default function StudentPage() {
                       </div>
                     </div>
                     <p className="emotion-record-content">{myFeed.content}</p>
-                  </div>
+                    <footer className="emotion-record-footer">
+                      <span aria-hidden="true">✦</span>
+                      오늘의 마음이 반짝이는 기록이 되었어요
+                    </footer>
+                  </article>
                 ) : isEmotionEditable ? null : (
                   <EmptyState
                     title="저장된 감정 기록이 없습니다"

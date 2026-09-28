@@ -365,17 +365,69 @@ main {
 
 /* 저장된 감정 기록 — 수정 동작은 본문 아래가 아닌 카드 헤더에 둡니다. */
 .emotion-record-card {
-  padding: 16px 18px;
-  border-color: #e6e1f7;
-  background: linear-gradient(145deg, #fbfdff 0%, #f8f5ff 100%);
+  position: relative;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--journal-accent) 24%, #e7ddc1);
+  border-radius: 9px 21px 21px 9px;
+  background: #fffdf6;
+  box-shadow: 0 10px 26px rgba(73, 56, 127, .12);
+}
+
+.emotion-record-tape {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: -9px;
+  width: 82px;
+  height: 18px;
+  transform: translateX(-50%) rotate(-2deg);
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--journal-accent) 42%, transparent) 0 8px, rgba(253, 224, 71, .4) 8px 16px);
+  clip-path: polygon(2% 6%, 98% 0, 96% 94%, 0 100%);
 }
 
 .emotion-record-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  padding: 24px 20px 15px 24px;
+  border-bottom: 1px dashed #d9ccab;
+  border-radius: 9px 21px 0 0;
+  background:
+    radial-gradient(circle at 92% 23%, rgba(250, 204, 21, .22) 0 2px, transparent 3px),
+    linear-gradient(130deg, var(--journal-soft), #fffdf7 66%, #f3efff);
+}
+
+.emotion-record-feeling {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.emotion-record-emoji {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--journal-accent) 30%, #fff);
+  border-radius: 16px;
+  background: rgba(255,255,255,.78);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--journal-accent) 14%, transparent);
+  font-size: 25px;
+}
+
+.emotion-record-feeling > div { display: grid; min-width: 0; gap: 1px; }
+.emotion-record-feeling small { color: #8b7fa5; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.emotion-record-feeling strong { color: var(--journal-accent); font-size: 19px; line-height: 1.25; }
+.emotion-record-feeling div > span { color: #766d87; font-size: 11px; font-weight: 700; }
+
+.emotion-record-time {
+  color: #958ba6;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .emotion-record-actions {
@@ -414,11 +466,43 @@ button.emotion-record-edit:hover:not(:disabled) {
 }
 
 .emotion-record-content {
+  min-height: 132px;
   margin: 0;
-  color: #332d4f;
-  line-height: 1.7;
+  padding: 20px 28px 20px 43px;
+  background:
+    linear-gradient(90deg, transparent 27px, rgba(244, 114, 182, .19) 28px, transparent 29px),
+    repeating-linear-gradient(180deg, #fffdf6 0 32px, #dbeafe 33px);
+  color: #46405d;
+  font-family: 'Gowun Dodum', 'Nanum Gothic', sans-serif;
+  font-size: 15px;
+  line-height: 33px;
   white-space: pre-wrap;
+  word-break: break-word;
 }
+
+.emotion-record-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 22px 11px;
+  border-radius: 0 0 21px 9px;
+  color: #9a90a8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.emotion-record-footer span { color: #eab308; }
+
+.emotion-record-star {
+  position: absolute;
+  z-index: 2;
+  color: #eab308;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.emotion-record-star-one { right: 15px; bottom: 10px; font-size: 10px; }
+.emotion-record-star-two { right: 34px; bottom: 20px; color: #a78bfa; font-size: 8px; }
 
 /* 월별 감정 모아보기 — 한 장씩 모은 별빛 일기장 */
 .emotion-journal {
@@ -833,11 +917,14 @@ button.emotion-record-edit:hover:not(:disabled) {
 
 @media (max-width: 560px) {
   .emotion-picker { padding: 16px 12px; }
-  .emotion-record-card { padding: 14px; }
-  .emotion-record-header { gap: 10px; }
+  .emotion-record-header { align-items: flex-start; gap: 12px; padding: 22px 14px 13px 17px; }
+  .emotion-record-emoji { width: 42px; height: 42px; flex-basis: 42px; font-size: 22px; }
+  .emotion-record-feeling strong { font-size: 17px; }
   .emotion-record-actions { align-items: flex-end; flex-direction: column; gap: 6px; }
-  .emotion-record-actions .hint { font-size: 11px; }
+  .emotion-record-time { max-width: 120px; font-size: 10px; text-align: right; white-space: normal; }
   button.emotion-record-edit { min-height: 36px; padding: 6px 10px; }
+  .emotion-record-content { min-height: 110px; padding: 17px 17px 17px 36px; }
+  .emotion-record-footer { padding-left: 17px; }
   .emotion-journal { gap: 14px; }
   .emotion-journal-title { padding: 13px 14px; }
   .emotion-journal-title h3 { align-items: flex-start; flex-direction: column; gap: 2px; font-size: 18px; }
