@@ -1462,8 +1462,8 @@ export default function StudentPage() {
                     <p className="hint">감정 기록을 불러오는 중입니다...</p>
                   </div>
                 ) : myFeed ? (
-                  <div className="card" style={{ padding: 14, background: '#f8fbff' }}>
-                    <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div className="card emotion-record-card">
+                    <div className="emotion-record-header">
                       <div className="grid" style={{ gap: 6 }}>
                         {emotionDate !== today ? <strong>{`${emotionDate} 감정 기록`}</strong> : null}
                         <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -1471,16 +1471,17 @@ export default function StudentPage() {
                           <span className="badge">{EMOTION_META[myFeed.emotion_type].label}</span>
                         </div>
                       </div>
-                      <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
-                    </div>
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{myFeed.content}</p>
-                    {isEmotionEditable && !isEditingEmotion && (
-                      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
-                        <button type="button" className="ghost" style={{ width: 'auto' }} onClick={onStartEditEmotion}>
-                          기록 고치기
-                        </button>
+                      <div className="emotion-record-actions">
+                        <span className="hint">{new Date(myFeed.created_at).toLocaleString('ko-KR')}</span>
+                        {isEmotionEditable && !isEditingEmotion && (
+                          <button type="button" className="emotion-record-edit" onClick={onStartEditEmotion}>
+                            <span aria-hidden="true">✎</span>
+                            기록 고치기
+                          </button>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    <p className="emotion-record-content">{myFeed.content}</p>
                   </div>
                 ) : isEmotionEditable ? null : (
                   <EmptyState

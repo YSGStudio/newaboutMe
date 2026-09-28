@@ -363,6 +363,63 @@ main {
   font-size: 13px;
 }
 
+/* 저장된 감정 기록 — 수정 동작은 본문 아래가 아닌 카드 헤더에 둡니다. */
+.emotion-record-card {
+  padding: 16px 18px;
+  border-color: #e6e1f7;
+  background: linear-gradient(145deg, #fbfdff 0%, #f8f5ff 100%);
+}
+
+.emotion-record-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.emotion-record-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+button.emotion-record-edit {
+  display: inline-flex;
+  width: auto;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  background: #fff;
+  color: #6039d7;
+  box-shadow: 0 3px 10px rgba(96, 57, 215, .08);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+button.emotion-record-edit:hover:not(:disabled) {
+  border-color: #a78bfa;
+  background: #f3efff;
+  box-shadow: 0 5px 14px rgba(96, 57, 215, .14);
+}
+
+.emotion-record-edit > span {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.emotion-record-content {
+  margin: 0;
+  color: #332d4f;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
 .emotion-step-title {
   display: flex;
   align-items: center;
@@ -587,6 +644,11 @@ main {
 
 @media (max-width: 560px) {
   .emotion-picker { padding: 16px 12px; }
+  .emotion-record-card { padding: 14px; }
+  .emotion-record-header { gap: 10px; }
+  .emotion-record-actions { align-items: flex-end; flex-direction: column; gap: 6px; }
+  .emotion-record-actions .hint { font-size: 11px; }
+  button.emotion-record-edit { min-height: 36px; padding: 6px 10px; }
   .emotion-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .emotion-category-card { min-height: 132px; }
   .emotion-category-character { width: 52px; height: 52px; font-size: 32px; }
