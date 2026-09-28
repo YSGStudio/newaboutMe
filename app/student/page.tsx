@@ -7,7 +7,7 @@
  * 뱃지·별빛 캐릭터 배너 등 학생 활동 전체를 담습니다. 로그인 후 스타 보이저 탭도 여기서 진입합니다.
  * (각 활동은 저장 시 뱃지 지급/연료 적립으로 이어집니다.)
  */
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import PageHeader from '@/components/ui/PageHeader';
@@ -1437,22 +1437,56 @@ export default function StudentPage() {
                 ) : monthlyFeeds.length === 0 ? (
                   <EmptyState title="이 달의 감정 기록이 없습니다" description="날짜별 보기에서 감정을 작성해보세요." />
                 ) : (
-                  <div style={{ display: 'grid', gap: 10 }}>
-                    {monthlyFeeds.map((feed) => {
-                      const dateStr = new Date(feed.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-                      return (
-                        <div key={feed.id} className="card" style={{ padding: 14, background: '#f8fbff' }}>
-                          <div className="row space-between" style={{ alignItems: 'flex-start', marginBottom: 6 }}>
-                            <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
-                              <span className="badge">{EMOTION_META[feed.emotion_type].categoryLabel}</span>
-                              <span className="badge">{EMOTION_META[feed.emotion_type].label}</span>
-                            </div>
-                            <span className="hint" style={{ fontSize: 12, flexShrink: 0 }}>{dateStr}</span>
-                          </div>
-                          <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{feed.content}</p>
-                        </div>
-                      );
-                    })}
+                  <div className="emotion-journal">
+                    <div className="emotion-journal-title">
+                      <span className="emotion-journal-title-icon" aria-hidden="true">✦</span>
+                      <div>
+                        <p>MY STARLIGHT DIARY</p>
+                        <h3>
+                          {parseInt(monthlyViewMonth.slice(5), 10)}월의 별빛 기록
+                          <span>{monthlyFeeds.length}개의 마음</span>
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="emotion-journal-grid" role="list">
+                      {monthlyFeeds.map((feed) => {
+                        const createdAt = new Date(feed.created_at);
+                        const dateStr = createdAt.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+                        const weekday = createdAt.toLocaleDateString('ko-KR', { weekday: 'short' });
+                        const meta = EMOTION_META[feed.emotion_type];
+                        const visual = EMOTION_CATEGORY_VISUAL[meta.category];
+                        const journalStyle = {
+                          '--journal-accent': visual.color,
+                          '--journal-soft': visual.softColor,
+                        } as CSSProperties;
+
+                        return (
+                          <article key={feed.id} className="emotion-journal-entry" style={journalStyle} role="listitem">
+                            <span className="emotion-journal-tape" aria-hidden="true" />
+                            <span className="emotion-journal-star emotion-journal-star-one" aria-hidden="true">★</span>
+                            <span className="emotion-journal-star emotion-journal-star-two" aria-hidden="true">✦</span>
+                            <header className="emotion-journal-entry-header">
+                              <div className="emotion-journal-date">
+                                <strong>{dateStr}</strong>
+                                <span>{weekday}요일</span>
+                              </div>
+                              <div className="emotion-journal-feeling">
+                                <span className="emotion-journal-emoji" aria-hidden="true">{visual.icon}</span>
+                                <div>
+                                  <small>{visual.friendlyLabel}</small>
+                                  <strong>{meta.label}</strong>
+                                </div>
+                              </div>
+                            </header>
+                            <p className="emotion-journal-content">{feed.content}</p>
+                            <footer className="emotion-journal-footer">
+                              <span aria-hidden="true">✦</span>
+                              오늘의 마음을 별빛으로 남겼어요
+                            </footer>
+                          </article>
+                        );
+                      })}
+                    </div>
                   </div>
                 )
               ) : (
