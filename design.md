@@ -77,6 +77,8 @@
 | 종이 크림 (피드·클래스메일) | `#fffdf5` `#fff7d8` / 테두리 `#e8dcb9` |
 | 배움성찰 "평가 대기" 상태 (`STATUS_COLOR.grading`) | 배경 `#fef9c3` / 테두리 `#fde68a` / 텍스트 `#a16207` |
 | 배움성찰 "작성 중" 카드 (`IN_PROGRESS_COLOR`, 미제출이지만 쓰기 시작함) | 배경 `#f5f3ff` / 테두리 `#c4b5fd` / 텍스트 `#6d28d9` |
+| 마음일기 저장된 기록 카드 (`.emotion-record-card`) | 배경 `#fbfdff → #f8f5ff` (145deg) / 테두리 `#e6e1f7` / 본문 `#332d4f` |
+| 마음일기 "기록 고치기" 버튼 (`button.emotion-record-edit`) | 흰 배경 / 테두리 `#c4b5fd`(hover `#a78bfa`) / 텍스트 `#6039d7` / hover 배경 `#f3efff` |
 | 평가 등급 칩 (`GRADE_COLOR`, 잘함·보통·노력요함) | 잘함 `#16a34a`/`#dcfce7` · 보통 `#a16207`/`#fef9c3` · 노력요함 `#dc2626`/`#fee2e2` |
 
 > 등급 색은 `lib/learning.ts`의 `GRADE_COLOR`에 한 번만 정의하고, `components/learning/GradeParts.tsx`가 `--grade-color` / `--grade-soft` CSS 변수로 넘깁니다(globals.css "배움성찰 평가요소 · 등급" 섹션). 평가피드백(`EvalDashboard`)에서 쓰던 값을 그대로 옮긴 것입니다.
@@ -305,6 +307,12 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 4. 선택 시 `--emotion-accent` 테두리 + `color-mix()`로 만든 accent 그림자 + 우상단 보라 체크 원
 5. `.emotion-step-connector`(금색 화살표) → `.emotion-detail-grid` (`auto-fit, minmax(104px, 1fr)`)
 6. `.emotion-selection-summary` → `.emotion-note-field` → `.emotion-submit`
+
+**저장된 기록 카드와 고치기** — 오늘 쓴 기록은 감정과 글을 고칠 수 있고, 지난 날짜는 읽기 전용입니다.
+- `.emotion-record-card` — 연보라 기운의 흰 카드. `.emotion-record-header`(좌: 감정 배지 / 우: `.emotion-record-actions`) → `.emotion-record-content`(본문)
+- 수정 동작은 본문 아래가 아니라 **헤더 오른쪽, 작성 시각 옆**에 둡니다. `button.emotion-record-edit`는 `✎` 아이콘(`aria-hidden`) + "기록 고치기" pill 버튼(`width: auto`)
+- 누르면 같은 `.emotion-picker` 폼이 저장된 감정·글을 채운 채 열리고, 제출 문구가 "이렇게 고치기"로 바뀝니다
+- 560px 이하에서는 `.emotion-record-actions`가 세로로 쌓여 시각 아래에 버튼이 옵니다
 
 ### 6.2 우주여행 (스타 보이저)
 
