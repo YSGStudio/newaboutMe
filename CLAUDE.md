@@ -158,7 +158,7 @@ design.md에 없는 **새로운 패턴·색·토큰·컴포넌트 구조를 도�
 |---|---|
 | `app/teacher/page.tsx` | `evalFeedbackVisible = canSeeEvalFeedback(teacherRole)`. 거짓이면 `평가피드백` 탭이 `items`에서 빠지고 렌더링도 막힘, `activeTab`이 `eval`이면 `dashboard`로 되돌림 |
 | `app/student/page.tsx` | 서버가 내려준 `evalFeedbackEnabled`. 거짓이면 `포트폴리오` 탭이 `items`에서 빠지고 렌더링도 막힘, `activeTab`이 `eval`이면 `voyage`로 되돌림 |
-| `components/teacher/StatsDashboard.tsx` | `showEval` prop. 거짓이면 평가 요약 타일·섹션과 PDF 내보내기의 평가 블록이 빠지고, `/api/eval/**`도 호출하지 않음 |
+| `components/teacher/StatsDashboard.tsx` | `showEval` prop. 거짓이면 화면의 평가 요약 타일·섹션이 빠지고, `/api/eval/**`도 호출하지 않음. PDF 내보내기에는 `showEval`과 무관하게 평가 블록을 넣지 않음 |
 | `lib/eval-access.ts` | 라우트용 가드 — `denyEvalTeacher(teacher)` · `denyEvalStudent(classes.teacher_id)` |
 | `app/api/eval/**` | 모든 라우트가 인증 직후 위 가드로 403을 돌려줌 |
 

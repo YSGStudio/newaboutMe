@@ -108,7 +108,7 @@ const learningSubmittedCount = (summary: LearningReport['summary']) => summary.s
 /** 배움성찰 블록 강조색 — 평가피드백이 쓰던 주황 계열 자리를 그대로 물려받는다. */
 const LEARNING_ACCENT = '#ea580c';
 
-type ClassAiResultItem = { snap: StudentSnapshot; reports: EvalReportSummary[]; learning: LearningReport | null; ai: GrowthAiResult | null; aiError?: string };
+type ClassAiResultItem = { snap: StudentSnapshot; learning: LearningReport | null; ai: GrowthAiResult | null; aiError?: string };
 
 /** 홀란드 성향 — 통합 리포트의 ③ 앞으로 파트. 근거가 부족하면 AI가 생략하므로 null일 수 있습니다. */
 type HollandResult = {
@@ -187,15 +187,8 @@ const PDF_STYLES = `
 
 const buildStudentHtmlBlock = (
   snap: StudentSnapshot,
-  reports: EvalReportSummary[],
   learning: LearningReport | null,
-  showEval: boolean,
 ): string => {
-
-  const gradeBg:    Record<string, string> = { high: '#dcfce7', mid: '#fef9c3', low: '#fee2e2' };
-  const gradeColor: Record<string, string> = { high: '#16a34a', mid: '#d97706', low: '#dc2626' };
-  const gradeLabel: Record<string, string> = { high: '잘함',    mid: '보통',    low: '노력'  };
-
   // ── 계획 ──
   const planHtml = snap.plans.length === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">등록된 계획이 없어요.</p>'
@@ -226,37 +219,6 @@ const buildStudentHtmlBlock = (
   const emotionInner = snap.emotions.totalFeeds === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">기록된 감정이 없어요.</p>'
     : barsHtml;
-
-  // ── 평가 ──
-  const gradeCount = { high: 0, mid: 0, low: 0 };
-  reports.forEach((r) => r.eval_report_items.forEach((item) => {
-    if (item.grade in gradeCount) gradeCount[item.grade as keyof typeof gradeCount]++;
-  }));
-  const gradeSummaryHtml = (['high', 'mid', 'low'] as const).filter((g) => gradeCount[g] > 0)
-    .map((g) => `<span style="flex:1;text-align:center;font-size:12px;font-weight:800;padding:6px 0;border-radius:8px;background:${gradeBg[g]};color:${gradeColor[g]}">${gradeLabel[g]} ${gradeCount[g]}</span>`)
-    .join('');
-
-  const reportsHtml = reports.length === 0
-    ? '<p style="color:#6b7280;font-size:13px;margin:0">작성된 평가가 없어요.</p>'
-    : reports.map((r) => {
-        const gc = { high: 0, mid: 0, low: 0 };
-        r.eval_report_items.forEach((item) => { if (item.grade in gc) gc[item.grade as keyof typeof gc]++; });
-        const badges = (['high', 'mid', 'low'] as const).filter((g) => gc[g] > 0)
-          .map((g) => `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${gradeBg[g]};color:${gradeColor[g]}">${gradeLabel[g]} ${gc[g]}</span>`)
-          .join('&nbsp;');
-        const subject = getReportSubject(r);
-        const accent = (subject && SUBJECT_COLOR[subject]) ?? DEFAULT_SUBJECT_COLOR;
-        const subjectChip = subject
-          ? `<span style="font-size:11px;font-weight:700;color:${accent};background:${accent}1a;border-radius:5px;padding:2px 6px;flex-shrink:0">${escapeHtml(subject)}</span>`
-          : '';
-        return `
-          <div style="background:#fff;border-radius:10px;padding:10px 12px 10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05);border-left:4px solid ${accent}">
-            ${subjectChip}
-            <span style="font-size:13px;color:#1e293b;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.title)}</span>
-            <span style="display:flex;gap:4px;flex-shrink:0">${badges}</span>
-            <span style="font-size:12px;color:#94a3b8;flex-shrink:0">${new Date(r.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</span>
-          </div>`;
-      }).join('');
 
   // ── 배움성찰 ──
   const learningSummary = learning?.summary ?? EMPTY_LEARNING_SUMMARY;
@@ -323,7 +285,6 @@ const buildStudentHtmlBlock = (
       ${summaryTile('🎯', `${snap.average.achievementRate}%`, '평균 실천률', '#16a34a')}
       ${summaryTile('💭', `${snap.emotions.totalFeeds}건`, '감정 기록', '#7c3aed')}
       ${summaryTile('📚', `${learningSubmittedCount(learningSummary)}건`, '배움성찰', LEARNING_ACCENT)}
-      ${showEval ? summaryTile('⭐', `${reports.length}건`, '평가', '#d97706') : ''}
     </div>
     <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
@@ -347,16 +308,7 @@ const buildStudentHtmlBlock = (
         <span style="margin-left:auto;font-size:12px;color:${LEARNING_ACCENT};font-weight:700">제출 ${learningSubmittedCount(learningSummary)}/${learningSummary.total}</span>
       </div>
       ${learningInnerHtml}
-    </div>
-    ${showEval ? `<div style="background:#fff7ed;border-radius:12px;padding:12px 14px 10px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-        <span style="font-size:14px">⭐</span>
-        <span style="font-size:14px;font-weight:700;color:#9a3412">평가 현황</span>
-        <span style="margin-left:auto;font-size:12px;color:#ea580c;font-weight:700">총 ${reports.length}건</span>
-      </div>
-      ${reports.length > 0 ? `<div style="display:flex;gap:6px;margin-bottom:10px">${gradeSummaryHtml}</div>` : ''}
-      ${reportsHtml}
-    </div>` : ''}`;
+    </div>`;
 };
 
 /**
@@ -971,14 +923,11 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     try {
       const results = await Promise.all(
         students.map(async (s) => {
-          const [snap, evalData, learning] = await Promise.all([
+          const [snap, learning] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            showEval
-              ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
-              : Promise.resolve({ reports: [] as EvalReportSummary[] }),
             api<LearningReport>(`/api/learning/student/${s.id}?period=${period}`),
           ]);
-          return { snap, reports: evalData.reports, learning };
+          return { snap, learning };
         })
       );
 
@@ -988,13 +937,13 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         return;
       }
 
-      const studentSections = results.map(({ snap, reports, learning }) => `
+      const studentSections = results.map(({ snap, learning }) => `
         <div class="student-block">
           <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
             <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
             <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
           </div>
-          ${buildStudentHtmlBlock(snap, reports, learning, showEval)}
+          ${buildStudentHtmlBlock(snap, learning)}
         </div>`).join('');
 
       const html = `<!doctype html>
@@ -1005,10 +954,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     <style>${PDF_STYLES}</style>
   </head>
   <body>
-    <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #e5e7eb;page-break-after:always;break-after:page">
-      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">별빛로그 전체 리포트</h1>
-      <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
-    </div>
     ${studentSections}
   </body>
 </html>`;
@@ -1044,7 +989,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
       <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">별빛로그 보고서</h1>
       <p style="color:#64748b;font-size:13px;margin:0">${snapshot.student.studentNumber}번 ${escapeHtml(snapshot.student.name)} · ${periodMeta[period].label} (${snapshot.range.startDate} ~ ${snapshot.range.endDate})</p>
     </div>
-    ${buildStudentHtmlBlock(snapshot, evalReports, learningReport, showEval)}
+    ${buildStudentHtmlBlock(snapshot, learningReport)}
     ${aiResult ? buildAiSectionHtml(aiResult) : ''}
   </body>
 </html>`;
@@ -1089,17 +1034,14 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
       const results = await Promise.all(
         students.map(async (s) => {
-          const [snap, evalData, learning] = await Promise.all([
+          const [snap, learning] = await Promise.all([
             api<StudentSnapshot>(`/api/stats/student/${s.id}/snapshot?period=${period}`),
-            showEval
-              ? api<{ reports: EvalReportSummary[] }>(`/api/eval/reports/student/${s.id}?period=${period}`)
-              : Promise.resolve({ reports: [] as EvalReportSummary[] }),
             api<LearningReport>(`/api/learning/student/${s.id}?period=${period}`),
           ]);
           const batchResult = resultByStudent.get(s.id);
           const ai: GrowthAiResult | null = batchResult?.report ? { ...batchResult.report, cached: false } : null;
           const aiError = ai ? undefined : batchResult?.message;
-          return { snap, reports: evalData.reports, learning, ai, aiError };
+          return { snap, learning, ai, aiError };
         })
       );
       // popup은 비동기 함수 내부에서 열면 브라우저가 차단함.
@@ -1126,13 +1068,13 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
     const classTitle = className?.trim() || '우리반';
 
-    const studentSections = classAiResults.map(({ snap, reports, learning, ai, aiError }) => `
+    const studentSections = classAiResults.map(({ snap, learning, ai, aiError }) => `
       <div class="student-block">
         <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb">
           <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">${snap.student.studentNumber}번 ${escapeHtml(snap.student.name)}</h1>
           <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} (${snap.range.startDate} ~ ${snap.range.endDate})</p>
         </div>
-        ${buildStudentHtmlBlock(snap, reports, learning, showEval)}
+        ${buildStudentHtmlBlock(snap, learning)}
         ${buildAiSectionHtml(ai, aiError)}
       </div>`).join('');
 
@@ -1144,10 +1086,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
     <style>${PDF_STYLES}</style>
   </head>
   <body>
-    <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #e5e7eb;page-break-after:always;break-after:page">
-      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">${escapeHtml(classTitle)} AI 성장 리포트</h1>
-      <p style="color:#64748b;font-size:13px;margin:0">${periodMeta[period].label} 기준 · 총 ${students.length}명 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
-    </div>
     ${studentSections}
   </body>
 </html>`;
