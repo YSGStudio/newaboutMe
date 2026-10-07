@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { todayDate, formatDateInSeoul } from '@/lib/date';
+import { todayDate } from '@/lib/date';
 
 export const FUEL_RULES = {
   plan_check: { base: 5, dailyCap: 1 },
@@ -12,7 +12,7 @@ export const FUEL_RULES = {
   comeback: { base: 20, dailyCap: null },
 } as const;
 
-export type FuelSource = keyof typeof FUEL_RULES | 'teacher_grant' | 'teacher_revoke';
+export type FuelSource = keyof typeof FUEL_RULES | 'teacher_grant' | 'teacher_revoke' | 'streak_fix';
 
 const BOOSTER_ELIGIBLE_SOURCES = new Set<FuelSource>(['plan_check', 'emotion_feed']);
 
@@ -77,16 +77,24 @@ export async function areAllActivePlansChecked(
   return planIds.every((id) => checkedIds.has(id));
 }
 
-const multiplierFor = (days: number) => days >= 10 ? 2 : days >= 5 ? 1.5 : days >= 3 ? 1.2 : 1;
+export const multiplierFor = (days: number) => days >= 10 ? 2 : days >= 5 ? 1.5 : days >= 3 ? 1.2 : 1;
 
-const previousSchoolDate = (date: string) => {
-  const cursor = new Date(`${date}T00:00:00+09:00`);
-  do cursor.setDate(cursor.getDate() - 1);
-  while (cursor.getDay() === 0 || cursor.getDay() === 6);
-  return formatDateInSeoul(cursor);
+// 날짜 문자열(YYYY-MM-DD)을 UTC 자정으로 다뤄 요일·하루 빼기를 계산한다.
+// 서버 시간대(Vercel은 UTC)에 따라 getDay/setDate 결과가 하루 밀리는 것을 막기 위함.
+const parseDateUtc = (date: string) => new Date(`${date}T00:00:00Z`);
+const isWeekendUtc = (d: Date) => d.getUTCDay() === 0 || d.getUTCDay() === 6;
+
+export const isWeekendDate = (date: string) => isWeekendUtc(parseDateUtc(date));
+
+// 직전 등교일(주말 제외). 월요일의 직전 등교일은 금요일.
+export const previousSchoolDate = (date: string) => {
+  const cursor = parseDateUtc(date);
+  do cursor.setUTCDate(cursor.getUTCDate() - 1);
+  while (isWeekendUtc(cursor));
+  return cursor.toISOString().slice(0, 10);
 };
 
-const updateStreak = (lastActiveOn: string | null, streakDays: number, earnedOn: string) => {
+export const updateStreak = (lastActiveOn: string | null, streakDays: number, earnedOn: string) => {
   if (lastActiveOn === earnedOn) return streakDays;
   if (lastActiveOn === previousSchoolDate(earnedOn)) return streakDays + 1;
   return Math.max(1, streakDays > 0 ? Math.ceil(streakDays / 2) : 1);
@@ -105,8 +113,11 @@ export async function grantFuel(
   const isRevoke = sourceType === 'teacher_revoke' || baseAmount < 0;
   // 매일 반복하는 감정 기록과 계획 체크만 연속 일수 및 부스터에 반영한다.
   // 성찰일기·별빛메일·배지·교사 지급 등은 기본 연료만 지급한다.
+  // 주말 활동은 기본 연료만 주고 연속 일수·마지막 활동일은 건드리지 않는다 —
+  // 연속은 평일끼리(금 → 월) 이어지므로 주말 기록이 월요일 판정을 끊지 않게 한다.
   const appliesBooster = !isRevoke
     && options?.applyBooster !== false
+    && !isWeekendDate(earnedOn)
     && BOOSTER_ELIGIBLE_SOURCES.has(sourceType);
 
   // 현재 상태를 1회만 읽는다(없으면 기본값). 사전 중복 SELECT는 제거 —

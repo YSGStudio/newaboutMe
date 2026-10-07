@@ -52,6 +52,7 @@ const SOURCE_LABEL: Record<string, string> = {
   teacher_grant: '선생님 특별 연료',
   teacher_revoke: '연료 조정',
   comeback: '복귀 보너스',
+  streak_fix: '연속 기록 보정',
 };
 
 export default function VoyageContent({ standalone = false }: { standalone?: boolean }) {
