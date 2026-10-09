@@ -6,7 +6,7 @@ import { logAdminAction } from '@/lib/adminSettings';
 
 // 전체 데이터 초기화 수동 실행 (관리자 전용)
 // 관리자가 확인 문구를 입력해 즉시 전체 학급을 초기화한다. 자동 삭제 정책은 없다.
-// classes 삭제가 students → 감정/계획/편지/뱃지/설문 등으로 cascade 된다. 되돌릴 수 없음.
+// classes 삭제가 students → 감정/편지/뱃지/설문 등으로 cascade 된다. 되돌릴 수 없음.
 const schema = z.object({ confirm: z.literal('초기화') });
 
 export async function POST(req: Request) {

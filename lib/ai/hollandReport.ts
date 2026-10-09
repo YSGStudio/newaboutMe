@@ -7,7 +7,7 @@ import { getOpenAIClient, GROWTH_REPORT_MODEL } from './openaiClient';
 
 export class InsufficientHollandDataError extends Error {
   constructor() {
-    super('분석할 데이터가 충분하지 않습니다. 감정 기록 10건, 계획 기록 7일 이상이 필요합니다.');
+    super('분석할 데이터가 충분하지 않습니다. 감정 기록이 10건 이상 필요합니다.');
     this.name = 'InsufficientHollandDataError';
   }
 }
@@ -45,7 +45,7 @@ export async function generateAndSaveHollandReport(
   // (평가피드백은 비활성 상태라 더 이상 읽지 않는다 — lib/features.ts 참고)
   const growthData = await gatherGrowthReportData(studentId, 'semester');
 
-  if (growthData.emotions.length < 10 && growthData.plans.length === 0) {
+  if (growthData.emotions.length < 10) {
     throw new InsufficientHollandDataError();
   }
 

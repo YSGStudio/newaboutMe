@@ -52,7 +52,6 @@ export async function GET() {
     recentLog: ledgerRes.data ?? [],
     todayFuel,
     missions: {
-      plan: countSource('plan_check') > 0,
       emotion: countSource('emotion_feed') > 0,
       reflection: countSource('reflection') > 0,
       letterCount: countSource('letter'),

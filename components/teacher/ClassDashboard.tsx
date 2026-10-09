@@ -29,7 +29,6 @@ type WatchRow = {
   student: Student;
   reasons: WatchReasonCode[];
   daysSinceRecord: number;
-  weekRate: number | null;
 };
 
 export type ClassDashboardData = {
@@ -37,16 +36,13 @@ export type ClassDashboardData = {
   kpi: {
     totalStudents: number;
     recordedToday: number;
-    todayPlanRate: number | null;
-    planCheckedStudents?: number;
-    planStudents?: number;
     pendingLearning: number;
     activityCount: number;
     watchCount: number;
     pendingReview: number;
     unreadLetters: number;
   } | null;
-  participation: { emotionRate: number; planRate: number; learningRate: number | null };
+  participation: { emotionRate: number; learningRate: number | null };
   latestActivity: { id: string; title: string; subject: string } | null;
   activityProgress: Array<{
     id: string;
@@ -71,7 +67,7 @@ export default function ClassDashboard({
   /** 부트스트랩이 함께 실어 준 첫 데이터. 있으면 마운트 직후 왕복 없이 바로 그린다. */
   initialData?: ClassDashboardData | null;
   /** 학생 칩을 눌렀을 때 — 성장리포트 탭으로 넘겨 상세를 열게 합니다. */
-  onNavigate?: (tab: 'student' | 'feed' | 'learning' | 'letters') => void;
+  onNavigate?: (tab: 'feed' | 'learning' | 'letters') => void;
 }) {
   const [data, setData] = useState<ClassDashboardData | null>(initialData);
   const [loading, setLoading] = useState(false);
@@ -133,9 +129,6 @@ export default function ClassDashboard({
   if (!data && loading) return <ClassDashboardSkeleton />;
 
   const kpi = data?.kpi;
-  const planStudents = kpi?.planStudents ?? 0;
-  const planCheckedStudents = kpi?.planCheckedStudents ?? 0;
-  const planCheckedRate = planStudents > 0 ? Math.round((planCheckedStudents / planStudents) * 100) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -161,12 +154,6 @@ export default function ClassDashboard({
                 value={`${kpi.recordedToday}/${kpi.totalStudents}`}
                 label="오늘 감정 기록"
                 accent="#7c3aed"
-              />
-              <KpiTile
-                icon="⭐"
-                value={planStudents === 0 ? '—' : `${planCheckedStudents}/${planStudents}`}
-                label="오늘 계획 모두 체크"
-                accent="#16a34a"
               />
               <KpiTile
                 icon="📚"
@@ -202,7 +189,6 @@ export default function ClassDashboard({
               </div>
               <div className="class-dashboard-bars">
                 <ParticipationBar label="마음 기록" value={data.participation.emotionRate} />
-                <ParticipationBar label="계획 모두 체크" value={data.participation.planRate ?? planCheckedRate} />
                 <ParticipationBar label="최근 배움성찰" value={data.participation.learningRate} />
               </div>
             </div>
@@ -221,10 +207,6 @@ export default function ClassDashboard({
               </button>
               <button type="button" onClick={() => onNavigate?.('feed')}>
                 <span aria-hidden="true">💜</span><span><strong>오늘 마음 기록</strong><small>학급 마음피드 바로 확인</small></span><b>{kpi.recordedToday}/{kpi.totalStudents}</b><i aria-hidden="true">›</i>
-              </button>
-              <button type="button" onClick={() => onNavigate?.('student')}>
-                {/* 분모는 계획을 세운 학생 수다. 계획이 없는 학생까지 세면 늘 미달로 보인다. */}
-                <span aria-hidden="true">⭐</span><span><strong>오늘 계획 기록</strong><small>계획을 모두 체크한 학생</small></span><b>{planStudents === 0 ? '계획 없음' : `${planCheckedStudents}/${planStudents}`}</b><i aria-hidden="true">›</i>
               </button>
             </div>
           </section>
@@ -264,7 +246,7 @@ export default function ClassDashboard({
           <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>살펴볼 학생</h3>
           <p className="hint" style={{ margin: '0 0 12px' }}>
             기록이 {WATCH_RULES.silentDays}일 이상 없거나, 부정 감정이 {WATCH_RULES.heavyStreak}회 이어지거나,
-            실천률이 지난주보다 {WATCH_RULES.planDropPoints}%p 이상 떨어진 학생을 자동으로 모았습니다.
+            교우관계·배움성찰에서 신호가 있는 학생을 자동으로 모았습니다.
             판단을 대신하지 않으니 참고 자료로만 봐주세요.
           </p>
 
@@ -286,7 +268,6 @@ export default function ClassDashboard({
                       {row.daysSinceRecord === 0 ? '오늘 기록함' : `${row.daysSinceRecord}일째 기록 없음`}
                     </span>
                   </span>
-                  {row.weekRate !== null && <span className="class-dashboard-watch-rate">주간 계획 실천 {row.weekRate}%</span>}
                   <span className="class-dashboard-watch-reasons">
                     {row.reasons.map((reason) => (
                       <span

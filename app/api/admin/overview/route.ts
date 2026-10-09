@@ -28,7 +28,6 @@ export async function GET() {
   const monthStartIso = getSeoulDayRange(`${today.slice(0, 7)}-01`).startIso;
   const todayStartIso = getSeoulDayRange(today).startIso;
   const weekStartIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const weekStartDate = weekStartIso.slice(0, 10);
   const soonDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const [
@@ -37,7 +36,6 @@ export async function GET() {
     studentCountRes,
     aiRes,
     emotionRes,
-    planRes,
     letterRes,
     evalRes,
     reflectionRes,
@@ -47,7 +45,6 @@ export async function GET() {
     supabaseAdmin.from('students').select('id', { count: 'exact', head: true }),
     supabaseAdmin.from('ai_usage_logs').select('feature, teacher_id').gte('created_at', monthStartIso),
     supabaseAdmin.from('emotion_feeds').select('student_id, created_at').gte('created_at', weekStartIso),
-    supabaseAdmin.from('plan_checks').select('id', { count: 'exact', head: true }).eq('is_completed', true).gte('check_date', weekStartDate),
     supabaseAdmin.from('letters').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
     supabaseAdmin.from('eval_reports').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
     supabaseAdmin.from('eval_reflections').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
@@ -107,7 +104,6 @@ export async function GET() {
     },
     activityLast7Days: {
       emotion: emotionRows.length,
-      planCompleted: planRes.count ?? 0,
       letter: letterRes.count ?? 0,
       evalReport: evalRes.count ?? 0,
       reflection: reflectionRes.count ?? 0,

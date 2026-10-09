@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { todayDate } from '@/lib/date';
 
 export const FUEL_RULES = {
-  plan_check: { base: 5, dailyCap: 1 },
   // 활동을 남긴 것 자체를 연료로 본다 — 분량으로 거르지 않고, 하루 상한(dailyCap)으로만 조절한다.
   emotion_feed: { base: 8, dailyCap: 1 },
   reflection: { base: 10, dailyCap: 1 },
@@ -14,7 +13,7 @@ export const FUEL_RULES = {
 
 export type FuelSource = keyof typeof FUEL_RULES | 'teacher_grant' | 'teacher_revoke' | 'streak_fix';
 
-const BOOSTER_ELIGIBLE_SOURCES = new Set<FuelSource>(['plan_check', 'emotion_feed']);
+const BOOSTER_ELIGIBLE_SOURCES = new Set<FuelSource>(['emotion_feed']);
 
 export type VoyageStar = {
   level: number;
@@ -48,33 +47,6 @@ export async function getStars(supabase: SupabaseClient): Promise<VoyageStar[]> 
   if (error) throw error;
   starsCache = (data ?? []) as VoyageStar[];
   return starsCache;
-}
-
-// 학생의 활성 계획이 오늘 모두 체크(완료/미완료 판정)되었는지.
-export async function areAllActivePlansChecked(
-  supabase: SupabaseClient,
-  studentId: string,
-  date: string,
-): Promise<boolean> {
-  const { data: activePlans } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('student_id', studentId)
-    .eq('is_active', true);
-  const planIds = (activePlans ?? []).map((plan) => plan.id);
-  if (planIds.length === 0) return false;
-
-  const { data: checks } = await supabase
-    .from('plan_checks')
-    .select('plan_id,is_completed')
-    .in('plan_id', planIds)
-    .eq('check_date', date);
-  const checkedIds = new Set(
-    (checks ?? [])
-      .filter((check) => typeof check.is_completed === 'boolean')
-      .map((check) => check.plan_id),
-  );
-  return planIds.every((id) => checkedIds.has(id));
 }
 
 export const multiplierFor = (days: number) => days >= 10 ? 2 : days >= 5 ? 1.5 : days >= 3 ? 1.2 : 1;
@@ -111,7 +83,7 @@ export async function grantFuel(
   const rule = sourceType in FUEL_RULES ? FUEL_RULES[sourceType as keyof typeof FUEL_RULES] : null;
   const baseAmount = options?.baseAmount ?? rule?.base ?? 0;
   const isRevoke = sourceType === 'teacher_revoke' || baseAmount < 0;
-  // 매일 반복하는 감정 기록과 계획 체크만 연속 일수 및 부스터에 반영한다.
+  // 매일 반복하는 감정 기록만 연속 일수 및 부스터에 반영한다.
   // 성찰일기·별빛메일·배지·교사 지급 등은 기본 연료만 지급한다.
   // 주말 활동은 기본 연료만 주고 연속 일수·마지막 활동일은 건드리지 않는다 —
   // 연속은 평일끼리(금 → 월) 이어지므로 주말 기록이 월요일 판정을 끊지 않게 한다.
@@ -132,7 +104,7 @@ export async function grantFuel(
   };
 
   // 일일 상한 — source_id가 매 활동마다 달라지는 소스(감정·성찰·편지)에만 필요.
-  // plan_check처럼 source_id가 날짜인 경우는 unique 제약이 이미 하루 1회를 보장한다.
+  // source_id가 날짜인 소스는 unique 제약이 이미 하루 1회를 보장한다.
   if (rule?.dailyCap && sourceId !== earnedOn) {
     const { count } = await supabase
       .from('fuel_ledger')

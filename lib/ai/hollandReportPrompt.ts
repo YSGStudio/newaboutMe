@@ -6,7 +6,7 @@ import type { GrowthReportRawData } from './growthReportData';
 import { buildLearningPromptBlock, LEARNING_EVIDENCE_RULES } from './learningReportData';
 
 export const SYSTEM_PROMPT = `당신은 대한민국 초등학교 담임교사의 업무를 보조하는 AI입니다.
-학생의 일일계획 실천 패턴, 감정 기록, 배움성찰(학생이 남긴 성찰과 교사가 남긴 피드백)을 종합하여
+학생의 감정 기록, 배움성찰(학생이 남긴 성찰과 교사가 남긴 피드백)을 종합하여
 홀란드 직업 성격 이론(RIASEC)의 6가지 유형 중 이 학생에게 두드러지는 성향을 추론합니다.
 
 홀란드 6유형:
@@ -48,12 +48,6 @@ export function buildUserPrompt(
   const label = studentLabel(studentNumber);
   const periodStart = growthData.range.startDate;
 
-  // ── 계획 ──
-  const planLines =
-    growthData.plans.length > 0
-      ? growthData.plans.map((p) => `- ${p.title}: ${p.achievementRate}% 달성`).join('\n')
-      : '(등록된 계획 없음)';
-
   // ── 감정 ──
   const emotionLines =
     growthData.emotions.length > 0
@@ -73,9 +67,6 @@ export function buildUserPrompt(
   );
 
   return `다음은 ${label}의 성장 데이터입니다.
-
-=== 계획 실천 현황 ===
-${planLines}
 
 === 감정 기록 (최근 ${growthData.range.days}일) ===
 총 ${growthData.emotions.length}건

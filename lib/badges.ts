@@ -1,10 +1,10 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { todayDate, formatDateInSeoul } from '@/lib/date';
+import { formatDateInSeoul } from '@/lib/date';
 import { EMOTION_META } from '@/types/domain';
 import type { EmotionType } from '@/types/domain';
 
 export type BadgeCategory = 'emotion' | 'plan' | 'reflection' | 'letter';
-export type BadgeTrigger = 'emotion_save' | 'plan_complete' | 'reflection_save' | 'mail_send';
+export type BadgeTrigger = 'emotion_save' | 'reflection_save' | 'mail_send';
 
 export type BadgeDef = {
   id: string;
@@ -13,6 +13,8 @@ export type BadgeDef = {
   category: BadgeCategory;
   categoryColor: string;
   condition: string;
+  /** 더 이상 새로 지급하지 않는 뱃지. 이미 받은 학생의 도감에만 남는다. */
+  retired?: boolean;
 };
 
 export const BADGES: BadgeDef[] = [
@@ -24,13 +26,14 @@ export const BADGES: BadgeDef[] = [
   { id: 'emotion_7days',    name: '7일의 기록',   icon: '🔥', category: 'emotion',     categoryColor: '#fbbf24', condition: '7일 연속 감정 기록' },
   { id: 'emotion_rainbow',  name: '감정 무지개',  icon: '🌈', category: 'emotion',     categoryColor: '#fbbf24', condition: '6가지 감정 카테고리 모두 기록' },
   { id: 'emotion_10types',  name: '감정 만물상',  icon: '🎭', category: 'emotion',     categoryColor: '#fbbf24', condition: '10가지 감정 종류 기록' },
-  // 계획 관리 (5개)
-  { id: 'plan_first',       name: '첫 계획',      icon: '✅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 처음으로 완료' },
-  { id: 'plan_perfect_1',   name: '오늘도 실천',  icon: '🌱', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 처음 달성' },
-  { id: 'plan_perfect_5',   name: '작은 실천가',  icon: '🏅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 5회' },
-  { id: 'plan_perfect_30',  name: '큰 실천가',    icon: '🏆', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 30일' },
-  { id: 'plan_check_100',   name: '백일의 기적',  icon: '💯', category: 'plan',        categoryColor: '#22c55e', condition: '모든 계획 체크 누적 100일' },
-  { id: 'plan_perfect_day', name: '완벽한 하루',  icon: '🌙', category: 'plan',        categoryColor: '#22c55e', condition: '감정 기록 + 계획 달성률 100%를 같은 날 달성' },
+  // 계획 관리 (6개) — 2026-10-09 일일계획 기능을 삭제하면서 지급을 멈췄다(retired).
+  // 이미 받은 학생의 도감·뱃지 수·별빛 캐릭터는 그대로 두기 위해 정의는 남긴다.
+  { id: 'plan_first',       name: '첫 계획',      icon: '✅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 처음으로 완료', retired: true },
+  { id: 'plan_perfect_1',   name: '오늘도 실천',  icon: '🌱', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 처음 달성', retired: true },
+  { id: 'plan_perfect_5',   name: '작은 실천가',  icon: '🏅', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 5회', retired: true },
+  { id: 'plan_perfect_30',  name: '큰 실천가',    icon: '🏆', category: 'plan',        categoryColor: '#22c55e', condition: '계획 달성률 100% 누적 30일', retired: true },
+  { id: 'plan_check_100',   name: '백일의 기적',  icon: '💯', category: 'plan',        categoryColor: '#22c55e', condition: '모든 계획 체크 누적 100일', retired: true },
+  { id: 'plan_perfect_day', name: '완벽한 하루',  icon: '🌙', category: 'plan',        categoryColor: '#22c55e', condition: '감정 기록 + 계획 달성률 100%를 같은 날 달성', retired: true },
   // 성찰일기 (4개)
   { id: 'reflection_first', name: '첫 성찰',      icon: '📖', category: 'reflection',  categoryColor: '#3b82f6', condition: '성찰일기 첫 작성' },
   { id: 'reflection_5',     name: '생각하는 아이', icon: '💭', category: 'reflection', categoryColor: '#3b82f6', condition: '성찰일기 누적 5회 작성' },
@@ -44,9 +47,11 @@ export const BADGES: BadgeDef[] = [
 
 export const BADGE_MAP = Object.fromEntries(BADGES.map((b) => [b.id, b]));
 
+/** 지금 지급 중인 뱃지. 학급 설정·소급 지급·도감의 미획득 목록은 이것만 본다. */
+export const ACTIVE_BADGES = BADGES.filter((b) => !b.retired);
+
 const TRIGGER_BADGE_IDS: Record<BadgeTrigger, string[]> = {
-  emotion_save:    ['emotion_first', 'emotion_10', 'emotion_30', 'emotion_100', 'emotion_7days', 'emotion_rainbow', 'emotion_10types', 'plan_perfect_day'],
-  plan_complete:   ['plan_first', 'plan_perfect_1', 'plan_perfect_5', 'plan_perfect_30', 'plan_check_100', 'plan_perfect_day'],
+  emotion_save:    ['emotion_first', 'emotion_10', 'emotion_30', 'emotion_100', 'emotion_7days', 'emotion_rainbow', 'emotion_10types'],
   reflection_save: ['reflection_first', 'reflection_5', 'reflection_10', 'reflection_20'],
   mail_send:       ['letter_first', 'letter_10', 'letter_20'],
 };
@@ -76,8 +81,8 @@ export async function backfillBadges(
   classTitles?: ClassTitleSetting[],
 ): Promise<void> {
   const allBadgeIds = enabledBadgeIds
-    ? BADGES.filter((b) => enabledBadgeIds.has(b.id)).map((b) => b.id)
-    : BADGES.map((b) => b.id);
+    ? ACTIVE_BADGES.filter((b) => enabledBadgeIds.has(b.id)).map((b) => b.id)
+    : ACTIVE_BADGES.map((b) => b.id);
   await awardBadgeList(supabase, studentId, allBadgeIds, classTitles);
 }
 
@@ -150,7 +155,6 @@ export async function checkAndAwardBadge(
 
 type BadgeStats = {
   emotion: { total: number; typeCount: number; categoryCount: number; recordedDates: Set<string> } | null;
-  plans: { perfectDays: number; checkedAllDays: number; anyCompleted: boolean; todayPerfect: boolean } | null;
   reflectionCount: number | null;
   letterCount: number | null;
 };
@@ -162,17 +166,13 @@ async function loadBadgeStats(
   studentId: string,
   badgeIds: string[],
 ): Promise<BadgeStats> {
-  const needsEmotion = badgeIds.some((id) => id.startsWith('emotion_') || id === 'plan_perfect_day');
-  const needsPlans = badgeIds.some((id) => id.startsWith('plan_'));
+  const needsEmotion = badgeIds.some((id) => id.startsWith('emotion_'));
   const needsReflection = badgeIds.some((id) => id.startsWith('reflection_'));
   const needsLetters = badgeIds.some((id) => id.startsWith('letter_'));
 
-  const [emotionRes, plansRes, reflectionRes, learningReflectionRes, letterRes] = await Promise.all([
+  const [emotionRes, reflectionRes, learningReflectionRes, letterRes] = await Promise.all([
     needsEmotion
       ? supabase.from('emotion_feeds').select('emotion_type,created_at').eq('student_id', studentId)
-      : Promise.resolve(null),
-    needsPlans
-      ? supabase.from('plans').select('id').eq('student_id', studentId).eq('is_active', true)
       : Promise.resolve(null),
     // 성찰 횟수는 두 기능을 합쳐 센다.
     // 평가피드백(eval_reflections)은 축소 예정이고, 배움성찰이 그 자리를 이어받는다.
@@ -207,46 +207,6 @@ async function loadBadgeStats(
     emotion = { total: rows.length, typeCount: types.size, categoryCount: categories.size, recordedDates };
   }
 
-  let plans: BadgeStats['plans'] = null;
-  if (plansRes) {
-    const planIds = ((plansRes.data ?? []) as { id: string }[]).map((p) => p.id);
-    if (planIds.length === 0) {
-      plans = { perfectDays: 0, checkedAllDays: 0, anyCompleted: false, todayPerfect: false };
-    } else {
-      const { data: checks } = await supabase
-        .from('plan_checks')
-        .select('plan_id,check_date,is_completed')
-        .in('plan_id', planIds);
-
-      const byDate = new Map<string, { total: number; completed: number; plans: Set<string> }>();
-      let anyCompleted = false;
-      for (const c of (checks ?? []) as { plan_id: string; check_date: string; is_completed: boolean }[]) {
-        const entry = byDate.get(c.check_date) ?? { total: 0, completed: 0, plans: new Set<string>() };
-        entry.total += 1;
-        entry.plans.add(c.plan_id);
-        if (c.is_completed) {
-          entry.completed += 1;
-          anyCompleted = true;
-        }
-        byDate.set(c.check_date, entry);
-      }
-
-      let perfectDays = 0;
-      let checkedAllDays = 0;
-      for (const entry of byDate.values()) {
-        if (entry.total > 0 && entry.total === entry.completed) perfectDays += 1;
-        if (entry.plans.size >= planIds.length) checkedAllDays += 1;
-      }
-
-      const todayEntry = byDate.get(todayDate());
-      const todayPerfect = Boolean(
-        todayEntry && todayEntry.plans.size >= planIds.length && todayEntry.total === todayEntry.completed
-      );
-
-      plans = { perfectDays, checkedAllDays, anyCompleted, todayPerfect };
-    }
-  }
-
   // 배움성찰은 한 제출물에 답이 여러 개 붙으므로 제출물 id 기준으로 중복을 제거한다.
   const learningReflectionCount = learningReflectionRes
     ? new Set(((learningReflectionRes.data ?? []) as { id: string }[]).map((row) => row.id)).size
@@ -254,7 +214,6 @@ async function loadBadgeStats(
 
   return {
     emotion,
-    plans,
     reflectionCount: reflectionRes || learningReflectionRes
       ? (reflectionRes?.count ?? 0) + learningReflectionCount
       : null,
@@ -288,22 +247,6 @@ function checkCondition(stats: BadgeStats, badgeId: string): boolean {
     case 'emotion_10types':
       return (stats.emotion?.typeCount ?? 0) >= 10;
 
-    // ── 계획 관리 ──────────────────────────────────────────
-    case 'plan_first':
-      return stats.plans?.anyCompleted ?? false;
-    case 'plan_perfect_1':
-      return (stats.plans?.perfectDays ?? 0) >= 1;
-    case 'plan_perfect_5':
-      return (stats.plans?.perfectDays ?? 0) >= 5;
-    case 'plan_perfect_30':
-      return (stats.plans?.perfectDays ?? 0) >= 30;
-    case 'plan_check_100':
-      return (stats.plans?.checkedAllDays ?? 0) >= 100;
-    case 'plan_perfect_day': {
-      const recordedToday = stats.emotion?.recordedDates.has(todayDate()) ?? false;
-      return recordedToday && (stats.plans?.todayPerfect ?? false);
-    }
-
     // ── 성찰일기 ──────────────────────────────────────────
     case 'reflection_first':
       return (stats.reflectionCount ?? 0) >= 1;
@@ -326,39 +269,3 @@ function checkCondition(stats: BadgeStats, badgeId: string): boolean {
       return false;
   }
 }
-
-export async function countPerfectPlanDays(supabase: SupabaseClient, studentId: string): Promise<number> {
-  // plan_checks에서 해당 학생의 날짜별 전체/완료 개수를 집계해 100% 달성 날짜 수 반환
-  const { data: plans } = await supabase
-    .from('plans')
-    .select('id')
-    .eq('student_id', studentId)
-    .eq('is_active', true);
-
-  if (!plans || plans.length === 0) return 0;
-
-  const planIds = plans.map((p: { id: string }) => p.id);
-
-  const { data: checks } = await supabase
-    .from('plan_checks')
-    .select('check_date, is_completed')
-    .in('plan_id', planIds);
-
-  if (!checks || checks.length === 0) return 0;
-
-  // 날짜별로 그룹핑
-  const dateMap = new Map<string, { total: number; completed: number }>();
-  for (const c of checks) {
-    const entry = dateMap.get(c.check_date) ?? { total: 0, completed: 0 };
-    entry.total += 1;
-    if (c.is_completed) entry.completed += 1;
-    dateMap.set(c.check_date, entry);
-  }
-
-  let perfectCount = 0;
-  for (const { total, completed } of dateMap.values()) {
-    if (total > 0 && total === completed) perfectCount += 1;
-  }
-  return perfectCount;
-}
-

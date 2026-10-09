@@ -2,7 +2,7 @@
 
 /**
  * StatsDashboard — "성장리포트" 탭
- * 학생별 통계(오늘/기간 실천률, 감정 분포, 배움성찰 현황)를 카드로 보여주고,
+ * 학생별 통계(감정 분포, 배움성찰 현황)를 카드로 보여주고,
  * AI 성장 리포트(총평·영역별 인사이트·홀란드 성향을 한 번에 생성)를 개별 학생에 대해 실행하며,
  * 개별/전체 PDF로 내보냅니다.
  * "전체 리포트 내보내기"와 "전체 분석하기"는 유료(PRO) 전용 — canBatchAnalyze prop으로 잠급니다.
@@ -42,23 +42,6 @@ type StudentSnapshot = {
     name: string;
     studentNumber: number;
   };
-  today: {
-    completed: number;
-    total: number;
-    achievementRate: number;
-  };
-  average: {
-    completed: number;
-    totalPossible: number;
-    achievementRate: number;
-  };
-  plans: Array<{
-    planId: string;
-    title: string;
-    completed: number;
-    totalPossible: number;
-    achievementRate: number;
-  }>;
   emotions: {
     totalFeeds: number;
     distribution: EmotionDistributionItem[];
@@ -128,7 +111,6 @@ type HollandResult = {
 type GrowthAiResult = {
   overallSummary: string;
   strengthKeywords: string[];
-  planAnalysis: string;
   emotionInsight: string;
   // 배움성찰 기록이 없는 학급도 있어 AI가 생략할 수 있다.
   learningInsight?: string;
@@ -165,7 +147,7 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
-// 달성률·제출률 막대 색 — 계획 실천률과 배움성찰 제출률이 같은 기준(80/50)을 쓴다.
+// 배움성찰 제출률 막대 색 — 80/50을 기준으로 나눈다.
 const rateBarColor = (pct: number) =>
   pct >= 80 ? 'linear-gradient(90deg,#22c55e,#16a34a)'
   : pct >= 50 ? 'linear-gradient(90deg,#facc15,#f59e0b)'
@@ -189,21 +171,6 @@ const buildStudentHtmlBlock = (
   snap: StudentSnapshot,
   learning: LearningReport | null,
 ): string => {
-  // ── 계획 ──
-  const planHtml = snap.plans.length === 0
-    ? '<p style="color:#6b7280;font-size:13px;margin:0">등록된 계획이 없어요.</p>'
-    : snap.plans.map((p) => `
-      <div style="background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-          <span style="font-size:13px;font-weight:600;color:#1e293b">${escapeHtml(p.title)}</span>
-          <span style="font-size:13px;font-weight:800;color:${rateTextColor(p.achievementRate)}">${p.achievementRate}%</span>
-        </div>
-        <div style="background:#e2e8f0;border-radius:99px;height:7px;overflow:hidden;margin-bottom:4px">
-          <div style="width:${p.achievementRate}%;height:100%;border-radius:99px;background:${rateBarColor(p.achievementRate)}"></div>
-        </div>
-        <span style="font-size:11px;color:#94a3b8">${p.completed}/${p.totalPossible}번 실천</span>
-      </div>`).join('');
-
   // ── 감정 ──
   const topEmotions = [...snap.emotions.distribution].filter((d) => d.count > 0).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
 
@@ -282,16 +249,8 @@ const buildStudentHtmlBlock = (
 
   return `
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      ${summaryTile('🎯', `${snap.average.achievementRate}%`, '평균 실천률', '#16a34a')}
       ${summaryTile('💭', `${snap.emotions.totalFeeds}건`, '감정 기록', '#7c3aed')}
       ${summaryTile('📚', `${learningSubmittedCount(learningSummary)}건`, '배움성찰', LEARNING_ACCENT)}
-    </div>
-    <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-        <span style="font-size:14px">📋</span>
-        <span style="font-size:14px;font-weight:700;color:#166534">계획별 실천률</span>
-      </div>
-      ${planHtml}
     </div>
     <div style="background:#f5f3ff;border-radius:12px;padding:12px 14px 10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
@@ -386,7 +345,6 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null, errorMessage?: string): s
       </div>
       ${summaryHtml}
       ${partLabel('② 지금의 모습')}
-      ${insightCard('일일계획 실천 분석', ai.planAnalysis, '#16a34a')}
       ${insightCard('감정 패턴 인사이트', ai.emotionInsight, '#7c3aed')}
       ${ai.learningInsight ? insightCard('배움성찰 인사이트', ai.learningInsight, LEARNING_ACCENT) : ''}
       ${partLabel('③ 앞으로')}
@@ -398,40 +356,6 @@ const buildAiSectionHtml = (ai: GrowthAiResult | null, errorMessage?: string): s
       </p>
     </div>`;
 };
-
-function PlanBarChart({ rows }: { rows: StudentSnapshot['plans'] }) {
-  return (
-    <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '12px 14px 10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <span style={{ fontSize: 14 }}>📋</span>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#166534' }}>계획별 실천률</h3>
-      </div>
-      {rows.length === 0 ? (
-        <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>등록된 계획이 없어요.</p>
-      ) : (
-        <div style={{ display: 'grid', gap: 7 }}>
-          {rows.map((row) => {
-            const barColor = rateBarColor(row.achievementRate);
-            return (
-              <div key={row.planId} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{row.title}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: rateTextColor(row.achievementRate) }}>
-                    {row.achievementRate}%
-                  </span>
-                </div>
-                <div style={{ background: '#e2e8f0', borderRadius: 99, height: 7, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ width: `${row.achievementRate}%`, height: '100%', borderRadius: 99, background: barColor, transition: 'width 0.4s ease' }} />
-                </div>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>{row.completed}/{row.totalPossible}번 실천</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function EmotionDonutChart({ distribution, totalFeeds }: { distribution: EmotionDistributionItem[]; totalFeeds: number }) {
   const activeItems = distribution.filter((d) => d.count > 0);
@@ -484,9 +408,8 @@ function SummaryTile({ icon, label, value, accent }: { icon: string; label: stri
   );
 }
 
-/** ② 지금의 모습 — 자료 출처별 인사이트 세 블록. 배움성찰은 기록이 없으면 AI가 생략합니다. */
-const AI_NOW_SECTIONS: { key: keyof Pick<GrowthAiResult, 'planAnalysis' | 'emotionInsight' | 'learningInsight'>; label: string; accent: string }[] = [
-  { key: 'planAnalysis', label: '일일계획 실천 분석', accent: '#16a34a' },
+/** ② 지금의 모습 — 자료 출처별 인사이트 두 블록. 배움성찰은 기록이 없으면 AI가 생략합니다. */
+const AI_NOW_SECTIONS: { key: keyof Pick<GrowthAiResult, 'emotionInsight' | 'learningInsight'>; label: string; accent: string }[] = [
   { key: 'emotionInsight', label: '감정 패턴 인사이트', accent: '#7c3aed' },
   { key: 'learningInsight', label: '배움성찰 인사이트', accent: LEARNING_ACCENT },
 ];
@@ -1177,7 +1100,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
         </p>
       )}
       <p className="hint" style={{ marginTop: 0 }}>
-        등록된 학생 카드를 클릭하면 상세 통계 창에서 오늘 실천률, 계획별 실천률, 감정 분포도를 확인할 수 있습니다.
+        등록된 학생 카드를 클릭하면 상세 통계 창에서 감정 분포도와 배움성찰 현황을 확인할 수 있습니다.
       </p>
 
       <div className="grid two">
@@ -1248,8 +1171,7 @@ export default function StatsDashboard({ classId, students, className, canBatchA
             </div>
 
             {snapshot && (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${showEval ? 4 : 3}, 1fr)`, gap: 8 }}>
-                <SummaryTile icon="🎯" label="평균 실천률" value={`${snapshot.average.achievementRate}%`} accent="#16a34a" />
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${showEval ? 3 : 2}, 1fr)`, gap: 8 }}>
                 <SummaryTile icon="💭" label="감정 기록" value={`${snapshot.emotions.totalFeeds}건`} accent="#7c3aed" />
                 <SummaryTile icon="📚" label="배움성찰" value={`${learningSubmittedCount(learningReport?.summary ?? EMPTY_LEARNING_SUMMARY)}건`} accent={LEARNING_ACCENT} />
                 {showEval && <SummaryTile icon="⭐" label="평가" value={`${evalReports.length}건`} accent="#d97706" />}
@@ -1268,7 +1190,6 @@ export default function StatsDashboard({ classId, students, className, canBatchA
 
             {!isLoading && snapshot && (
               <div style={{ display: 'grid', gap: 12 }}>
-                <PlanBarChart rows={snapshot.plans} />
                 <EmotionDonutChart distribution={snapshot.emotions.distribution} totalFeeds={snapshot.emotions.totalFeeds} />
                 <LearningSection report={learningReport} />
                 {showEval && <EvalSection reports={evalReports} loading={evalLoading} />}

@@ -3,7 +3,7 @@
 /**
  * VoyageContent — 학생용 스타 보이저(우주여행) 대시보드 본문
  * 학생이 로그인 후 보는 화면으로, 연료 게이지와 별 지도(항로), 다음 기항지까지 남은 연료,
- * 오늘의 활동(감정·계획·성찰·편지) 완료 상태, 최근 항해일지를 보여줍니다.
+ * 오늘의 활동(감정·성찰·편지) 완료 상태, 최근 항해일지를 보여줍니다.
  * 연료는 감정 기록·계획 체크 등 활동으로 쌓이며(lib/voyage의 grantFuel), 여기서는 그 결과를 보여줍니다.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -33,7 +33,7 @@ type VoyageData = {
   stars: Star[];
   recentLog: Ledger[];
   todayFuel: number;
-  missions: { plan: boolean; emotion: boolean; reflection: boolean; letterCount: number };
+  missions: { emotion: boolean; reflection: boolean; letterCount: number };
 };
 
 type QuestSummary = {
@@ -43,7 +43,7 @@ type QuestSummary = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  plan_check: '오늘 계획 전체 체크',
+  plan_check: '오늘 계획 전체 체크', // 일일계획 삭제(2026-10-09) 전에 쌓인 연료 내역 표시용
   emotion_feed: '감정 기록',
   reflection: '성찰일기',
   letter: '별빛메일',
@@ -101,7 +101,6 @@ export default function VoyageContent({ standalone = false }: { standalone?: boo
   if (!data) return <section className="card"><p>우주선을 준비하고 있어요...</p></section>;
 
   const missions = [
-    { icon: '✅', name: '오늘 계획', fuel: 5, done: data.missions.plan },
     { icon: '💜', name: '감정 기록', fuel: 8, done: data.missions.emotion },
     { icon: '📖', name: '성찰일기', fuel: 10, done: data.missions.reflection },
     { icon: '💌', name: '별빛메일', fuel: 5, done: data.missions.letterCount > 0 },

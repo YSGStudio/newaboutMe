@@ -24,14 +24,12 @@ export const CATEGORY_VALENCE: Record<EmotionCategoryType, Valence> = {
 export type WatchReasonCode =
   | 'silent'        // 기록이 끊김
   | 'heavy'         // 부정 감정이 이어짐
-  | 'plan_drop'     // 실천률 급락
   | 'isolated'      // 교우관계에서 고립 신호
   | 'learning_late'; // 배움성찰 밀림
 
 export const WATCH_REASON_META: Record<WatchReasonCode, { icon: string; label: string; detail: string }> = {
   silent:        { icon: '🔕', label: '기록이 끊김',   detail: '3일 이상 감정 기록이 없습니다.' },
   heavy:         { icon: '💧', label: '마음이 무거움', detail: '최근 감정 기록이 연속으로 부정 계열입니다.' },
-  plan_drop:     { icon: '📉', label: '실천률 급락',   detail: '지난주보다 계획 실천률이 크게 떨어졌습니다.' },
   isolated:      { icon: '🍃', label: '혼자일 수 있음', detail: '교우관계 설문에서 고립 신호가 있습니다.' },
   learning_late: { icon: '📚', label: '성찰 밀림',     detail: '배움성찰 활동을 연속으로 내지 않았습니다.' },
 };
@@ -40,6 +38,5 @@ export const WATCH_REASON_META: Record<WatchReasonCode, { icon: string; label: s
 export const WATCH_RULES = {
   silentDays: 3,
   heavyStreak: 3,
-  planDropPoints: 30,
   learningMissed: 2,
 } as const;

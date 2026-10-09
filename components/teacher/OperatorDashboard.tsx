@@ -35,7 +35,7 @@ type Overview = {
     estimatedCostUsd: number;
     topTeachers: { id: string; name: string; count: number }[];
   };
-  activityLast7Days: { emotion: number; planCompleted: number; letter: number; evalReport: number; reflection: number };
+  activityLast7Days: { emotion: number; letter: number; evalReport: number; reflection: number };
   activeStudents: { dau: number; wau: number };
   expiringSoon: { id: string; name: string; paidUntil: string | null }[];
 };
@@ -431,7 +431,6 @@ export default function OperatorDashboard() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {[
                   ['감정 기록', overview.activityLast7Days.emotion],
-                  ['계획 실천', overview.activityLast7Days.planCompleted],
                   ['별빛메일', overview.activityLast7Days.letter],
                   ['평가', overview.activityLast7Days.evalReport],
                   ['성찰일기', overview.activityLast7Days.reflection],

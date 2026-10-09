@@ -3,7 +3,7 @@
 /**
  * 학생 메인 대시보드 — 경로 "/student"
  * 학생이 로그인(학급코드+이름+PIN)하고 하루를 보내는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
- * 감정 기록(마음일기), 오늘 계획 체크, 별빛메일, 성찰일기, 교우관계 설문 응답,
+ * 감정 기록(마음일기), 별빛메일, 성찰일기, 교우관계 설문 응답,
  * 뱃지·별빛 캐릭터 배너 등 학생 활동 전체를 담습니다. 로그인 후 스타 보이저 탭도 여기서 진입합니다.
  * (각 활동은 저장 시 뱃지 지급/연료 적립으로 이어집니다.)
  */
@@ -22,15 +22,6 @@ import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
 import type { AwardedBadge } from '@/lib/badges';
 import { studentApi as api } from '@/lib/api-client';
-
-type PlanRow = { id: string; title: string; isCompleted: boolean | null };
-type PlanAchievementRow = {
-  planId: string;
-  title: string;
-  completed: number;
-  totalPossible: number;
-  achievementRate: number;
-};
 
 type VoyageSummary = {
   totalFuel: number;
@@ -58,8 +49,6 @@ type EmotionStats = {
 } | null;
 
 type EmotionChartItem = { key: string; label: string; count: number; ratio: number; color: string };
-
-type PlanTitleHistory = { id: string; old_title: string; new_title: string; changed_at: string };
 
 type Classmate = { id: string; name: string; student_number: number };
 
@@ -240,14 +229,11 @@ export default function StudentPage() {
   const [studentName, setStudentName] = useState('');
   const [sessionChecking, setSessionChecking] = useState(true);
   const [bootLoading, setBootLoading] = useState(false); // 로그인 후 초기 데이터 로딩 중(우주선 로딩 화면)
-  const [planDate, setPlanDate] = useState(getTodayInSeoul);
   const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
-  const [plans, setPlans] = useState<PlanRow[]>([]);
-  const [planAchievements, setPlanAchievements] = useState<PlanAchievementRow[]>([]);
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'plan' | 'learning' | 'eval' | 'relationship' | 'letters'>('voyage');
+  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'learning' | 'eval' | 'relationship' | 'letters'>('voyage');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
@@ -298,13 +284,6 @@ export default function StudentPage() {
   const [emotionCategory, setEmotionCategory] = useState(EMOTION_CATEGORIES[0].key);
   const [emotionType, setEmotionType] = useState<EmotionType>(EMOTION_CATEGORIES[0].emotions[0]);
 
-  const [editingPlanId, setEditingPlanId] = useState('');
-  const [editingTitle, setEditingTitle] = useState('');
-  const [editingLoading, setEditingLoading] = useState(false);
-  const [planHistoryMap, setPlanHistoryMap] = useState<Record<string, PlanTitleHistory[]>>({});
-  const [openHistoryPlanId, setOpenHistoryPlanId] = useState('');
-  const [planCelebration, setPlanCelebration] = useState<{ planId: string; key: number; kind: 'complete' | 'encourage' } | null>(null);
-
   const [lettersEnabled, setLettersEnabled] = useState(true);
   // 평가피드백(포트폴리오)은 관리자 선생님의 학급에만 열려 있습니다(lib/features.ts).
   // 서버가 학급 담임의 role을 보고 내려주는 값입니다.
@@ -312,10 +291,9 @@ export default function StudentPage() {
   const [studentTitle, setStudentTitle] = useState('별빛 새싹');
   const [studentBadgeCount, setStudentBadgeCount] = useState(0);
   const [voyageSummary, setVoyageSummary] = useState<VoyageSummary | null>(null);
-  const [badgeStats, setBadgeStats] = useState({ emotionCount: 0, perfectPlanDays: 0, reflectionCount: 0, letterSentCount: 0 });
+  const [badgeStats, setBadgeStats] = useState({ emotionCount: 0, reflectionCount: 0, letterSentCount: 0 });
   const [badgePopupQueue, setBadgePopupQueue] = useState<AwardedBadge[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
-  const [planLoading, setPlanLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
   const [isEditingEmotion, setIsEditingEmotion] = useState(false);
   const [myFeedLoading, setMyFeedLoading] = useState(false);
@@ -327,16 +305,9 @@ export default function StudentPage() {
   const [monthlyFeeds, setMonthlyFeeds] = useState<MonthlyFeedRow[]>([]);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const today = getTodayInSeoul();
-  const isPlanEditable = planDate === today;
   const isEmotionEditable = emotionDate === today;
 
-  const todaySummary = useMemo(() => {
-    const completed = plans.filter((plan) => plan.isCompleted === true).length;
-    return {
-      emotion: myFeed ? EMOTION_META[myFeed.emotion_type].label : '기록 전',
-      practiceRate: plans.length > 0 ? Math.round((completed / plans.length) * 100) : 0,
-    };
-  }, [myFeed, plans]);
+  const todayEmotionLabel = myFeed ? EMOTION_META[myFeed.emotion_type].label : '기록 전';
 
   const emotionOptions = useMemo(
     () => EMOTION_CATEGORIES.find((category) => category.key === emotionCategory)?.emotions ?? [],
@@ -394,44 +365,30 @@ export default function StudentPage() {
       const nextDate = getTodayInSeoul();
       if (nextDate === currentDate) return;
 
-      const shouldRefreshPlanDate = planDate === currentDate;
       const shouldRefreshEmotionDate = emotionDate === currentDate;
       const previousMonth = currentDate.slice(0, 7);
       currentDate = nextDate;
 
-      if (shouldRefreshPlanDate) setPlanDate(nextDate);
       if (shouldRefreshEmotionDate) setEmotionDate(nextDate);
       // 달이 바뀌면 평가기록 월별 탭도 새 달로 옮깁니다(사용자가 직접 고른 달은 그대로 둡니다).
       setEvalMonth((current) => (current === previousMonth ? nextDate.slice(0, 7) : current));
 
-      void Promise.all([
-        api<{ plans: PlanRow[] }>(`/api/plans/today?date=${shouldRefreshPlanDate ? nextDate : planDate}`).then((data) => setPlans(data.plans)),
-        loadPlanAchievements(),
-        api<{ feed: MyFeedRow }>(`/api/feeds?date=${shouldRefreshEmotionDate ? nextDate : emotionDate}`).then((data) => setMyFeed(data.feed))
-      ]).catch((err) => {
+      void api<{ feed: MyFeedRow }>(`/api/feeds?date=${shouldRefreshEmotionDate ? nextDate : emotionDate}`)
+        .then((data) => setMyFeed(data.feed))
+        .catch((err) => {
         setError((err as Error).message);
         clearNoticeLater();
       });
     }, 60 * 1000);
 
     return () => window.clearInterval(timer);
-  }, [emotionDate, planDate, studentName]);
+  }, [emotionDate, studentName]);
 
   const clearNoticeLater = () => {
     window.setTimeout(() => {
       setMessage('');
       setError('');
     }, 2500);
-  };
-
-  const loadPlans = async (date: string = planDate) => {
-    const data = await api<{ plans: PlanRow[] }>(`/api/plans/today?date=${date}`);
-    setPlans(data.plans);
-  };
-
-  const loadPlanAchievements = async () => {
-    const data = await api<{ plans: PlanAchievementRow[] }>('/api/stats/student/me/plans');
-    setPlanAchievements(data.plans);
   };
 
   const loadMyFeed = async (date: string = emotionDate) => {
@@ -504,9 +461,8 @@ export default function StudentPage() {
       setLettersEnabled(data.class.lettersEnabled ?? true);
       setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
       const loginToday = getTodayInSeoul();
-      setPlanDate(loginToday);
       setEmotionDate(loginToday);
-      await Promise.all([loadPlans(loginToday), loadPlanAchievements(), loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
+      await Promise.all([loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
       void loadVoyageSummary(); // 배너용 — 로그인 완료를 막지 않도록 기다리지 않는다
       setActiveTab('voyage');
       setStudentName(data.student.name); // 데이터가 준비된 뒤 대시보드 노출
@@ -518,137 +474,6 @@ export default function StudentPage() {
     } finally {
       setLoginLoading(false);
       setBootLoading(false);
-    }
-  };
-
-  const onCreatePlan = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!isPlanEditable) {
-      setError('지난 날짜의 계획은 수정할 수 없습니다.');
-      clearNoticeLater();
-      return;
-    }
-    setPlanLoading(true);
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const title = String(form.get('title'));
-    try {
-      const data = await api<{ plan: { id: string; title: string } }>('/api/plans', { method: 'POST', body: JSON.stringify({ title }) });
-      formEl.reset();
-      setPlans((prev) => [...prev, { id: data.plan.id, title: data.plan.title, isCompleted: null }]);
-      await loadPlanAchievements();
-      setMessage('계획이 추가되었습니다.');
-      clearNoticeLater();
-    } catch (err) {
-      setError((err as Error).message);
-      clearNoticeLater();
-    } finally {
-      setPlanLoading(false);
-    }
-  };
-
-  const togglePlan = async (planId: string, nextState: boolean | null) => {
-    if (!isPlanEditable) {
-      setError('지난 날짜의 계획은 수정할 수 없습니다.');
-      clearNoticeLater();
-      return;
-    }
-
-    const before = plans;
-    setPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, isCompleted: nextState } : plan)));
-
-    // 축하 애니메이션은 서버 응답을 기다리지 않고 체크와 동시에 즉시 재생(낙관적 UI).
-    // (계획 체크 API는 배지·연료 지급까지 처리하느라 응답이 느려서, 기다리면 딜레이가 체감된다)
-    const celebrationKey = Date.now();
-    if (nextState === true || nextState === false) {
-      setPlanCelebration({ planId, key: celebrationKey, kind: nextState ? 'complete' : 'encourage' });
-      window.setTimeout(() => {
-        setPlanCelebration((current) => current?.key === celebrationKey ? null : current);
-      }, 950);
-    }
-
-    try {
-      const checkData = await api<{ newBadges: AwardedBadge[] }>(`/api/plans/${planId}/check?date=${planDate}`, {
-        method: 'POST',
-        body: JSON.stringify({ isCompleted: nextState })
-      });
-      await loadPlanAchievements();
-      void loadVoyageSummary();
-      handleNewBadges(checkData.newBadges ?? []);
-    } catch (err) {
-      setPlans(before);
-      setPlanCelebration((current) => (current?.key === celebrationKey ? null : current)); // 실패 시 축하도 취소
-      setError((err as Error).message);
-      clearNoticeLater();
-    }
-  };
-
-  const deletePlan = async (planId: string) => {
-    if (!isPlanEditable) {
-      setError('지난 날짜의 계획은 수정할 수 없습니다.');
-      clearNoticeLater();
-      return;
-    }
-
-    const before = plans;
-    setPlans((prev) => prev.filter((plan) => plan.id !== planId));
-    try {
-      await api(`/api/plans/${planId}`, { method: 'DELETE' });
-      await loadPlanAchievements();
-      setMessage('계획이 삭제되었습니다.');
-      clearNoticeLater();
-    } catch (err) {
-      setPlans(before);
-      setError((err as Error).message);
-      clearNoticeLater();
-    }
-  };
-
-  const startEditPlan = (plan: PlanRow) => {
-    setEditingPlanId(plan.id);
-    setEditingTitle(plan.title);
-  };
-
-  const cancelEditPlan = () => {
-    setEditingPlanId('');
-    setEditingTitle('');
-  };
-
-  const updatePlan = async (planId: string) => {
-    const trimmed = editingTitle.trim();
-    if (!trimmed) return;
-    setEditingLoading(true);
-    try {
-      const data = await api<{ plan: { id: string; title: string } }>(`/api/plans/${planId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ title: trimmed })
-      });
-      setPlans((prev) => prev.map((p) => (p.id === planId ? { ...p, title: data.plan.title } : p)));
-      // 이력 캐시 초기화 (다음 열람 시 새로 불러옴)
-      setPlanHistoryMap((prev) => { const next = { ...prev }; delete next[planId]; return next; });
-      cancelEditPlan();
-      setMessage('계획이 수정되었습니다.');
-      clearNoticeLater();
-    } catch (err) {
-      setError((err as Error).message);
-      clearNoticeLater();
-    } finally {
-      setEditingLoading(false);
-    }
-  };
-
-  const toggleHistory = async (planId: string) => {
-    if (openHistoryPlanId === planId) {
-      setOpenHistoryPlanId('');
-      return;
-    }
-    setOpenHistoryPlanId(planId);
-    if (planHistoryMap[planId]) return; // 이미 로드됨
-    try {
-      const data = await api<{ history: PlanTitleHistory[] }>(`/api/plans/${planId}/history`);
-      setPlanHistoryMap((prev) => ({ ...prev, [planId]: data.history }));
-    } catch {
-      setPlanHistoryMap((prev) => ({ ...prev, [planId]: [] }));
     }
   };
 
@@ -899,18 +724,12 @@ export default function StudentPage() {
     await api('/api/auth/student/logout', { method: 'POST' });
     setStudentName('');
     setActiveTab('voyage');
-    setPlanDate(getTodayInSeoul());
     setEmotionDate(getTodayInSeoul());
-    setPlans([]);
-    setPlanAchievements([]);
     setMyFeed(null);
     setEvalReports([]);
     setEvalReportsLoaded(false);
     setEvalMonth(getThisMonthInSeoul());
     setEvalDetail(null);
-    setEditingPlanId('');
-    setPlanHistoryMap({});
-    setOpenHistoryPlanId('');
     setReceivedLetters([]);
     setSentLetters([]);
     setReceivedLoaded(false);
@@ -935,7 +754,7 @@ export default function StudentPage() {
       const d = await api<{
         badgeCount: number;
         title: string;
-        stats: { emotionCount: number; perfectPlanDays: number; reflectionCount: number; letterSentCount: number };
+        stats: { emotionCount: number; reflectionCount: number; letterSentCount: number };
       }>('/api/badges/me');
       setStudentBadgeCount(d.badgeCount);
       setStudentTitle(d.title);
@@ -985,11 +804,8 @@ export default function StudentPage() {
         setLettersEnabled(data.class.lettersEnabled ?? true);
         setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
         const loginToday = getTodayInSeoul();
-        setPlanDate(loginToday);
         setEmotionDate(loginToday);
         await Promise.all([
-          loadPlans(loginToday),
-          loadPlanAchievements(),
           loadMyFeed(loginToday),
           loadBadgeProfile(),
           loadRelationshipStatus(),
@@ -1056,16 +872,6 @@ export default function StudentPage() {
     setEmotionDate(nextDate);
     try {
       await loadMyFeed(nextDate);
-    } catch (err) {
-      setError((err as Error).message);
-      clearNoticeLater();
-    }
-  };
-
-  const onChangePlanDate = async (nextDate: string) => {
-    setPlanDate(nextDate);
-    try {
-      await loadPlans(nextDate);
     } catch (err) {
       setError((err as Error).message);
       clearNoticeLater();
@@ -1230,27 +1036,15 @@ export default function StudentPage() {
               border: '1px solid rgba(196,181,253,0.65)',
             }}>
               <p style={{ margin: 0, fontSize: 9, color: '#7c3aed', fontWeight: 700, whiteSpace: 'nowrap' }}>💜 오늘 감정</p>
-              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#1e1b4b', fontWeight: 800, whiteSpace: 'nowrap' }}>{todaySummary.emotion}</p>
-            </div>
-            <div style={{
-              minWidth: 70,
-              padding: '5px 9px',
-              borderRadius: 10,
-              textAlign: 'center',
-              background: 'rgba(255,255,255,0.6)',
-              border: '1px solid rgba(165,180,252,0.65)',
-            }}>
-              <p style={{ margin: 0, fontSize: 9, color: '#4f46e5', fontWeight: 700, whiteSpace: 'nowrap' }}>⭐ 실천률</p>
-              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#1e1b4b', fontWeight: 800 }}>{todaySummary.practiceRate}%</p>
+              <p style={{ margin: '1px 0 0', fontSize: 12, color: '#1e1b4b', fontWeight: 800, whiteSpace: 'nowrap' }}>{todayEmotionLabel}</p>
             </div>
           </div>
 
           <div style={{ width: 1, height: 32, background: '#c7d2fe', flexShrink: 0 }} />
 
-          {/* 통계 칩 4개 */}
+          {/* 통계 칩 3개 */}
           {[
             { icon: '💜', label: '감정', value: badgeStats.emotionCount,    unit: '회' },
-            { icon: '✅', label: '계획100%', value: badgeStats.perfectPlanDays, unit: '일' },
             { icon: '📝', label: '성찰', value: badgeStats.reflectionCount, unit: '회' },
             { icon: '💌', label: '편지', value: badgeStats.letterSentCount,  unit: '통' },
           ].map((stat) => (
@@ -1346,7 +1140,6 @@ export default function StudentPage() {
               items={[
                 { key: 'voyage', label: '별빛여행', icon: '🚀' },
                 { key: 'emotion', label: '마음일기', icon: '💜' },
-                { key: 'plan', label: '일일계획', icon: '⭐' },
                 { key: 'learning', label: '배움성찰', icon: '📚' },
                 // 평가피드백은 관리자 선생님의 학급에만 보입니다(lib/features.ts).
                 ...(evalFeedbackEnabled ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
@@ -1359,7 +1152,7 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'voyage' | 'emotion' | 'plan' | 'learning' | 'eval' | 'relationship' | 'letters');
+                setActiveTab(key as 'voyage' | 'emotion' | 'learning' | 'eval' | 'relationship' | 'letters');
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
                 if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
@@ -1632,198 +1425,6 @@ export default function StudentPage() {
                   )}
                 </form>
               )}
-            </section>
-          )}
-
-          {activeTab === 'plan' && (
-            <section className="card">
-              <div className="row space-between" style={{ marginBottom: 8 }}>
-                <h2 style={{ margin: 0 }}>오늘의 계획</h2>
-                <div style={{ width: 180 }}>
-                  <label style={{ marginBottom: 4 }}>날짜 선택</label>
-                  <input
-                    type="date"
-                    value={planDate}
-                    max={today}
-                    onChange={(event) => onChangePlanDate(event.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="hint" style={{ marginTop: 0 }}>
-                {isPlanEditable ? '오늘 계획은 추가, 체크, 삭제가 가능합니다.' : '과거 날짜의 계획은 조회만 가능하며 수정할 수 없습니다.'}
-              </p>
-              <div className="grid two" style={{ marginBottom: 12 }}>
-                {planAchievements.length === 0 ? (
-                  <EmptyState title="실천률 데이터가 없습니다" description="계획을 추가하면 누적 실천률이 표시됩니다." />
-                ) : (
-                  planAchievements.map((item) => (
-                    <div key={item.planId} className="card" style={{ padding: 10 }}>
-                      <div className="row space-between" style={{ marginBottom: 4 }}>
-                        <strong style={{ fontSize: 14 }}>{item.title}</strong>
-                        <span className="badge">{item.achievementRate}%</span>
-                      </div>
-                      <div className="progress-track">
-                        <div className="progress-fill" style={{ width: `${item.achievementRate}%` }} />
-                      </div>
-                      <p className="hint">
-                        이번 달 누적 {item.completed}/{item.totalPossible}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-              <form className="row" onSubmit={onCreatePlan}>
-                <input name="title" placeholder="예: 책 30분 읽기" required disabled={!isPlanEditable} />
-                <div style={{ width: 140 }}>
-                  <SubmitButton loading={planLoading} idleText="추가" disabled={!isPlanEditable} />
-                </div>
-              </form>
-
-              <div className="grid student-plan-list" style={{ marginTop: 12 }}>
-                {plans.length === 0 ? (
-                  <EmptyState
-                    title="등록된 계획이 없습니다"
-                    description={isPlanEditable ? '오늘 계획을 하나 추가해보세요.' : '선택한 날짜에 확인할 계획 데이터가 없습니다.'}
-                  />
-                ) : (
-                  plans.map((plan) => {
-                    const isEditing = editingPlanId === plan.id;
-                    const isHistoryOpen = openHistoryPlanId === plan.id;
-                    const history = planHistoryMap[plan.id];
-                    return (
-                      <div
-                        key={plan.id}
-                        className={`card student-plan-item${plan.isCompleted === true ? ' is-complete' : plan.isCompleted === false ? ' is-incomplete' : ''}`}
-                      >
-                        {planCelebration?.planId === plan.id && (
-                          <span
-                            key={planCelebration.key}
-                            className={`student-plan-celebration is-${planCelebration.kind}`}
-                            aria-hidden="true"
-                          >
-                            <span className="plan-celebration-ring" />
-                            <span className="plan-celebration-piece piece-1">★</span>
-                            <span className="plan-celebration-piece piece-2">✦</span>
-                            <span className="plan-celebration-piece piece-3">●</span>
-                            <span className="plan-celebration-piece piece-4">◆</span>
-                            <span className="plan-celebration-piece piece-5">✦</span>
-                            <span className="plan-celebration-piece piece-6">●</span>
-                            <span className="plan-celebration-piece piece-7">★</span>
-                            <span className="plan-celebration-piece piece-8">◆</span>
-                            <span className="plan-celebration-pop">
-                              {planCelebration.kind === 'complete' ? '참 잘했어요!' : '응원할게요!'}
-                            </span>
-                          </span>
-                        )}
-                        {/* 편집 모드 */}
-                        {isEditing ? (
-                          <div className="row student-plan-edit" style={{ gap: 6 }}>
-                            <input
-                              value={editingTitle}
-                              maxLength={50}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              style={{ flex: 1, minHeight: 36 }}
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              className="ghost student-plan-action plan-action-save"
-                              disabled={editingLoading || !editingTitle.trim()}
-                              onClick={() => updatePlan(plan.id)}
-                            >
-                              <span aria-hidden="true">✦</span>{editingLoading ? '저장 중...' : '저장'}
-                            </button>
-                            <button
-                              type="button"
-                              className="outline student-plan-action"
-                              onClick={cancelEditPlan}
-                            >
-                              <span aria-hidden="true">×</span>취소
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="student-plan-row">
-                            <div className="student-plan-title-wrap">
-                              <span className="student-plan-status" aria-hidden="true">
-                                {plan.isCompleted === true ? '✓' : plan.isCompleted === false ? '–' : '✦'}
-                              </span>
-                              <span className="student-plan-title">{plan.title}</span>
-                            </div>
-                            <div className="student-plan-actions">
-                            <button
-                              type="button"
-                              className={`student-plan-action plan-action-complete${plan.isCompleted === true ? ' is-selected' : ''}`}
-                              disabled={!isPlanEditable}
-                              onClick={() => togglePlan(plan.id, plan.isCompleted === true ? null : true)}
-                            >
-                              <span aria-hidden="true">✓</span>완료
-                            </button>
-                            <button
-                              type="button"
-                              className={`student-plan-action plan-action-incomplete${plan.isCompleted === false ? ' is-selected' : ''}`}
-                              disabled={!isPlanEditable}
-                              onClick={() => togglePlan(plan.id, plan.isCompleted === false ? null : false)}
-                            >
-                              <span aria-hidden="true">↺</span>미완료
-                            </button>
-                            {isPlanEditable && (
-                              <button
-                                type="button"
-                                className="student-plan-action plan-action-edit"
-                                onClick={() => startEditPlan(plan)}
-                              >
-                                <span aria-hidden="true">✎</span>수정
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className={`student-plan-action plan-action-history${isHistoryOpen ? ' is-selected' : ''}`}
-                              onClick={() => toggleHistory(plan.id)}
-                            >
-                              <span aria-hidden="true">◷</span>이력 <span aria-hidden="true">{isHistoryOpen ? '▴' : '▾'}</span>
-                            </button>
-                            {isPlanEditable && (
-                              <button
-                                type="button"
-                                className="student-plan-action plan-action-delete"
-                                onClick={() => deletePlan(plan.id)}
-                              >
-                                <span aria-hidden="true">♲</span>삭제
-                              </button>
-                            )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 변경 이력 */}
-                        {isHistoryOpen && (
-                          <div className="student-plan-history">
-                            <p className="hint" style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600 }}>◷ 변경 이력</p>
-                            {!history ? (
-                              <p className="hint" style={{ fontSize: 12 }}>불러오는 중...</p>
-                            ) : history.length === 0 ? (
-                              <p className="hint" style={{ fontSize: 12 }}>변경 이력이 없습니다.</p>
-                            ) : (
-                              <div className="grid" style={{ gap: 4 }}>
-                                {history.map((h) => (
-                                  <div key={h.id} style={{ fontSize: 12, color: '#64748b' }}>
-                                    <span style={{ color: '#dc2626' }}>{h.old_title}</span>
-                                    {' → '}
-                                    <span style={{ color: '#16a34a' }}>{h.new_title}</span>
-                                    <span style={{ marginLeft: 8, color: '#94a3b8' }}>
-                                      {new Date(h.changed_at).toLocaleDateString('ko-KR')}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </section>
           )}
 

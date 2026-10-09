@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { BADGES, backfillBadges, countPerfectPlanDays, ClassTitleSetting } from '@/lib/badges';
+import { ACTIVE_BADGES, BADGES, backfillBadges, ClassTitleSetting } from '@/lib/badges';
 
 export async function GET() {
   const auth = await requireStudentSession();
@@ -47,7 +47,9 @@ export async function GET() {
     console.error('[badges/me] student_badges 조회 실패 (마이그레이션 미적용 가능성):', countError.message);
   }
 
-  const totalEnabled = enabledBadgeIds ? enabledBadgeIds.size : BADGES.length;
+  const totalEnabled = enabledBadgeIds
+    ? ACTIVE_BADGES.filter((b) => enabledBadgeIds.has(b.id)).length
+    : ACTIVE_BADGES.length;
   if ((earnedCount ?? 0) < totalEnabled) {
     await backfillBadges(supabaseAdmin, sid, enabledBadgeIds, classTitles);
   }
@@ -58,21 +60,20 @@ export async function GET() {
     emotionResult,
     reflectionResult,
     letterResult,
-    perfectDays,
   ] = await Promise.all([
     supabaseAdmin.from('student_badges').select('badge_id, earned_at').eq('student_id', sid),
     supabaseAdmin.from('students').select('badge_count, title').eq('id', sid).single(),
     supabaseAdmin.from('emotion_feeds').select('id', { count: 'exact', head: true }).eq('student_id', sid),
     supabaseAdmin.from('eval_reflections').select('id', { count: 'exact', head: true }).eq('student_id', sid),
     supabaseAdmin.from('letters').select('id', { count: 'exact', head: true }).eq('sender_id', sid),
-    countPerfectPlanDays(supabaseAdmin, sid),
   ]);
 
   const earnedMap = new Map(
     (earnedRows.data ?? []).map((r: { badge_id: string; earned_at: string }) => [r.badge_id, r.earned_at])
   );
 
-  const badges = BADGES.map((b) => ({
+  // 지급을 멈춘(retired) 뱃지는 이미 받은 학생에게만 보여준다.
+  const badges = BADGES.filter((b) => !b.retired || earnedMap.has(b.id)).map((b) => ({
     ...b,
     earned: earnedMap.has(b.id),
     earnedAt: earnedMap.get(b.id) ?? null,
@@ -85,7 +86,6 @@ export async function GET() {
     title: studentRow.data?.title ?? '별빛 새싹',
     stats: {
       emotionCount:    emotionResult.count    ?? 0,
-      perfectPlanDays: perfectDays,
       reflectionCount: reflectionResult.count ?? 0,
       letterSentCount: letterResult.count     ?? 0,
     },

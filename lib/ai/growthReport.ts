@@ -16,7 +16,7 @@ import { getOpenAIClient, GROWTH_REPORT_MODEL } from './openaiClient';
 
 export class InsufficientDataError extends Error {
   constructor() {
-    super('분석할 데이터가 충분하지 않습니다. (계획·감정기록이 모두 없음)');
+    super('분석할 데이터가 충분하지 않습니다. (감정 기록·배움성찰이 모두 없음)');
     this.name = 'InsufficientDataError';
   }
 }
@@ -25,7 +25,7 @@ export type GrowthReportApiResult = GrowthReportResult & {
   generatedAt: string;
   cached: boolean;
   // 캐시된 응답은 원본 데이터를 다시 조회하지 않으므로 비어있을 수 있음
-  dataSummary?: { planCount: number; emotionCount: number };
+  dataSummary?: { emotionCount: number; learningCount: number };
 };
 
 // 통합 이전(2026-08-28 마이그레이션 전)에 저장된 행은 요약·키워드·성향이 비어 있다.
@@ -33,7 +33,6 @@ export type GrowthReportApiResult = GrowthReportResult & {
 type CachedRow = {
   overall_summary: string | null;
   strength_keywords: unknown;
-  plan_analysis: string;
   emotion_insight: string;
   learning_insight: string | null;
   growth_suggestion: string;
@@ -48,7 +47,7 @@ type CachedRow = {
 };
 
 const CACHED_COLUMNS =
-  'overall_summary, strength_keywords, plan_analysis, emotion_insight, learning_insight, growth_suggestion, ' +
+  'overall_summary, strength_keywords, emotion_insight, learning_insight, growth_suggestion, ' +
   'holland_primary_type, holland_primary_label, holland_primary_reason, ' +
   'holland_secondary_type, holland_secondary_label, holland_secondary_reason, ' +
   'holland_career_suggestions, created_at';
@@ -80,11 +79,11 @@ export async function getOrGenerateGrowthReport(
   const data = await gatherGrowthReportData(studentId, period);
 
   const dataSummary = {
-    planCount: data.plans.length,
     emotionCount: data.emotions.length,
+    learningCount: data.learning.submittedCount,
   };
 
-  if (dataSummary.planCount === 0 && dataSummary.emotionCount === 0) {
+  if (dataSummary.emotionCount === 0 && dataSummary.learningCount === 0) {
     throw new InsufficientDataError();
   }
 
@@ -132,7 +131,6 @@ export async function getOrGenerateGrowthReport(
       generated_date: generatedDate,
       overall_summary: result.overallSummary,
       strength_keywords: result.strengthKeywords,
-      plan_analysis: result.planAnalysis,
       emotion_insight: result.emotionInsight,
       learning_insight: result.learningInsight ?? null,
       growth_suggestion: result.growthSuggestion,
@@ -198,7 +196,6 @@ function buildApiResultFromCache(cached: CachedRow): GrowthReportApiResult {
   return {
     overallSummary: cached.overall_summary ?? '',
     strengthKeywords: toStringArray(cached.strength_keywords),
-    planAnalysis: cached.plan_analysis,
     emotionInsight: cached.emotion_insight,
     learningInsight: cached.learning_insight ?? undefined,
     growthSuggestion: cached.growth_suggestion,

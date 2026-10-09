@@ -3,7 +3,7 @@
 /**
  * 교사 대시보드 — 경로 "/teacher"
  * 교사가 로그인(이메일+비밀번호)해 학급을 운영하는 핵심 화면으로, 이 앱에서 가장 큰 페이지입니다.
- * 상단 탭으로 기능을 전환합니다: 학급관리 · 학생관리 · 마음피드 · 평가피드백 · 교우관계 ·
+ * 상단 탭으로 기능을 전환합니다: 학급관리 · 마음피드 · 평가피드백 · 교우관계 ·
  * 성장리포트 · 별빛메일 · 학급설정, 그리고 관리자 전용 운영관리(회원·사용량·공지).
  * 각 탭의 실제 내용은 components/teacher/*의 대시보드 컴포넌트들이 담당합니다.
  */
@@ -33,6 +33,7 @@ import ClassSettings from "@/components/teacher/ClassSettings";
 import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
+import LetterThreads from "@/components/teacher/LetterThreads";
 import { formatDateInSeoul } from "@/lib/date";
 import { api } from "@/lib/api-client";
 import usePoll from "@/lib/use-poll";
@@ -51,6 +52,8 @@ type LetterRow = {
   created_at: string;
   updated_at: string;
   teacher_archived_at: string | null; // 교사가 읽음처리한 시각 (null이면 새 편지)
+  sender_id: string;
+  recipient_id: string;
   sender: { id: string; name: string; student_number: number } | null;
   recipient: { id: string; name: string; student_number: number } | null;
 };
@@ -64,22 +67,10 @@ type ClassItem = {
   letters_enabled: boolean;
 };
 
-type StudentPlan = {
-  id: string;
-  title: string;
-  isCompleted: boolean | null;
-};
-
 type StudentItem = {
   id: string;
   name: string;
   student_number: number;
-  todayCompleted?: number;
-  todayTotal?: number;
-  todayAchievementRate?: number;
-  isTodayAllCompleted?: boolean;
-  isTodayAllChecked?: boolean;
-  plans?: StudentPlan[];
 };
 
 type FeedItem = {
@@ -121,7 +112,6 @@ export default function TeacherPage() {
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
     | "class"
-    | "student"
     | "feed"
     | "learning"
     | "eval"
@@ -163,7 +153,6 @@ export default function TeacherPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [classLoading, setClassLoading] = useState(false);
   const [feedLoading, setFeedLoading] = useState(false);
-  const [studentListLoading, setStudentListLoading] = useState(false);
   const [deletingClassId, setDeletingClassId] = useState("");
   const [deleteConfirmClass, setDeleteConfirmClass] =
     useState<ClassItem | null>(null);
@@ -237,6 +226,11 @@ export default function TeacherPage() {
       return haystack.includes(keyword);
     });
   }, [classLetters, activeLetters, letterSearch]);
+  // 대화 목록에 올릴 기준 — 평소에는 새 편지, 검색 중에는 검색에 걸린 편지가 든 대화.
+  const visibleLetterIds = useMemo(
+    () => new Set(filteredLetters.map((letter) => letter.id)),
+    [filteredLetters]
+  );
   // 무료회원은 학급 1개까지, 유료·관리자는 추가 생성 가능
   const canCreateClass = canUseAi || classes.length === 0;
   // 유료 → 무료 전환 후 학급이 2개 이상 남은 상태: 학급 정리 전까지 다른 탭 잠금
@@ -528,13 +522,8 @@ export default function TeacherPage() {
     }
   }, [activeTab, selectedClassId, feedDate, loadFeeds]);
 
-  // 일일계획·마음피드는 학생이 지금 쓰고 있는 화면을 옆에서 보는 성격이라,
+  // 마음피드는 학생이 지금 쓰고 있는 화면을 옆에서 보는 성격이라,
   // 열려 있는 동안 15초마다 조용히 다시 읽는다(usePoll이 탭이 뒤에 있으면 건너뛴다).
-  usePoll(() => loadStudents(selectedClassId), {
-    enabled: activeTab === "student" && Boolean(selectedClassId),
-    busy: studentListLoading,
-  });
-
   // 지난 날짜를 보고 있어도 갱신한다 — 그날 기록에 친구들의 반응이 계속 붙는다.
   usePoll(() => loadFeeds(selectedClassId, feedDate, true), {
     enabled: activeTab === "feed" && Boolean(selectedClassId),
@@ -1073,19 +1062,6 @@ export default function TeacherPage() {
     setFeedDate(nextDate);
   };
 
-  const onRefreshStudents = async () => {
-    if (!selectedClassId || studentListLoading) return;
-    setStudentListLoading(true);
-    try {
-      await loadStudents(selectedClassId);
-    } catch (err) {
-      setAuthError((err as Error).message);
-      clearNoticeLater();
-    } finally {
-      setStudentListLoading(false);
-    }
-  };
-
   return (
     <main
       className={`grid${
@@ -1403,12 +1379,6 @@ export default function TeacherPage() {
               items={[
                 { key: "dashboard", label: "대시보드", icon: "📊", disabled: isOverClassLimit },
                 {
-                  key: "student",
-                  label: "일일계획",
-                  icon: "🧑‍🚀",
-                  disabled: isOverClassLimit,
-                },
-                {
                   key: "feed",
                   label: "마음피드",
                   icon: "💜",
@@ -1498,181 +1468,6 @@ export default function TeacherPage() {
           </aside>
 
           {activeTab === "class" && renderClassManagement()}
-
-          {activeTab === "student" && (
-            <section className="card">
-              <div className="student-management-header">
-                <div>
-                  <h2 style={{ margin: 0 }}>일일계획</h2>
-                  <p className="hint" style={{ margin: "4px 0 0" }}>
-                    학생별 오늘 계획과 체크 현황을 확인합니다.
-                  </p>
-                </div>
-                <div
-                  className="student-management-actions"
-                  aria-label="일일계획 도구"
-                >
-                  <RefreshButton
-                    onClick={onRefreshStudents}
-                    loading={studentListLoading}
-                    disabled={!selectedClassId}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ margin: 0 }}>학생 목록</h3>
-
-                {students.length === 0 ? (
-                  <EmptyState
-                    title="등록된 학생이 없습니다"
-                    description="학생을 추가하면 이곳에 표시됩니다."
-                  />
-                ) : (
-                  <div className="student-card-grid" style={{ marginTop: 8 }}>
-                    {students.map((student) => {
-                      const todayCompleted = student.todayCompleted ?? 0;
-                      const todayTotal = student.todayTotal ?? 0;
-                      const todayAchievementRate =
-                        student.todayAchievementRate ?? 0;
-                      const isTodayAllChecked = Boolean(
-                        student.isTodayAllChecked
-                      );
-                      const plans = student.plans ?? [];
-                      const studentMascots = ["🚀", "🪐", "🌙", "🛸"];
-                      const mascotIndex =
-                        (student.student_number - 1) % studentMascots.length;
-                      return (
-                        <article
-                          key={student.id}
-                          className={`card student-card starlight-student-card student-card-theme-${mascotIndex}${
-                            isTodayAllChecked ? " student-card-complete" : ""
-                          }`}
-                        >
-                          <span
-                            className="student-card-twinkle student-card-twinkle-one"
-                            aria-hidden="true"
-                          >
-                            ✦
-                          </span>
-                          <span
-                            className="student-card-twinkle student-card-twinkle-two"
-                            aria-hidden="true"
-                          >
-                            ★
-                          </span>
-                          <div className="student-card-heading">
-                            <div
-                              className="student-card-avatar"
-                              aria-hidden="true"
-                            >
-                              <span>{studentMascots[mascotIndex]}</span>
-                              <i />
-                            </div>
-                            <div className="student-card-identity">
-                              <span>{student.student_number}번 탐험가</span>
-                              <strong>{student.name}</strong>
-                            </div>
-                            <span className="student-achievement-badge">
-                              {isTodayAllChecked
-                                ? "완료 ★"
-                                : `${todayAchievementRate}%`}
-                            </span>
-                          </div>
-                          <div className="student-card-progress-area">
-                            <div className="row space-between">
-                              <span>오늘의 별빛 미션</span>
-                              <strong>
-                                {todayCompleted}/{todayTotal}
-                              </strong>
-                            </div>
-                            <div className="progress-track student-starlight-progress">
-                              <div
-                                className="progress-fill"
-                                style={{ width: `${todayAchievementRate}%` }}
-                              />
-                              <span
-                                className="student-progress-star"
-                                style={{
-                                  left: `clamp(8px, ${todayAchievementRate}%, calc(100% - 8px))`,
-                                }}
-                                aria-hidden="true"
-                              >
-                                ★
-                              </span>
-                            </div>
-                          </div>
-
-                          {plans.length > 0 && (
-                            <div className="student-card-plan-list">
-                              <p
-                                className="hint"
-                                style={{
-                                  margin: "0 0 6px",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                📝 오늘 계획
-                              </p>
-                              <div className="grid" style={{ gap: 4 }}>
-                                {plans.map((plan) => {
-                                  const statusLabel =
-                                    plan.isCompleted === true
-                                      ? "완료"
-                                      : plan.isCompleted === false
-                                      ? "미완료"
-                                      : "미선택";
-                                  const statusColor =
-                                    plan.isCompleted === true
-                                      ? "#16a34a"
-                                      : plan.isCompleted === false
-                                      ? "#dc2626"
-                                      : "#94a3b8";
-                                  return (
-                                    <div
-                                      key={plan.id}
-                                      className="row space-between"
-                                      style={{ fontSize: 13, padding: "3px 0" }}
-                                    >
-                                      {/* min-width:0 이 있어야 flex 안에서 말줄임(...)이 동작한다. title로 마우스 오버 시 전체 문장 노출 */}
-                                      <span
-                                        title={plan.title}
-                                        style={{
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                          flex: 1,
-                                          minWidth: 0,
-                                        }}
-                                      >
-                                        {plan.title}
-                                      </span>
-                                      <span
-                                        style={{
-                                          color: statusColor,
-                                          fontWeight: 600,
-                                          flexShrink: 0,
-                                          marginLeft: 6,
-                                        }}
-                                      >
-                                        {statusLabel}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
 
           {activeTab === "feed" && (
             <section className="card">
@@ -1970,124 +1765,14 @@ export default function TeacherPage() {
                   description="읽음처리한 지난 편지는 위 검색창에서 찾아볼 수 있습니다."
                 />
               ) : (
-                <div className="teacher-letter-list">
-                  {/* 헤더 */}
-                  <div className="teacher-letter-list-head">
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#64748b",
-                      }}
-                    >
-                      제목
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#64748b",
-                      }}
-                    >
-                      보낸 사람
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#64748b",
-                      }}
-                    >
-                      받는 사람
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#64748b",
-                      }}
-                    >
-                      작성일
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#64748b",
-                      }}
-                    >
-                      관리
-                    </span>
-                  </div>
-                  {filteredLetters.map((letter) => (
-                    <div
-                      key={letter.id}
-                      className={`teacher-letter-row${
-                        letter.teacher_archived_at ? " is-read" : ""
-                      }`}
-                    >
-                      <span className="letter-subject-cell">
-                        <span
-                          className="letter-envelope-icon"
-                          aria-hidden="true"
-                        >
-                          {letter.teacher_archived_at ? "✉" : "💌"}
-                        </span>
-                        {letter.teacher_archived_at && (
-                          <span
-                            title="이미 읽음처리한 편지입니다"
-                            style={{
-                              flexShrink: 0,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#64748b",
-                              background: "#f1f5f9",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: 20,
-                              padding: "2px 7px",
-                            }}
-                          >
-                            읽음
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openLetterDetail(letter)}
-                          className="letter-title-button"
-                        >
-                          {letter.title}
-                        </button>
-                      </span>
-                      <span style={{ fontSize: 13, color: "#374151" }}>
-                        {letter.sender?.name ?? "?"}
-                      </span>
-                      <span style={{ fontSize: 13, color: "#374151" }}>
-                        {letter.recipient?.name ?? "?"}
-                      </span>
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                        {new Date(letter.created_at).toLocaleDateString(
-                          "ko-KR",
-                          { month: "numeric", day: "numeric" }
-                        )}
-                      </span>
-                      <button
-                        type="button"
-                        className="outline"
-                        style={{
-                          width: "auto",
-                          padding: "4px 10px",
-                          fontSize: 12,
-                          color: "#dc2626",
-                          borderColor: "#fca5a5",
-                        }}
-                        onClick={() => onDeleteLetter(letter.id)}
-                        disabled={deletingLetterId === letter.id}
-                      >
-                        {deletingLetterId === letter.id ? "삭제 중" : "삭제"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <LetterThreads
+                  letters={classLetters}
+                  visibleIds={visibleLetterIds}
+                  searching={Boolean(letterSearch.trim())}
+                  deletingId={deletingLetterId}
+                  onOpen={openLetterDetail}
+                  onDelete={onDeleteLetter}
+                />
               )}
             </section>
           )}
@@ -2497,7 +2182,7 @@ export default function TeacherPage() {
                 </strong>{" "}
                 학급을 삭제합니다.
                 <br />
-                소속 학생, 감정 기록, 계획, 편지, 평가, 설문 등 모든 데이터가
+                소속 학생, 감정 기록, 편지, 평가, 설문 등 모든 데이터가
                 함께 삭제되며 복구할 수 없습니다.
               </p>
             </div>
@@ -2786,7 +2471,7 @@ export default function TeacherPage() {
                 <li>내 교사 계정(아이디)이 삭제됩니다.</li>
                 <li>내가 만든 모든 학급이 삭제됩니다.</li>
                 <li>
-                  학급에 속한 모든 데이터(학생 계정, 감정 기록, 계획,
+                  학급에 속한 모든 데이터(학생 계정, 감정 기록,
                   별빛메일, 성찰일기, 교우관계 설문, 뱃지, 평가 기록, AI 분석
                   결과 등)가 함께 삭제됩니다.
                 </li>

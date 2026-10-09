@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { todayDate } from '@/lib/utils';
 import { studentCreateSchema } from '@/lib/validators';
 import { hashPassword, DEFAULT_STUDENT_PASSWORD } from '@/lib/password';
 
@@ -21,83 +20,7 @@ export async function GET(_: Request, { params }: Params) {
     .order('student_number', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const students = data ?? [];
-  if (students.length === 0) return NextResponse.json({ students: [] });
-
-  const studentIds = students.map((student) => student.id);
-  const today = todayDate();
-
-  const { data: plans, error: planError } = await supabaseAdmin
-    .from('plans')
-    .select('id,student_id,title')
-    .in('student_id', studentIds)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true });
-
-  if (planError) return NextResponse.json({ error: planError.message }, { status: 500 });
-
-  const planRows = plans ?? [];
-  const totalByStudent = new Map<string, number>();
-  const planToStudent = new Map<string, string>();
-  const plansByStudent = new Map<string, { id: string; title: string }[]>();
-
-  planRows.forEach((plan) => {
-    totalByStudent.set(plan.student_id, (totalByStudent.get(plan.student_id) ?? 0) + 1);
-    planToStudent.set(plan.id, plan.student_id);
-    const list = plansByStudent.get(plan.student_id) ?? [];
-    list.push({ id: plan.id, title: plan.title });
-    plansByStudent.set(plan.student_id, list);
-  });
-
-  const planIds = planRows.map((plan) => plan.id);
-  const completedByStudent = new Map<string, number>();
-  const checkedByStudent = new Map<string, number>();
-  const checkStatusByPlan = new Map<string, boolean | null>();
-
-  if (planIds.length > 0) {
-    const { data: checks, error: checkError } = await supabaseAdmin
-      .from('plan_checks')
-      .select('plan_id,is_completed')
-      .in('plan_id', planIds)
-      .eq('check_date', today);
-
-    if (checkError) return NextResponse.json({ error: checkError.message }, { status: 500 });
-
-    (checks ?? []).forEach((check) => {
-      const studentId = planToStudent.get(check.plan_id);
-      if (!studentId) return;
-      checkStatusByPlan.set(check.plan_id, check.is_completed);
-      if (typeof check.is_completed === 'boolean') {
-        checkedByStudent.set(studentId, (checkedByStudent.get(studentId) ?? 0) + 1);
-      }
-      if (check.is_completed === true) {
-        completedByStudent.set(studentId, (completedByStudent.get(studentId) ?? 0) + 1);
-      }
-    });
-  }
-
-  return NextResponse.json({
-    students: students.map((student) => {
-      const todayTotal = totalByStudent.get(student.id) ?? 0;
-      const todayCompleted = completedByStudent.get(student.id) ?? 0;
-      const todayChecked = checkedByStudent.get(student.id) ?? 0;
-      const todayAchievementRate = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
-      const studentPlans = (plansByStudent.get(student.id) ?? []).map((plan) => ({
-        id: plan.id,
-        title: plan.title,
-        isCompleted: checkStatusByPlan.has(plan.id) ? checkStatusByPlan.get(plan.id)! : null
-      }));
-      return {
-        ...student,
-        todayCompleted,
-        todayTotal,
-        todayAchievementRate,
-        isTodayAllCompleted: todayTotal > 0 && todayCompleted === todayTotal,
-        isTodayAllChecked: todayTotal > 0 && todayChecked === todayTotal,
-        plans: studentPlans
-      };
-    })
-  });
+  return NextResponse.json({ students: data ?? [] });
 }
 
 export async function POST(req: Request, { params }: Params) {

@@ -8,7 +8,6 @@
 - 학생 관리: 학생 등록/목록
 - 학생 인증: 학급코드+이름 로그인
 - 감정 피드: 작성, 학급 타임라인 조회, 반응(4종)
-- 계획 관리: 계획 등록(최대 5개), 일일 체크, 오늘 달성률
 - 비즈니스 규칙: 피드 하루 최대 1개
 
 ## 기술
@@ -54,9 +53,6 @@ npm run dev
 - `POST /api/feeds`
 - `GET /api/feeds/class/:classId`
 - `POST /api/feeds/:id/reactions`
-- `POST /api/plans`
-- `GET /api/plans/today`
-- `POST /api/plans/:id/check`
 
 ## 주의
 - 학생 세션은 `student_sessions` 테이블 + HttpOnly 쿠키로 관리합니다.

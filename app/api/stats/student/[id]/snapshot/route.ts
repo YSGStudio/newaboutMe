@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getPeriodRange, isPeriod, isWeekendDate, safeRate } from '@/lib/stats';
+import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
 import { EMOTION_TYPES } from '@/types/domain';
 
 type Params = { params: { id: string } };
@@ -17,42 +17,6 @@ export async function GET(req: Request, { params }: Params) {
   const url = new URL(req.url);
   const period = isPeriod(url.searchParams.get('period')) ? (url.searchParams.get('period') as 'week' | 'month' | 'semester') : 'month';
   const range = getPeriodRange(period);
-
-  const { data: plans, error: planError } = await supabaseAdmin
-    .from('plans')
-    .select('id,title')
-    .eq('student_id', params.id)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true });
-
-  if (planError) return NextResponse.json({ error: planError.message }, { status: 500 });
-
-  const planList = plans ?? [];
-  const planIds = planList.map((plan) => plan.id);
-
-  const isRangeEndWeekend = isWeekendDate(range.endDate);
-  const todayTotal = isRangeEndWeekend ? 0 : planList.length;
-  const completedByPlan = new Map<string, number>();
-  let todayCompleted = 0;
-
-  if (planIds.length > 0) {
-    const { data: checks, error: checkError } = await supabaseAdmin
-      .from('plan_checks')
-      .select('plan_id,is_completed,check_date')
-      .in('plan_id', planIds)
-      .gte('check_date', range.startDate)
-      .lte('check_date', range.endDate)
-      .eq('is_completed', true);
-
-    if (checkError) return NextResponse.json({ error: checkError.message }, { status: 500 });
-
-    (checks ?? []).forEach((check) => {
-      completedByPlan.set(check.plan_id, (completedByPlan.get(check.plan_id) ?? 0) + 1);
-      if (!isRangeEndWeekend && check.check_date === range.endDate) {
-        todayCompleted += 1;
-      }
-    });
-  }
 
   const { data: feeds, error: feedError } = await supabaseAdmin
     .from('emotion_feeds')
@@ -80,30 +44,6 @@ export async function GET(req: Request, { params }: Params) {
       name: student.name,
       studentNumber: student.student_number
     },
-    today: {
-      completed: todayCompleted,
-      total: todayTotal,
-      achievementRate: safeRate(todayCompleted, todayTotal)
-    },
-    average: {
-      completed: Array.from(completedByPlan.values()).reduce((acc, v) => acc + v, 0),
-      totalPossible: planList.length * range.weekdays,
-      achievementRate: safeRate(
-        Array.from(completedByPlan.values()).reduce((acc, v) => acc + v, 0),
-        planList.length * range.weekdays
-      )
-    },
-    plans: planList.map((plan) => {
-      const completed = completedByPlan.get(plan.id) ?? 0;
-      const totalPossible = range.weekdays;
-      return {
-        planId: plan.id,
-        title: plan.title,
-        completed,
-        totalPossible,
-        achievementRate: safeRate(completed, totalPossible)
-      };
-    }),
     emotions: {
       totalFeeds,
       distribution: EMOTION_TYPES.map((emotionType) => ({

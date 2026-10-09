@@ -36,7 +36,7 @@ export default function AuthIllustration({ role }: Props) {
       <div className="auth-illustration-copy">
         <span className="auth-illustration-kicker">✦ 별빛로그</span>
         <h2>{isTeacher ? '아이들의 성장을 기록하는 공간' : '오늘의 나를 기록하는 공간'}</h2>
-        <p>{isTeacher ? '작은 기록을 모아 빛나는 성장 이야기를 만들어 보세요.' : '감정과 계획을 하나씩 남기며 나만의 별빛을 키워 보세요.'}</p>
+        <p>{isTeacher ? '작은 기록을 모아 빛나는 성장 이야기를 만들어 보세요.' : '감정과 배움을 하나씩 남기며 나만의 별빛을 키워 보세요.'}</p>
       </div>
     </div>
   );

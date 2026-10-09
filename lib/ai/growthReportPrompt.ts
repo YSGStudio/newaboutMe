@@ -11,12 +11,12 @@ import { buildLearningPromptBlock, LEARNING_EVIDENCE_RULES } from "./learningRep
  * 지금은 한 번의 호출로 "① 한눈에 보기 → ② 지금의 모습 → ③ 앞으로" 3부를 모두 생성합니다.
  */
 export const SYSTEM_PROMPT = `당신은 대한민국 초등학교 담임교사의 업무를 보조하는 AI입니다.
-교사가 수집한 학생의 일일계획 실천 기록, 감정 기록, 배움성찰(학생이 남긴 성찰과
+교사가 수집한 학생의 감정 기록과 배움성찰(학생이 남긴 성찰과
 교사가 남긴 피드백)을 바탕으로 따뜻하고 통찰력 있는 성장 리포트를 작성합니다.
 
 리포트는 세 부분으로 이루어집니다.
 ① 한눈에 보기 — 전체를 아우르는 종합 총평과 강점 키워드
-② 지금의 모습 — 계획 실천 / 감정 패턴 / 배움성찰
+② 지금의 모습 — 감정 패턴 / 배움성찰
 ③ 앞으로 — 홀란드(RIASEC) 성향과 추천 직업, 그리고 맞춤 성장 제언
 
 홀란드 6유형:
@@ -31,10 +31,9 @@ export const SYSTEM_PROMPT = `당신은 대한민국 초등학교 담임교사�
 - 초등학생 눈높이에 맞는 따뜻하고 격려하는 어조 사용
 - 부정적 표현 대신 성장 가능성 중심으로 서술
 - 반드시 데이터에 근거하여 서술하고, 근거를 구체적으로 밝힐 것
-- 일일계획 실천 패턴(잘 지켜지는 계획/어려운 계획, 전체 경향)을 구체적으로 분석
 - 감정 기록의 시계열 패턴(특정 시기에 반복되는 감정, 키워드 등)을 분석
 - 배움성찰에서 반복되는 자기인식(잘한 점·어려운 점·다음 목표)과 교사가 관찰한 강점을 함께 살필 것
-- 종합 총평은 세 영역을 관통하는 이 학생만의 특징을 짚을 것. 각 항목을 그대로 요약해 붙이지 말 것
+- 종합 총평은 두 영역을 관통하는 이 학생만의 특징을 짚을 것. 각 항목을 그대로 요약해 붙이지 말 것
 - 강점 키워드는 2~6자의 짧은 명사구 3개 (예: "꾸준함", "따뜻한 공감", "스스로 점검")
 - 추천 직업은 초등학생이 이해할 수 있는 구체적인 직업명으로 5개 제시
 - 맞춤 성장 제언은 성향 분석까지 반영해 다음에 무엇을 시도하면 좋을지 구체적으로 제안
@@ -64,7 +63,6 @@ const hollandSchema = z.object({
 export const growthReportResponseSchema = z.object({
   overallSummary: z.string().min(1).max(600),
   strengthKeywords: z.array(z.string().min(1).max(20)).min(1).max(5),
-  planAnalysis: z.string().min(1).max(600),
   emotionInsight: z.string().min(1).max(600),
   // 배움성찰이 아직 없는 학급도 있으므로 선택 항목으로 둔다.
   learningInsight: z.string().max(600).optional(),
@@ -78,11 +76,12 @@ export type HollandResult = z.infer<typeof hollandSchema>;
 
 /**
  * 홀란드 성향을 추론할 만큼 자료가 쌓였는지 판단합니다.
- * 통합 전 InsufficientHollandDataError가 쓰던 기준(감정 10건 미만 + 계획 없음)을 그대로 옮겼습니다.
+ * 감정 기록이 10건 이상 쌓였을 때만 성향을 추론합니다.
+ * (예전에는 계획이 하나라도 있으면 허용했지만, 일일계획 기능이 삭제되어 감정 기록만 봅니다.)
  * 성장 분석 자체는 이보다 느슨한 기준으로 생성되므로, 성향만 빠진 리포트가 나올 수 있습니다.
  */
 export function hasEnoughDataForHolland(data: GrowthReportRawData): boolean {
-  return !(data.emotions.length < 10 && data.plans.length === 0);
+  return data.emotions.length >= 10;
 }
 
 export function buildUserPrompt(
@@ -93,21 +92,6 @@ export function buildUserPrompt(
   const periodStart = data.range.startDate;
   const periodLabel = PERIOD_LABEL[data.range.period];
   const hollandAllowed = hasEnoughDataForHolland(data);
-
-  const planLines =
-    data.plans.length > 0
-      ? data.plans
-          .map((p) => `- ${p.title}: ${p.achievementRate}% 달성`)
-          .join("\n")
-      : "(등록된 계획 없음)";
-
-  const overallRate =
-    data.plans.length > 0
-      ? Math.round(
-          data.plans.reduce((sum, p) => sum + p.achievementRate, 0) /
-            data.plans.length
-        )
-      : 0;
 
   const learningBlock = buildLearningPromptBlock(data.learning, (iso) =>
     toRelativeDateLabel(iso, periodStart)
@@ -145,10 +129,6 @@ export function buildUserPrompt(
 
   return `다음은 ${label}의 최근 ${periodLabel} 성장 데이터입니다.
 
-=== 계획 달성 현황 ===
-전체 달성률: ${overallRate}%
-${planLines}
-
 === 감정 기록 (최근 ${periodLabel}) ===
 총 ${data.emotions.length}건
 ${emotionLines}
@@ -158,9 +138,8 @@ ${learningBlock}
 ${hollandNote}
 위 데이터를 바탕으로 다음 JSON을 생성해주세요:
 {
-  "overallSummary": "세 영역을 관통하는 종합 총평 (2~3문장)",
+  "overallSummary": "두 영역을 관통하는 종합 총평 (2~3문장)",
   "strengthKeywords": ["강점 키워드 3개 (각 2~6자)"],
-  "planAnalysis": "일일계획 실천 패턴 분석 (2~3문장)",
   "emotionInsight": "감정 패턴 분석 요약 (2~3문장)",
   "learningInsight": "배움성찰에서 드러난 자기인식과 교사가 관찰한 강점 (2~3문장). 근거가 부족하면 그렇게 쓸 것",
   ${hollandInstruction},

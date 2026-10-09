@@ -19,13 +19,13 @@ const TITLE_META: Record<string, { color: string; next: string | null; nextThres
   '별빛 전설':   { color: '#ec4899', next: null,        nextThreshold: 20, image: '/별빛전설.png' },
 };
 
-type Stats = { emotionCount: number; perfectPlanDays: number; reflectionCount: number; letterSentCount: number };
+type Stats = { emotionCount: number; reflectionCount: number; letterSentCount: number };
 
 export default function BadgesPage() {
   const [badges, setBadges] = useState<BadgeWithStatus[]>([]);
   const [badgeCount, setBadgeCount] = useState(0);
   const [title, setTitle] = useState('별빛 새싹');
-  const [stats, setStats] = useState<Stats>({ emotionCount: 0, perfectPlanDays: 0, reflectionCount: 0, letterSentCount: 0 });
+  const [stats, setStats] = useState<Stats>({ emotionCount: 0, reflectionCount: 0, letterSentCount: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -102,7 +102,6 @@ export default function BadgesPage() {
         <div style={{ display: 'flex', gap: 8, marginTop: 16, overflowX: 'auto', paddingBottom: 2 }}>
           {[
             { icon: '💜', label: '감정 기록', value: stats.emotionCount,    unit: '회' },
-            { icon: '✅', label: '계획 100%', value: stats.perfectPlanDays, unit: '일' },
             { icon: '📝', label: '성찰일기',  value: stats.reflectionCount, unit: '회' },
             { icon: '💌', label: '편지 발송', value: stats.letterSentCount, unit: '통' },
           ].map((s) => (

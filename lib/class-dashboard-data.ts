@@ -15,7 +15,6 @@ import { gradingFor, loadGradingStats } from '@/lib/learning-access';
  *
  * 왕복 줄이기가 이 파일의 설계 원칙이다.
  * - 학급 소유 확인을 학생 조회와 **병렬로** 돌린다(먼저 확인하고 나서 조회하지 않는다)
- * - plan_checks는 임베드 필터로 학급 학생 것만 서버에서 걸러 온다
  * - 교우관계 지명은 설문 조회와 합쳐 한 번에 가져온다
  * 이렇게 해서 인증 이후 왕복이 3회(소유+학생 / 병렬 배치 / 없음)로 줄었다.
  */
@@ -36,14 +35,12 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
   const dates = recentSeoulDates(LOOKBACK_DAYS);
   const today = todayDate();
   const rangeStartIso = new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString();
-  const weekAgo = formatDateInSeoul(new Date(Date.now() - 7 * 86400000));
-  const twoWeeksAgo = formatDateInSeoul(new Date(Date.now() - 14 * 86400000));
 
   // 전부 학급 기준으로 거른다. 학생 목록을 먼저 받아 그 id로 좁히던 때는
   // 이 배치가 학생 조회를 기다려야 해서 왕복이 한 번 더 있었다.
   const [
     ownedRes, studentRes,
-    feedsRes, plansRes, checksRes, learningActRes, learningSubRes, nominationRes, lettersRes,
+    feedsRes, learningActRes, learningSubRes, nominationRes, lettersRes,
   ] = await Promise.all([
     supabaseAdmin
       .from('classes')
@@ -61,18 +58,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
       .select('student_id,emotion_type,created_at,students!inner(class_id)')
       .eq('students.class_id', classId)
       .gte('created_at', rangeStartIso),
-    supabaseAdmin
-      .from('plans')
-      .select('id,student_id,students!inner(class_id)')
-      .eq('students.class_id', classId)
-      .eq('is_active', true),
-    // plans → students 2단계 조인으로 이 학급 체크만 서버에서 걸러 온다.
-    // 예전에는 전체 학급의 2주치를 받아 메모리에서 걸렀다.
-    supabaseAdmin
-      .from('plan_checks')
-      .select('plan_id,is_completed,check_date,plans!inner(students!inner(class_id))')
-      .eq('plans.students.class_id', classId)
-      .gte('check_date', twoWeeksAgo),
     supabaseAdmin
       .from('learning_activities')
       .select('id,title,subject,created_at')
@@ -105,9 +90,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
   const studentIds = students.map((s) => s.id);
 
   const feeds = feedsRes.data ?? [];
-  const plans = plansRes.data ?? [];
-  const planOwner = new Map(plans.map((p) => [p.id, p.student_id]));
-  const checks = checksRes.data ?? [];
 
   // ── 날짜별 감정 + 마지막 기록일 ─────────────────────────────────
   // '살펴볼 학생'의 기록 끊김·부정 감정 연속 판정에 쓴다.
@@ -133,28 +115,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
     const prevLast = lastRecordDate.get(feed.student_id);
     if (!prevLast || day > prevLast) lastRecordDate.set(feed.student_id, day);
   });
-
-  // ── 계획 실천률 (오늘 / 이번 주 / 지난주) ────────────────────────
-  const rateFor = (from: string, to: string) => {
-    const byStudent = new Map<string, { done: number; total: number }>();
-    checks.forEach((check) => {
-      if (check.check_date < from || check.check_date > to) return;
-      const studentId = planOwner.get(check.plan_id);
-      if (!studentId) return;
-      const bucket = byStudent.get(studentId) ?? { done: 0, total: 0 };
-      bucket.total += 1;
-      if (check.is_completed) bucket.done += 1;
-      byStudent.set(studentId, bucket);
-    });
-    return byStudent;
-  };
-
-  const thisWeek = rateFor(weekAgo, today);
-  const lastWeek = rateFor(twoWeeksAgo, weekAgo);
-  const todayRates = rateFor(today, today);
-
-  const pct = (bucket?: { done: number; total: number }) =>
-    bucket && bucket.total > 0 ? Math.round((bucket.done / bucket.total) * 100) : null;
 
   // ── 배움성찰 미제출 ──────────────────────────────────────────────
   const learningActivities = learningActRes.data ?? [];
@@ -227,16 +187,10 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
     }
     if (streak >= WATCH_RULES.heavyStreak) reasons.push('heavy');
 
-    const nowRate = pct(thisWeek.get(student.id));
-    const beforeRate = pct(lastWeek.get(student.id));
-    if (nowRate !== null && beforeRate !== null && beforeRate - nowRate >= WATCH_RULES.planDropPoints) {
-      reasons.push('plan_drop');
-    }
-
     if (isolated.has(student.id)) reasons.push('isolated');
     if ((missedByStudent.get(student.id) ?? 0) >= WATCH_RULES.learningMissed) reasons.push('learning_late');
 
-    return { student, reasons, daysSinceRecord: daysSince, weekRate: nowRate };
+    return { student, reasons, daysSinceRecord: daysSince };
   }).filter((row) => row.reasons.length > 0)
     // 사유가 많은 학생부터 — 손이 가장 급한 순서다.
     .sort((a, b) => b.reasons.length - a.reasons.length);
@@ -246,25 +200,12 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
     feeds.filter((f) => formatDateInSeoul(new Date(f.created_at)) === today).map((f) => f.student_id),
   ).size;
 
-  const todayValues = students.map((s) => pct(todayRates.get(s.id))).filter((v): v is number => v !== null);
-  const todayPlanRate = todayValues.length > 0
-    ? Math.round(todayValues.reduce((sum, v) => sum + v, 0) / todayValues.length)
-    : null;
-
   const pendingLearning = [...missedByStudent.values()].filter((n) => n > 0).length;
 
   // ── 오늘 참여 현황 · 학생별 상태 ────────────────────────────────
   const recordedTodayIds = new Set(
     feeds.filter((f) => formatDateInSeoul(new Date(f.created_at)) === today).map((f) => f.student_id),
   );
-  const todayCheckByPlan = new Map<string, boolean | null>();
-  checks.filter((c) => c.check_date === today).forEach((c) => todayCheckByPlan.set(c.plan_id, c.is_completed));
-  const plansByStudent = new Map<string, { id: string }[]>();
-  plans.forEach((plan) => {
-    const bucket = plansByStudent.get(plan.student_id) ?? [];
-    bucket.push(plan);
-    plansByStudent.set(plan.student_id, bucket);
-  });
 
   const latestActivity = learningActivities[0] ?? null;
   const latestSubmissionByStudent = new Map(
@@ -275,34 +216,21 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
 
   // 학생별 현황 — 화면에 표로 내보내지는 않고, 아래 KPI·참여율 계산에만 쓴다.
   const studentStatus = students.map((student) => {
-    const studentPlans = plansByStudent.get(student.id) ?? [];
-    const completedPlans = studentPlans.filter((plan) => todayCheckByPlan.get(plan.id) === true).length;
-    // 계획이 있는 학생이 모든 항목에 완료/미완료를 선택했을 때만 "모두 체크"로 본다.
-    const planChecked = studentPlans.length > 0
-      && studentPlans.every((plan) => typeof todayCheckByPlan.get(plan.id) === 'boolean');
-    const planRate = studentPlans.length > 0 ? Math.round((completedPlans / studentPlans.length) * 100) : null;
     const submission = latestSubmissionByStudent.get(student.id);
     const learningStatus = !latestActivity ? 'no_activity' : statusOf(submission);
     const reasons: string[] = [];
     if (!recordedTodayIds.has(student.id)) reasons.push('오늘 마음 기록 없음');
-    if (studentPlans.length > 0 && completedPlans < studentPlans.length) reasons.push('오늘 계획 미완료');
     if (learningStatus === 'none') reasons.push('최근 배움성찰 미제출');
     if (learningStatus === 'submitted') reasons.push('배움성찰 확인 필요');
     if (learningStatus === 'grading') reasons.push('배움성찰 평가 대기');
     return {
       student,
       emotionRecorded: recordedTodayIds.has(student.id),
-      planCompleted: completedPlans,
-      planTotal: studentPlans.length,
-      planRate,
-      planChecked,
       learningStatus,
       attentionReasons: reasons,
     };
   }).sort((a, b) => b.attentionReasons.length - a.attentionReasons.length || a.student.student_number - b.student.student_number);
 
-  const planParticipants = studentStatus.filter((row) => row.planTotal > 0);
-  const planCheckedStudents = studentStatus.filter((row) => row.planChecked).length;
   const latestSubmitted = studentStatus.filter((row) => ['submitted', 'grading', 'reviewed'].includes(row.learningStatus)).length;
   // 확인이 필요한 기록 — 피드백을 기다리는 제출과 요소 평가가 덜 끝난 제출(평가 대기).
   const pendingReview = studentStatus.filter((row) => row.learningStatus === 'submitted' || row.learningStatus === 'grading').length;
@@ -349,9 +277,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
     kpi: {
       totalStudents: students.length,
       recordedToday,
-      todayPlanRate,
-      planCheckedStudents,
-      planStudents: planParticipants.length,
       pendingLearning,
       activityCount: activityIds.length,
       watchCount: watch.length,
@@ -360,7 +285,6 @@ export async function buildClassDashboard(classId: string, teacherId: string) {
     },
     participation: {
       emotionRate: safeRate(recordedTodayIds.size, students.length),
-      planRate: safeRate(planCheckedStudents, planParticipants.length),
       learningRate: latestActivity ? safeRate(latestSubmitted, students.length) : null,
     },
     latestActivity: latestActivity ? { id: latestActivity.id, title: latestActivity.title, subject: latestActivity.subject } : null,

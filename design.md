@@ -204,7 +204,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
   box-shadow: var(--shadow-sm);
 }
 ```
-모든 콘텐츠 블록의 기본 단위. 도메인 카드는 `.card`에 수식 클래스를 덧붙여 배경만 교체합니다 (`.starlight-mail-card`, `.starlight-student-card`, `.student-plan-item`, `.feed-post` …).
+모든 콘텐츠 블록의 기본 단위. 도메인 카드는 `.card`에 수식 클래스를 덧붙여 배경만 교체합니다 (`.starlight-mail-card`, `.feed-post`, `.emotion-record-card` …).
 
 ### 5.2 버튼
 
@@ -332,7 +332,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 - `.voyage-hero` — 260px 딥스페이스 그라디언트, 좌측 116px 로켓 이모지(`voyage-float` 애니메이션), 우측 카피. 티어가 오르면 `drop-shadow` 광량이 시안 → 금색으로 상승
 - `.voyage-route` — 별 정거장 목록. 미도달은 `opacity:.35 + grayscale(1)`, `.reached`는 금색 테두리+글로우, `.current`는 시안 아웃라인 + `scale(1.1)`
 - `.voyage-gauge` — 13px 트랙, 채움은 `시안→인디고→금색` 3색 그라디언트, 끝에 로켓 이모지가 매달림
-- `.voyage-mission` — 4열. 미완료는 점선 테두리 회색, `.done`은 실선 + 민트 배경
+- `.voyage-mission` — 3열(감정 기록 · 성찰일기 · 별빛메일). 미완료는 점선 테두리 회색, `.done`은 실선 + 민트 배경
 - `.voyage-quest-card` — 4열 그리드 링크 카드(아이콘 / 카피 / 게이지 / 화살표)
 
 ### 6.3 마음 피드 — "종이 쪽지"
@@ -347,6 +347,16 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 .feed-post-header { border-bottom: 1px dashed #d9ccab; }  /* 점선 = 절취선 */
 ```
 hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 클래스메일(`.starlight-mail-card`)과 알림장에서도 공유됩니다.
+
+### 6.3.1 별빛메일 (교사) — 두 학생 대화 묶음
+
+`components/teacher/LetterThreads.tsx` · 묶기 로직은 `lib/letter-threads.ts`. 편지와 답장이 따로 흩어지지 않도록 **같은 두 학생이 주고받은 편지를 한 대화로** 묶습니다(DB에 답장 연결 정보가 없어 기준은 학생 짝).
+- `.letter-thread` — 대화 한 묶음. 새 편지가 있으면 `.is-new`(라일락 테두리 + 크림→흰→연보라 그라디언트), 없으면 반투명 흰 배경. 오른쪽 위 작은 금색 `✦`
+- `button.letter-thread-head` — 펼침 토글(`aria-expanded`). 봉투 아이콘 + "학생A ↔ 학생B"(출석번호 앞선 학생이 왼쪽) + 마지막 편지 제목(말줄임) + "N통 · 새 편지 N · 날짜" + `▸/▾`
+- `.letter-thread-body` — 점선 절취선 아래 시간순 목록. 읽음처리한 지난 편지도 맥락을 위해 함께 보여줍니다
+- `.letter-bubble` — 왼쪽 학생이 보낸 편지는 §6.3 종이 쪽지 색(`#fffdf5` / `#e8dcb9`, 왼쪽이 각진 라운딩), 오른쪽 학생은 연보라(`#f7f5ff` / `#ddd6fe`, 라운딩 좌우 반전). 폭 `min(78%, 520px)`, 560px 이하 92%
+- 검색 중에는 모든 대화를 펼치고 걸린 편지를 `.is-match`(금색 테두리 + 3px 금색 링)로 강조
+- 새 편지 표시는 `.letter-thread-new`(`--primary-soft` / `--primary` pill)
 
 ### 6.4 로그인 — 좌 일러스트 / 우 폼
 
@@ -418,7 +428,7 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - **터치 타깃**: 버튼 `min-height: 44px`, 조밀한 툴바 버튼도 `36~38px` 아래로 내리지 않습니다.
 - **포커스**: 인풋은 3px 보라 링, 탭은 `:focus-visible { outline: 3px solid rgba(99,102,241,.24); outline-offset: 2px; }`.
 - **이모지**: 장식용 이모지·글리프에는 항상 `aria-hidden="true"`. 아이콘만 있는 버튼에는 `aria-label`.
-- **의미 전달을 색에만 의존하지 않기**: 완료 상태는 색 + 실선 테두리 + 아이콘 변화를 함께 씁니다(`.voyage-mission.done`, `.student-plan-item.is-complete`).
+- **의미 전달을 색에만 의존하지 않기**: 완료 상태는 색 + 실선 테두리 + 아이콘 변화를 함께 씁니다(`.voyage-mission.done`).
 - **모션 민감도**: §7의 `prefers-reduced-motion` 규칙.
 - 대비: 딥스페이스 배경 위 보조 텍스트는 `#aaa2dc` 이상, 본문은 `#d9d4f7`/`#fff`를 씁니다.
 

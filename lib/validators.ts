@@ -73,18 +73,6 @@ export const reactionSchema = z.object({
   reactionType: z.enum(['heart', 'hug', 'fighting'])
 });
 
-export const planCreateSchema = z.object({
-  title: z.string().min(1).max(50)
-});
-
-export const planUpdateSchema = z.object({
-  title: z.string().min(1).max(50)
-});
-
-export const planCheckSchema = z.object({
-  isCompleted: z.boolean().nullable()
-});
-
 export const relationshipSurveyCreateSchema = z.object({
   classId: z.string().uuid(),
   includesNegative: z.boolean().optional().default(false)

@@ -8,7 +8,7 @@
  * classId를 prop으로 받아 해당 학급의 설정을 불러오고 저장합니다.
  */
 import { ReactNode, useEffect, useState } from 'react';
-import { BADGES } from '@/lib/badges';
+import { ACTIVE_BADGES } from '@/lib/badges';
 import Notice from '@/components/ui/Notice';
 import Tabs from '@/components/ui/Tabs';
 import StudentRoster from '@/components/teacher/StudentRoster';
@@ -24,7 +24,6 @@ const DEFAULT_TITLES = [
 
 const CATEGORY_LABELS: Record<string, string> = {
   emotion: '감정 기록',
-  plan: '일일 계획',
   reflection: '성찰일기',
   letter: '별빛메일',
 };
@@ -52,7 +51,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
 
   // 뱃지 설정 상태: badgeId → isEnabled
   const [badgeEnabled, setBadgeEnabled] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(BADGES.map((b) => [b.id, true]))
+    Object.fromEntries(ACTIVE_BADGES.map((b) => [b.id, true]))
   );
   const [badgeSaving, setBadgeSaving] = useState(false);
 
@@ -70,11 +69,11 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
     )
       .then((d) => {
         if (d.badges.length > 0) {
-          const map: Record<string, boolean> = Object.fromEntries(BADGES.map((b) => [b.id, true]));
+          const map: Record<string, boolean> = Object.fromEntries(ACTIVE_BADGES.map((b) => [b.id, true]));
           d.badges.forEach((b) => { map[b.badge_id] = b.is_enabled; });
           setBadgeEnabled(map);
         } else {
-          setBadgeEnabled(Object.fromEntries(BADGES.map((b) => [b.id, true])));
+          setBadgeEnabled(Object.fromEntries(ACTIVE_BADGES.map((b) => [b.id, true])));
         }
         if (d.titles.length === 5) {
           setTitles([...d.titles].sort((a, b) => a.tier - b.tier));
@@ -95,7 +94,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
   };
 
   const onSelectAll = (enable: boolean) => {
-    setBadgeEnabled(Object.fromEntries(BADGES.map((b) => [b.id, enable])));
+    setBadgeEnabled(Object.fromEntries(ACTIVE_BADGES.map((b) => [b.id, enable])));
   };
 
   const saveBadges = async () => {
@@ -105,7 +104,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
         method: 'PUT',
         body: JSON.stringify({
           classId,
-          badges: BADGES.map((b) => ({ badgeId: b.id, isEnabled: badgeEnabled[b.id] ?? true })),
+          badges: ACTIVE_BADGES.map((b) => ({ badgeId: b.id, isEnabled: badgeEnabled[b.id] ?? true })),
         }),
       });
       setMsg('뱃지 설정이 저장되었습니다.'); clear();
@@ -142,8 +141,8 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
   if (loading) return <p style={{ color: '#94a3b8', fontSize: 14 }}>불러오는 중...</p>;
 
   // 카테고리별로 그룹
-  const categories = Array.from(new Set(BADGES.map((b) => b.category)));
-  const enabledCount = Object.values(badgeEnabled).filter(Boolean).length;
+  const categories = Array.from(new Set(ACTIVE_BADGES.map((b) => b.category)));
+  const enabledCount = ACTIVE_BADGES.filter((b) => badgeEnabled[b.id] ?? true).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -205,7 +204,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
           <div>
             <h3 style={{ margin: '0 0 2px', fontSize: 17 }}>뱃지 설정</h3>
             <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
-              활성화된 뱃지만 학생들에게 지급됩니다. ({enabledCount}/{BADGES.length}개 활성)
+              활성화된 뱃지만 학생들에게 지급됩니다. ({enabledCount}/{ACTIVE_BADGES.length}개 활성)
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -220,7 +219,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
               {CATEGORY_LABELS[cat] ?? cat}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-              {BADGES.filter((b) => b.category === cat).map((b) => {
+              {ACTIVE_BADGES.filter((b) => b.category === cat).map((b) => {
                 const on = badgeEnabled[b.id] ?? true;
                 return (
                   <button
