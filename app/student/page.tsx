@@ -22,6 +22,7 @@ import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
 import type { AwardedBadge } from '@/lib/badges';
 import { studentApi as api } from '@/lib/api-client';
+import usePoll from '@/lib/use-poll';
 
 type VoyageSummary = {
   totalFuel: number;
@@ -346,6 +347,45 @@ export default function StudentPage() {
     }
   }, [activeTab, evalFeedbackEnabled]);
 
+  // 선생님이 별빛메일을 끄면 보던 편지·쓰던 편지를 모두 닫고 탭에서 나옵니다.
+  // 다시 켜졌을 때 예전 목록이 남아 있지 않도록 불러온 상태도 비웁니다.
+  useEffect(() => {
+    if (lettersEnabled) return;
+    setActiveTab((current) => (current === 'letters' ? 'voyage' : current));
+    setLetterDetail(null);
+    setComposeOpen(false);
+    setComposeRecipientId('');
+    setComposeTitle('');
+    setComposeContent('');
+    setComposeError('');
+    setLetterMsg('');
+    setReceivedLetters([]);
+    setSentLetters([]);
+    setReceivedLoaded(false);
+    setSentLoaded(false);
+    setClassmates([]);
+    setClassmatesLoaded(false);
+  }, [lettersEnabled]);
+
+  /**
+   * 학급 설정(별빛메일 사용 여부 등)을 서버에서 다시 읽어 화면에 맞춥니다.
+   * 선생님이 설정을 바꾸면 학생이 새로고침하지 않아도 탭이 나타나거나 사라지게 합니다.
+   */
+  const syncClassSettings = async () => {
+    const data = await api<{ class: { lettersEnabled: boolean; evalFeedbackEnabled: boolean } }>('/api/auth/student/me');
+    const nextLettersEnabled = data.class.lettersEnabled ?? true;
+    if (lettersEnabled && !nextLettersEnabled) {
+      setMessage('선생님이 별빛메일을 잠시 꺼 두었어요.');
+      clearNoticeLater();
+    }
+    setLettersEnabled(nextLettersEnabled);
+    setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
+  };
+
+  // 로그인해 있는 동안 10초마다 학급 설정을 확인합니다(탭이 뒤에 있으면 건너뛰고, 돌아오면 바로 확인).
+  // 편지를 쓰는 중에도 건너뛰지 않습니다 — 꺼졌다면 쓰던 창까지 닫아야 하기 때문입니다.
+  usePoll(syncClassSettings, { enabled: Boolean(studentName), intervalMs: 10_000 });
+
   useEffect(() => {
     if (!emotionOptions.includes(emotionType)) {
       setEmotionType(emotionOptions[0] ?? EMOTION_CATEGORIES[0].emotions[0]);
@@ -619,6 +659,8 @@ export default function StudentPage() {
       window.setTimeout(() => setLetterMsg(''), 2500);
     } catch (err) {
       setComposeError((err as Error).message);
+      // 그 사이 선생님이 별빛메일을 껐을 수 있으니 바로 다시 확인합니다.
+      void syncClassSettings().catch(() => null);
     } finally {
       setSendLoading(false);
     }

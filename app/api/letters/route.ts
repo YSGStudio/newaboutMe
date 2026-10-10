@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireStudentSession } from '@/lib/student-session';
+import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
 import { checkAndAwardBadge, type AwardedBadge } from '@/lib/badges';
 import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
 
@@ -14,6 +14,8 @@ const letterCreateSchema = z.object({
 export async function POST(req: Request) {
   const auth = await requireStudentSession();
   if ('error' in auth) return auth.error;
+  const disabled = denyLettersDisabled(auth.student);
+  if (disabled) return disabled;
 
   const body = await req.json();
   const parsed = letterCreateSchema.safeParse(body);

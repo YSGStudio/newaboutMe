@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireStudentSession } from '@/lib/student-session';
+import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
 
 export async function GET() {
   const auth = await requireStudentSession();
   if ('error' in auth) return auth.error;
+  const disabled = denyLettersDisabled(auth.student);
+  if (disabled) return disabled;
 
   const { data, error } = await supabaseAdmin
     .from('students')

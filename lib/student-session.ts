@@ -92,3 +92,15 @@ export async function requireStudentSession() {
     }
   };
 }
+
+/**
+ * 학급의 별빛메일이 꺼져 있으면 403 응답을 반환한다.
+ *
+ * 교사가 별빛메일 설정을 끄면 학생 화면은 다음 갱신 때 탭을 닫지만, 그 사이에
+ * 열려 있던 편지 쓰기 창에서 보내기를 누를 수 있다. 화면을 감추는 것만으로는
+ * 라우트가 막히지 않으므로 학생용 편지 라우트에서 이 함수로 한 번 더 확인한다.
+ */
+export function denyLettersDisabled(student: { classes: { letters_enabled: boolean | null } }): NextResponse | null {
+  if (student.classes.letters_enabled !== false) return null;
+  return NextResponse.json({ error: '선생님이 별빛메일을 잠시 꺼 두었어요.' }, { status: 403 });
+}

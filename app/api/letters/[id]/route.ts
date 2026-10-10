@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireStudentSession } from '@/lib/student-session';
+import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 
 const letterUpdateSchema = z.object({
@@ -19,6 +19,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // 학생 세션 시도
   const studentAuth = await requireStudentSession();
   if (!('error' in studentAuth)) {
+    const disabled = denyLettersDisabled(studentAuth.student);
+    if (disabled) return disabled;
+
     const { data: letter, error } = await supabaseAdmin
       .from('letters')
       .select('id, title, content, is_read, created_at, updated_at, sender_id, recipient_id')
