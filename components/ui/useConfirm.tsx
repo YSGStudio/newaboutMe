@@ -15,6 +15,8 @@ type ConfirmOptions = {
   message: string;      // 여러 줄은 '\n'으로 구분
   confirmText?: string;
   cancelText?: string;
+  /** 처음 포커스를 둘 버튼. 다시 생각해 보게 하고 싶을 땐 'cancel'로 둡니다(엔터가 취소가 됨). */
+  defaultFocus?: 'confirm' | 'cancel';
 };
 
 // 브라우저 기본 confirm 대신 화면 가운데 예쁜 모달을 띄우는 훅.
@@ -56,6 +58,7 @@ function ConfirmModal({
   message,
   confirmText = '사용하기',
   cancelText = '취소',
+  defaultFocus = 'confirm',
   onConfirm,
   onCancel,
 }: ConfirmOptions & { onConfirm: () => void; onCancel: () => void }) {
@@ -93,10 +96,10 @@ function ConfirmModal({
           <h3 id="ai-confirm-title" className="ai-confirm-title">{title}</h3>
           <p id="ai-confirm-message" className="ai-confirm-message">{message}</p>
           <div className="ai-confirm-actions">
-          <button type="button" onClick={onCancel} className="ai-confirm-cancel">
+          <button type="button" onClick={onCancel} autoFocus={defaultFocus === 'cancel'} className="ai-confirm-cancel">
             {cancelText}
           </button>
-          <button type="button" onClick={onConfirm} autoFocus className="ai-confirm-submit">
+          <button type="button" onClick={onConfirm} autoFocus={defaultFocus === 'confirm'} className="ai-confirm-submit">
             <span aria-hidden="true">✦</span> {confirmText}
           </button>
           </div>

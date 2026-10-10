@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
+import { useConfirm } from '@/components/ui/useConfirm';
 import BookCard from '@/components/student/BookCard';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { formatDateInSeoul } from '@/lib/date';
@@ -115,6 +116,7 @@ export default function LearningContent() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const { confirm, confirmDialog } = useConfirm();
   const [linkUrl, setLinkUrl] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [linkOpen, setLinkOpen] = useState(false);
@@ -216,6 +218,24 @@ export default function LearningContent() {
 
   const saveAnswer = async () => {
     if (!detail) return;
+    // 이번 저장으로 제출이 끝나는 순간에만 한 번 더 묻습니다.
+    // 쓰다가 중간에 저장할 때마다 띄우면 읽지 않고 넘기게 되기 때문입니다.
+    if (missingItems.length === 0) {
+      const ok = await confirm({
+        title: '✦ 내기 전에 한 번 더 확인해요',
+        message: [
+          '내가 쓴 자기점검도 선생님 평가에 들어가요.',
+          '내 결과물을 다시 보면서 제대로 돌아보았나요?',
+          '',
+          '· 잘된 점과 아쉬운 점을 내 결과물에서 찾아 썼나요?',
+          '· "네", "잘함"처럼 한 마디로만 쓰지 않았나요?',
+        ].join('\n'),
+        cancelText: '다시 볼게요',
+        confirmText: '네, 낼게요',
+        defaultFocus: 'cancel',
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     setModalError('');
     setModalMsg('');
@@ -349,6 +369,7 @@ export default function LearningContent() {
 
   return (
     <>
+      {confirmDialog}
       <section className="card">
         <h2 style={{ margin: '0 0 12px' }}>배움성찰</h2>
         {error && <Notice type="error" message={error} />}
