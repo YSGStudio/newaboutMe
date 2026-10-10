@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       .maybeSingle(),
     supabaseAdmin
       .from('classes')
-      .select('id,class_name,grade,section,class_code,letters_enabled,created_at')
+      .select('id,class_name,grade,section,class_code,letters_enabled,voyage_map_enabled,created_at')
       .eq('teacher_id', user.id)
       .order('created_at', { ascending: false }),
     supabaseAdmin

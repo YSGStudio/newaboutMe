@@ -183,3 +183,17 @@ export async function grantBadgeFuel(
   }
 }
 
+
+/**
+ * 연료를 별 지도 위의 위치로 바꾼다. 0은 출발(지구), N은 N번째 별에 도착, 그 사이는 다음 별까지 간 비율.
+ * 우리 반 항해 지도는 친구의 연료 숫자 대신 이 위치만 보여준다.
+ */
+export function voyagePosition(totalFuel: number, stars: Pick<VoyageStar, 'fuel_threshold'>[]): number {
+  const reached = stars.filter((star) => star.fuel_threshold <= totalFuel).length;
+  if (reached >= stars.length) return stars.length;
+  const previous = reached === 0 ? 0 : stars[reached - 1].fuel_threshold;
+  const next = stars[reached].fuel_threshold;
+  const fraction = Math.max(0, Math.min(1, (totalFuel - previous) / (next - previous)));
+  // 위치만 쓰면 되므로 소수 둘째 자리에서 자른다.
+  return Math.round((reached + fraction) * 100) / 100;
+}

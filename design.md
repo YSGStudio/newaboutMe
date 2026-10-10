@@ -334,6 +334,13 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,24
 - `.voyage-gauge` — 13px 트랙, 채움은 `시안→인디고→금색` 3색 그라디언트, 끝에 로켓 이모지가 매달림
 - `.voyage-mission` — 3열(감정 기록 · 성찰일기 · 별빛메일). 미완료는 점선 테두리 회색, `.done`은 실선 + 민트 배경
 - `.voyage-quest-card` — 4열 그리드 링크 카드(아이콘 / 카피 / 게이지 / 화살표)
+- `.voyage-crew-card` — **우리 반 항해 지도**(`components/student/ClassVoyageMap.tsx`). 친구들의 우주선 위치를 한 줄에 한 명씩 보여주고, **연료 숫자는 그리지 않습니다**(서버도 위치값만 내려줌). 교사가 학급설정 > 별빛여행에서 끄면 카드가 사라집니다
+  - `.voyage-crew-row` — `76px 이름 / 항로` 2열. 줄 순서는 번호 순(순위표처럼 보이지 않게)
+  - `.voyage-crew-head` — 맨 위 정거장 줄. 지구(🌏) + 별 10개를 항로와 같은 가로 비율로 배치(`.voyage-crew-stop`, 26px 원은 `.voyage-star-stop` 색 재사용)
+  - `.voyage-crew-lane` — 8px 간격 라일락(`#ddd6fe`) 점선 항로. 양 끝 우주선이 잘리지 않게 좌우 14px 들임
+  - `.voyage-crew-ship` — 🚀를 45° 돌려 오른쪽을 향하게, `left: 위치%`로 놓음. `left` 전환 `.4s`
+  - `.is-me` — 내 줄. `.voyage-star-stop.reached`의 금색(`#f5d46f` / `#fff9de` + 글로우)을 재사용하고 이름 옆에 "나" pill, 우주선을 키워 금색 drop-shadow
+  - 560px 이하: 이름 열 56px, 정거장 이름 숨김, 아이콘·우주선 축소. `prefers-reduced-motion`에서 전환 끔
 
 ### 6.3 마음 피드 — "종이 쪽지"
 

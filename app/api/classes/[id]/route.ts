@@ -10,7 +10,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const { data: classRow } = await supabaseAdmin
     .from('classes')
-    .select('id, letters_enabled')
+    .select('id')
     .eq('id', params.id)
     .eq('teacher_id', auth.teacher.id)
     .maybeSingle();
@@ -19,20 +19,29 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: '학급 접근 권한이 없습니다.' }, { status: 403 });
   }
 
+  // 학급 기능 켜기/끄기 — 별빛메일(letters_enabled)과 우리 반 항해 지도(voyage_map_enabled).
+  // 한 번에 하나 이상 보내야 하고, 보낸 값은 모두 boolean이어야 한다.
   const body = await req.json();
-  const { letters_enabled } = body;
+  const updates: { letters_enabled?: boolean; voyage_map_enabled?: boolean } = {};
+  for (const key of ['letters_enabled', 'voyage_map_enabled'] as const) {
+    if (body?.[key] === undefined) continue;
+    if (typeof body[key] !== 'boolean') {
+      return NextResponse.json({ error: `${key} 값은 true 또는 false여야 합니다.` }, { status: 400 });
+    }
+    updates[key] = body[key];
+  }
 
-  if (typeof letters_enabled !== 'boolean') {
-    return NextResponse.json({ error: 'letters_enabled 값이 필요합니다.' }, { status: 400 });
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'letters_enabled 또는 voyage_map_enabled 값이 필요합니다.' }, { status: 400 });
   }
 
   const { error } = await supabaseAdmin
     .from('classes')
-    .update({ letters_enabled })
+    .update(updates)
     .eq('id', params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, letters_enabled });
+  return NextResponse.json({ ok: true, ...updates });
 }
 
 export async function DELETE(_: Request, { params }: Params) {

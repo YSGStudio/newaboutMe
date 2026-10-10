@@ -65,6 +65,8 @@ type ClassItem = {
   section: number;
   class_code: string;
   letters_enabled: boolean;
+  /** 우리 반 항해 지도 — 학생이 친구들의 우주선 위치를 볼 수 있는지. */
+  voyage_map_enabled: boolean;
 };
 
 type StudentItem = {
@@ -124,7 +126,7 @@ export default function TeacherPage() {
     | "operator"
   >("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<"roster" | "letters" | "badges" | "titles">("roster");
+  const [settingsSection, setSettingsSection] = useState<"roster" | "letters" | "voyage" | "badges" | "titles">("roster");
 
   // 교사 역할 정보
   const [teacherRole, setTeacherRole] = useState<TeacherRole>("general");
@@ -157,7 +159,8 @@ export default function TeacherPage() {
   const [deleteConfirmClass, setDeleteConfirmClass] =
     useState<ClassItem | null>(null);
   const [deleteClassNameInput, setDeleteClassNameInput] = useState("");
-  const [togglingLettersClassId, setTogglingLettersClassId] = useState("");
+  /** 켜고 끄는 중인 학급 기능 — `${classId}:${컬럼명}`. */
+  const [togglingClassFeature, setTogglingClassFeature] = useState("");
 
   // 학급 전체 비밀번호 초기화
   const [showResetAllPasswordConfirm, setShowResetAllPasswordConfirm] =
@@ -395,23 +398,31 @@ export default function TeacherPage() {
     }
   };
 
-  const onToggleLetters = async (classId: string, current: boolean) => {
-    setTogglingLettersClassId(classId);
+  /** 학급 기능(별빛메일 · 우리 반 항해 지도)을 켜고 끈다. */
+  const onToggleClassFeature = async (
+    classId: string,
+    feature: "letters_enabled" | "voyage_map_enabled",
+    current: boolean
+  ) => {
+    const next = !current;
+    setTogglingClassFeature(`${classId}:${feature}`);
+    // 스위치는 즉시 반응시키고, 저장 실패 때만 원래 값으로 되돌린다.
+    setClasses((prev) =>
+      prev.map((c) => c.id === classId ? { ...c, [feature]: next } : c)
+    );
     try {
       await api(`/api/classes/${classId}`, {
         method: "PATCH",
-        body: JSON.stringify({ letters_enabled: !current }),
+        body: JSON.stringify({ [feature]: next }),
       });
-      setClasses((prev) =>
-        prev.map((c) =>
-          c.id === classId ? { ...c, letters_enabled: !current } : c
-        )
-      );
     } catch (err) {
+      setClasses((prev) =>
+        prev.map((c) => c.id === classId ? { ...c, [feature]: current } : c)
+      );
       setAuthError((err as Error).message);
       clearNoticeLater();
     } finally {
-      setTogglingLettersClassId("");
+      setTogglingClassFeature("");
     }
   };
 
@@ -735,6 +746,7 @@ export default function TeacherPage() {
                           { key: "classes", label: "학급관리", icon: "🏫" },
                           { key: "roster", label: "학생명단", icon: "🧑‍🚀" },
                           { key: "letters", label: "별빛메일", icon: "💌" },
+                          { key: "voyage", label: "별빛여행", icon: "🚀" },
                           { key: "badges", label: "뱃지설정", icon: "🏅" },
                           { key: "titles", label: "별빛단계", icon: "✨" },
                         ]}
@@ -2028,8 +2040,11 @@ export default function TeacherPage() {
                 classId={selectedClassId}
                 initialSection={settingsSection}
                 lettersEnabled={selectedClass?.letters_enabled}
-                lettersToggling={togglingLettersClassId === selectedClassId}
-                onToggleLetters={selectedClass ? () => onToggleLetters(selectedClass.id, selectedClass.letters_enabled) : undefined}
+                lettersToggling={togglingClassFeature === `${selectedClassId}:letters_enabled`}
+                onToggleLetters={selectedClass ? () => onToggleClassFeature(selectedClass.id, "letters_enabled", selectedClass.letters_enabled) : undefined}
+                voyageMapEnabled={selectedClass?.voyage_map_enabled}
+                voyageMapToggling={togglingClassFeature === `${selectedClassId}:voyage_map_enabled`}
+                onToggleVoyageMap={selectedClass ? () => onToggleClassFeature(selectedClass.id, "voyage_map_enabled", selectedClass.voyage_map_enabled) : undefined}
                 onOpenClassManagement={() => setActiveTab("class")}
                 onRosterChanged={() => selectedClassId && loadStudents(selectedClassId)}
                 renderClassManagement={() => renderClassManagement({ hideNav: true })}

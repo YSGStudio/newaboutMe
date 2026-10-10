@@ -1093,6 +1093,37 @@ button.emotion-record-edit:hover:not(:disabled) {
 .voyage-log-list b { color: #0795aa; font-size: 12px; }
 .voyage-log-list b.negative { color: #dc2626; }
 
+/* ── 스타 보이저 · 우리 반 항해 지도 ── */
+/* 한 줄에 한 친구. 가운데 점선 항로 위에 우주선을 지도 위치(%)대로 놓는다. 숫자는 그리지 않는다. */
+.voyage-crew-card h2 { margin: 0; color: #30276d; font-size: 18px; }
+.voyage-crew-map { display: grid; gap: 4px; margin-top: 16px; }
+.voyage-crew-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 34px; padding: 2px 6px; border: 1px solid transparent; border-radius: 12px; }
+.voyage-crew-row.is-me { border-color: #f5d46f; background: #fff9de; box-shadow: 0 0 15px rgba(250,204,21,.18); }
+.voyage-crew-name { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; color: #4c4568; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.voyage-crew-name em { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; background: #f5d46f; color: #30276d; font-size: 10px; font-style: normal; font-weight: 800; }
+/* 양 끝 우주선이 잘리지 않도록 항로를 안쪽으로 14px 들인다. */
+.voyage-crew-lane { position: relative; height: 28px; margin: 0 14px; background: linear-gradient(90deg, #ddd6fe 50%, transparent 0) 0 50% / 8px 1px repeat-x; }
+.voyage-crew-head .voyage-crew-lane { height: 44px; background: none; }
+.voyage-crew-stop { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; transform: translateX(-50%); }
+.voyage-crew-stop b { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid #ddd6fe; border-radius: 50%; background: #f4f1ff; font-size: 14px; }
+.voyage-crew-stop small { color: #766c95; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.voyage-crew-ship { position: absolute; top: 50%; font-size: 18px; transform: translate(-50%, -50%) rotate(45deg); transition: left .4s ease; }
+.voyage-crew-row.is-me .voyage-crew-ship { font-size: 22px; filter: drop-shadow(0 0 6px rgba(255,214,107,.75)); }
+
+@media (max-width: 560px) {
+  .voyage-crew-row { grid-template-columns: 56px minmax(0, 1fr); gap: 6px; padding: 2px 4px; }
+  .voyage-crew-lane { margin: 0 10px; }
+  .voyage-crew-head .voyage-crew-lane { height: 28px; }
+  .voyage-crew-stop b { width: 20px; height: 20px; font-size: 11px; }
+  .voyage-crew-stop small { display: none; }
+  .voyage-crew-ship { font-size: 15px; }
+  .voyage-crew-row.is-me .voyage-crew-ship { font-size: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voyage-crew-ship { transition: none; }
+}
+
 @keyframes voyage-float {
   0%, 100% { transform: translateY(0) rotate(-4deg); }
   50% { transform: translateY(-9px) rotate(2deg); }

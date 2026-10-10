@@ -3,6 +3,7 @@
 /**
  * ClassSettings — "학급설정" 탭 내용
  * 선택한 학급의 규칙을 교사가 직접 조정합니다.
+ * - 별빛메일 · 별빛여행(우리 반 항해 지도): 학급 기능 on/off
  * - 뱃지: 어떤 뱃지를 학급에서 사용할지 on/off
  * - 별빛 캐릭터: 5단계 별빛 캐릭터(예: 별빛 새싹~전설)의 이름과 달성 기준(필요 뱃지 개수) 편집
  * classId를 prop으로 받아 해당 학급의 설정을 불러오고 저장합니다.
@@ -28,7 +29,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   letter: '별빛메일',
 };
 
-type SettingSection = 'classes' | 'roster' | 'letters' | 'badges' | 'titles';
+type SettingSection = 'classes' | 'roster' | 'letters' | 'voyage' | 'badges' | 'titles';
 
 type Props = {
   classId: string;
@@ -36,6 +37,9 @@ type Props = {
   lettersEnabled?: boolean;
   lettersToggling?: boolean;
   onToggleLetters?: () => void;
+  voyageMapEnabled?: boolean;
+  voyageMapToggling?: boolean;
+  onToggleVoyageMap?: () => void;
   onOpenClassManagement?: () => void;
   /** 학급 관리 화면을 이 안에서 그린다. 다른 섹션처럼 페이지를 벗어나지 않게 하려는 것. */
   renderClassManagement?: () => ReactNode;
@@ -43,7 +47,7 @@ type Props = {
   onRosterChanged?: () => void;
 };
 
-export default function ClassSettings({ classId, initialSection = 'roster', lettersEnabled = false, lettersToggling = false, onToggleLetters, onOpenClassManagement, onRosterChanged, renderClassManagement }: Props) {
+export default function ClassSettings({ classId, initialSection = 'roster', lettersEnabled = false, lettersToggling = false, onToggleLetters, voyageMapEnabled = false, voyageMapToggling = false, onToggleVoyageMap, onOpenClassManagement, onRosterChanged, renderClassManagement }: Props) {
   const [activeSection, setActiveSection] = useState<SettingSection>(initialSection);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
@@ -151,6 +155,7 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
           { key: 'classes', label: '학급관리', icon: '🏫' },
           { key: 'roster', label: '학생명단', icon: '🧑‍🚀' },
           { key: 'letters', label: '별빛메일', icon: '💌' },
+          { key: 'voyage', label: '별빛여행', icon: '🚀' },
           { key: 'badges', label: '뱃지설정', icon: '🏅' },
           { key: 'titles', label: '별빛단계', icon: '✨' },
         ]}
@@ -179,22 +184,30 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
         <section className="card" style={{ boxShadow: 'var(--shadow-sm)' }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>별빛메일 설정</h3>
           <p className="hint" style={{ margin: '0 0 16px' }}>학생들이 별빛메일을 주고받을 수 있는지 설정합니다.</p>
-          <div className="row space-between" style={{ padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#fafbff' }}>
-            <div><strong style={{ display: 'block', fontSize: 14 }}>별빛메일 사용</strong><span className="hint">끄면 학생 화면에서 편지 기능을 사용할 수 없습니다.</span></div>
-            <div className="row" style={{ width: 'auto' }}>
-              <button
-                type="button"
-                aria-pressed={lettersEnabled}
-                aria-label={`별빛메일 ${lettersEnabled ? '끄기' : '켜기'}`}
-                onClick={onToggleLetters}
-                disabled={lettersToggling || !onToggleLetters}
-                style={{ width: 44, minHeight: 24, height: 24, padding: 0, borderRadius: 12, background: lettersEnabled ? '#16a34a' : '#cbd5e1', boxShadow: 'none', position: 'relative' }}
-              >
-                <span style={{ position: 'absolute', top: 3, left: lettersEnabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
-              </button>
-              <strong style={{ color: lettersEnabled ? '#16a34a' : '#94a3b8', fontSize: 12 }}>{lettersToggling ? '변경 중' : lettersEnabled ? 'ON' : 'OFF'}</strong>
-            </div>
-          </div>
+          <FeatureToggle
+            title="별빛메일 사용"
+            hint="끄면 학생 화면에서 편지 기능을 사용할 수 없습니다."
+            label="별빛메일"
+            enabled={lettersEnabled}
+            toggling={lettersToggling}
+            onToggle={onToggleLetters}
+          />
+        </section>
+      )}
+
+      {/* ── 별빛여행 설정 ── */}
+      {activeSection === 'voyage' && (
+        <section className="card" style={{ boxShadow: 'var(--shadow-sm)' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 17 }}>별빛여행 설정</h3>
+          <p className="hint" style={{ margin: '0 0 16px' }}>학생 별빛여행 화면에 표시할 항목을 설정합니다.</p>
+          <FeatureToggle
+            title="우리 반 항해 지도"
+            hint="켜면 학생이 같은 반 친구들의 우주선 위치를 이름과 함께 봅니다. 연료 숫자는 표시하지 않습니다."
+            label="우리 반 항해 지도"
+            enabled={voyageMapEnabled}
+            toggling={voyageMapToggling}
+            onToggle={onToggleVoyageMap}
+          />
         </section>
       )}
 
@@ -303,6 +316,36 @@ export default function ClassSettings({ classId, initialSection = 'roster', lett
           {titleSaving ? '저장 중...' : '별빛 캐릭터 설정 저장'}
         </button>
       </section>}
+    </div>
+  );
+}
+
+/** 학급 기능 하나를 켜고 끄는 줄 — 제목·설명 + 스위치 + ON/OFF 표시. */
+function FeatureToggle({ title, hint, label, enabled, toggling, onToggle }: {
+  title: string;
+  hint: string;
+  /** 스위치 aria-label 앞부분 ("별빛메일 끄기") */
+  label: string;
+  enabled: boolean;
+  toggling: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <div className="row space-between" style={{ padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#fafbff' }}>
+      <div><strong style={{ display: 'block', fontSize: 14 }}>{title}</strong><span className="hint">{hint}</span></div>
+      <div className="row" style={{ width: 'auto' }}>
+        <button
+          type="button"
+          aria-pressed={enabled}
+          aria-label={`${label} ${enabled ? '끄기' : '켜기'}`}
+          onClick={onToggle}
+          disabled={toggling || !onToggle}
+          style={{ width: 44, minHeight: 24, height: 24, padding: 0, borderRadius: 12, background: enabled ? '#16a34a' : '#cbd5e1', boxShadow: 'none', position: 'relative' }}
+        >
+          <span style={{ position: 'absolute', top: 3, left: enabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+        </button>
+        <strong style={{ color: enabled ? '#16a34a' : '#94a3b8', fontSize: 12 }}>{toggling ? '변경 중' : enabled ? 'ON' : 'OFF'}</strong>
+      </div>
     </div>
   );
 }
