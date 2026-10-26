@@ -12,7 +12,7 @@ import { learningAnswerSchema } from '@/lib/validators';
 import { rewardLearningSubmission } from '@/lib/learning-rewards';
 
 // 학생 성찰 답변 저장 (질문별로 여러 개를 한 번에)
-// 저장 후 제출 완료 여부를 다시 판정한다 — 결과물 1개 이상 + 모든 질문에 답하면 완료다.
+// 저장 후 제출 완료 여부를 다시 판정한다 — 모든 질문에 답하면 완료다(결과물은 없어도 된다).
 
 type Params = { params: { activityId: string } };
 

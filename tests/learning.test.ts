@@ -36,8 +36,17 @@ describe('isSubmittable', () => {
     expect(isSubmittable(1, 2, ['답1', '답2'])).toBe(true);
   });
 
-  it('결과물이 없으면 제출이 아니다', () => {
-    expect(isSubmittable(0, 1, ['답'])).toBe(false);
+  it('질문이 있는 활동은 결과물 없이 모든 답변만 있어도 제출이다', () => {
+    expect(isSubmittable(0, 1, ['답'])).toBe(true);
+  });
+
+  it('답하지 않은 질문이 있으면 결과물이 있어도 제출이 아니다', () => {
+    expect(isSubmittable(1, 2, ['답1', ' '])).toBe(false);
+  });
+
+  it('질문이 없는 활동은 결과물이 있어야 제출이다', () => {
+    expect(isSubmittable(0, 0, [])).toBe(false);
+    expect(isSubmittable(1, 0, [])).toBe(true);
   });
 
   it('질문이 있는 활동은 자기평가 없이도 제출이다', () => {

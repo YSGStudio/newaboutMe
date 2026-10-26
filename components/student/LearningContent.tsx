@@ -207,8 +207,9 @@ export default function LearningContent() {
   const missingItems = (() => {
     if (!detail || locked) return [];
     const items: string[] = [];
+    // 결과물은 질문이 없는 활동에서만 꼭 필요해요 — 질문이 있으면 답만 써도 낼 수 있어요.
     const materialCount = (detail.submission?.files.length ?? 0) + (detail.submission?.links.length ?? 0);
-    if (materialCount === 0) items.push('결과물(사진·PDF·링크)을 1개 이상 올려요.');
+    if (detail.questions.length === 0 && materialCount === 0) items.push('결과물(사진·PDF·링크)을 1개 이상 올려요.');
     const unanswered = detail.questions
       .map((q, index) => ((answers[q.id] ?? '').trim() ? null : index + 1))
       .filter((n): n is number => n !== null);
@@ -225,9 +226,9 @@ export default function LearningContent() {
         title: '✦ 내기 전에 한 번 더 확인해요',
         message: [
           '내가 쓴 자기점검도 선생님 평가에 들어가요.',
-          '내 결과물을 다시 보면서 제대로 돌아보았나요?',
+          '내가 한 활동을 다시 떠올리며 제대로 돌아보았나요?',
           '',
-          '· 잘된 점과 아쉬운 점을 내 결과물에서 찾아 썼나요?',
+          '· 잘된 점과 아쉬운 점을 내 활동에서 찾아 썼나요?',
           '· "네", "잘함"처럼 한 마디로만 쓰지 않았나요?',
         ].join('\n'),
         cancelText: '다시 볼게요',
@@ -755,7 +756,7 @@ export default function LearningContent() {
                       {saving ? '저장 중...' : '성찰 저장하기'}
                     </button>
                     <p className="hint" style={{ margin: '6px 0 0' }}>
-                      결과물 1개 이상을 올리고 질문에 모두 답하면 제출이 끝나요.
+                      질문에 모두 답하면 제출이 끝나요. 결과물은 있으면 함께 올려요.
                     </p>
                     {missingItems.length > 0 && (
                       <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: '#b45309' }}>

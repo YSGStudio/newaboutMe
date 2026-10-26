@@ -107,8 +107,9 @@ export function checkLearningFile(file: FileCheckInput, currentCount: number): s
 
 /**
  * 제출 완료로 볼 수 있는지 판정한다.
- * 결과물(파일 또는 링크) 1개 이상 + 선생님이 낸 질문에 **모두** 답해야 한다.
- * 질문이 하나도 없는 활동이면 결과물만 있으면 된다.
+ * - 질문이 있는 활동: 선생님이 낸 질문에 **모두** 답하면 된다. 결과물은 있어도 되고 없어도 된다
+ *   (평가요소 질문이면 이때부터 평가 대기가 된다).
+ * - 질문이 하나도 없는 활동: 낼 내용이 결과물뿐이므로 결과물(파일 또는 링크)이 1개 이상 있어야 한다.
  * 교사 대리 업로드는 이 규칙을 따르지 않고 라우트에서 따로 처리한다.
  */
 export function isSubmittable(
@@ -116,8 +117,7 @@ export function isSubmittable(
   questionCount: number,
   answers: (string | null | undefined)[],
 ): boolean {
-  if (materialCount <= 0) return false;
-  if (questionCount === 0) return true;
+  if (questionCount === 0) return materialCount > 0;
   if (answers.length < questionCount) return false;
   return answers.every((answer) => (answer ?? '').trim().length > 0);
 }

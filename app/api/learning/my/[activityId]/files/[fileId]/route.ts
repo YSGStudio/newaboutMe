@@ -46,7 +46,7 @@ export async function DELETE(_: Request, { params }: Params) {
 
   await removeStorageObjects([file.storage_path]);
 
-  // 마지막 결과물을 지우면 제출 조건이 깨진다 — 상태를 다시 판정한다.
+  // 질문이 없는 활동은 마지막 결과물을 지우면 제출 조건이 깨진다 — 상태를 다시 판정한다.
   const submitted = await recalcSubmissionStatus(submission);
 
   return NextResponse.json({ ok: true, submitted });

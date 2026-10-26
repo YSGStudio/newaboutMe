@@ -12,7 +12,7 @@ import { checkLearningLink } from '@/lib/learning';
 import { learningLinkSchema } from '@/lib/validators';
 
 // 학생 결과물 링크 등록
-// 파일과 마찬가지로 "결과물 1개"로 세므로, 링크만 올리고 성찰을 써도 제출이 완료된다.
+// 파일과 마찬가지로 "결과물 1개"로 센다. 질문이 없는 활동은 링크 하나만으로도 제출이 완료된다.
 
 type Params = { params: { activityId: string } };
 
