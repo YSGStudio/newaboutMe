@@ -365,6 +365,18 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - 검색 중에는 모든 대화를 펼치고 걸린 편지를 `.is-match`(금색 테두리 + 3px 금색 링)로 강조
 - 새 편지 표시는 `.letter-thread-new`(`--primary-soft` / `--primary` pill)
 
+### 6.3.2 모둠 프로젝트 — 흐름도(간트형 타임라인)
+
+`components/group-project/Timeline.tsx` · 좌표 계산은 `lib/group-project/timeline.ts`. 외부 간트 라이브러리 없이 절대 위치로 그립니다. 모둠 프로젝트의 다른 화면은 `.card`·`.badge`·`Tabs` 등 기존 패턴만 쓰고, CSS는 `.gp-` 접두사로 `globals.css`의 "모둠 프로젝트" 섹션에 있습니다.
+- `.gp-timeline-scroll` — 표 안쪽만 가로 스크롤. 폭은 `왼쪽 라벨 144px + max(480px, 날짜 수 × 26px)`이고 페이지는 넓어지지 않습니다
+- `.gp-timeline-head` / `.gp-timeline-axis` — 맨 위 날짜 눈금(최대 10개, `left: %`)
+- `.gp-timeline-section` — 모둠 방의 "방 공통 / 1모둠 …" 구역 줄. `--primary-soft` 배경
+- `button.gp-bar` — 시작일~마감일 막대. `left`·`width`만 인라인 %로 주고 색은 상태 클래스로 정합니다: `.is-todo` `--muted` · `.is-doing` `--primary` · `.is-done` `--ok`. 막대 글자는 담당자 이름, 누르면 할 일 상세로 갑니다
+- `.is-overdue` — 기한 지남. `--danger` 2px 외곽선(색에만 의존하지 않도록 `title`과 범례에 문구를 함께 둠)
+- `.gp-timeline-today` — 오늘 세로선. `--danger`, 그날의 가운데 위치
+- "날짜 미정" — 날짜 없는 할 일은 표 아래 `button.gp-pill` 목록으로 모읍니다
+- 연한 상태 배경은 새 색을 만들지 않고 `color-mix(in srgb, var(--danger) 10%, var(--surface))`처럼 토큰을 섞습니다
+
 ### 6.4 로그인 — 좌 일러스트 / 우 폼
 
 `.auth-login-shell`은 `minmax(280px,.9fr) / minmax(320px,1.1fr)` 2열 카드. 좌측 `.auth-illustration`은 딥스페이스 그라디언트 위에 SVG 책 일러스트 + 반짝이는 별(`auth-twinkle`)·연필 부유(`auth-pencil-float`) 애니메이션. 720px 이하에서 1열로 접히고 설명 문단은 숨깁니다.

@@ -6,7 +6,7 @@ import { hasActivePaidPlan } from '@/lib/auth';
 import type { TeacherProfile } from '@/lib/auth';
 import { getAppSettings } from '@/lib/adminSettings';
 
-export type AiFeature = 'growth_report' | 'holland_report' | 'subject_report';
+export type AiFeature = 'growth_report' | 'holland_report' | 'subject_report' | 'task_drafts';
 
 // 등급별 월 한도는 app_settings(운영관리 > 설정)에서 읽는다. 기본값은
 // lib/adminSettings.ts의 DEFAULT_SETTINGS에 있다. 사용량은 이번 달 로그 개수를

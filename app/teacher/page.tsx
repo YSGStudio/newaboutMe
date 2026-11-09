@@ -34,6 +34,7 @@ import OperatorDashboard from "@/components/teacher/OperatorDashboard";
 import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
 import LetterThreads from "@/components/teacher/LetterThreads";
+import GroupProjectTeacherPanel from "@/components/group-project/TeacherPanel";
 import { formatDateInSeoul } from "@/lib/date";
 import { api } from "@/lib/api-client";
 import usePoll from "@/lib/use-poll";
@@ -116,6 +117,7 @@ export default function TeacherPage() {
     | "class"
     | "feed"
     | "learning"
+    | "groupProject"
     | "eval"
     | "stats"
     | "ai"
@@ -1402,6 +1404,12 @@ export default function TeacherPage() {
                   icon: "📚",
                   disabled: isOverClassLimit,
                 },
+                {
+                  key: "groupProject",
+                  label: "모둠 프로젝트",
+                  icon: "🧩",
+                  disabled: isOverClassLimit,
+                },
                 // 평가피드백은 관리자 계정에만 보입니다(lib/features.ts).
                 ...(evalFeedbackVisible
                   ? [{
@@ -1639,6 +1647,10 @@ export default function TeacherPage() {
 
           {activeTab === "learning" && (
             <LearningDashboard classId={selectedClassId} />
+          )}
+
+          {activeTab === "groupProject" && (
+            <GroupProjectTeacherPanel classId={selectedClassId} />
           )}
 
           {evalFeedbackVisible && activeTab === "eval" && (

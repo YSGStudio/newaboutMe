@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/adminSettings';
+import { prepareGroupProjectsDelete, removeStoragePaths } from '@/lib/group-project/storage';
 
 // 전체 데이터 초기화 수동 실행 (관리자 전용)
 // 관리자가 확인 문구를 입력해 즉시 전체 학급을 초기화한다. 자동 삭제 정책은 없다.
@@ -25,8 +26,19 @@ export async function POST(req: Request) {
     .from('classes')
     .select('id', { count: 'exact', head: true });
 
+  // 모둠 프로젝트는 cascade에 맡기면 FK 검사에 걸리므로 주제를 먼저 지운다.
+  let groupProjectFiles: string[];
+  try {
+    groupProjectFiles = await prepareGroupProjectsDelete('all');
+  } catch (e) {
+    console.error('[reset-year] 모둠 프로젝트 정리 실패:', e);
+    return NextResponse.json({ error: '초기화하지 못했습니다. 잠시 후 다시 시도하십시오.' }, { status: 500 });
+  }
+
   const { error } = await supabaseAdmin.from('classes').delete().gte('created_at', '1970-01-01');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await removeStoragePaths(groupProjectFiles);
 
   await logAdminAction(
     { id: auth.teacher.id, name: auth.teacher.name },

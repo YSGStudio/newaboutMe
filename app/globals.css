@@ -47,6 +47,8 @@ main {
 
 /* ── Design v2 · 별빛 사이드 내비게이션 ── */
 .dashboard-layout {
+  /* 열을 내용 폭에 맡기면 좁은 화면에서 탭 줄 폭만큼 페이지 전체가 넓어진다. */
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   max-width: none;
   margin: 0;
@@ -4809,4 +4811,438 @@ button.class-dashboard-task-list,
 
 @media (prefers-reduced-motion: reduce) {
   .auth-preparing-spinner { animation: none; }
+}
+
+/* ── 모둠 프로젝트 · 공통 ── */
+.gp-root { min-width: 0; }
+
+.gp-panel,
+.gp-stack,
+.gp-form {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.gp-stack { gap: 10px; margin: 0; padding: 0; list-style: none; }
+.gp-form { gap: 12px; }
+
+.gp-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: start;
+  gap: 16px;
+}
+
+.gp-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.gp-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 12px;
+}
+
+.gp-min { min-width: 0; overflow-wrap: anywhere; }
+.gp-field label { margin-bottom: 0; }
+.gp-field label > input,
+.gp-field label > select,
+.gp-field label > textarea { margin-top: 6px; }
+.gp-field .hint { margin: 4px 0 0; }
+
+.gp-section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.gp-section-title h3 { margin: 0; color: var(--text); font-size: 16px; font-weight: 700; }
+.gp-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  overflow-wrap: anywhere;
+}
+
+.gp-notice-title { margin: 2px 0 6px; color: var(--text); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.gp-subtitle { margin: 0 0 6px; color: var(--text); font-size: 14px; font-weight: 700; }
+.gp-meta { margin: 2px 0; color: var(--muted); font-size: 13px; font-weight: 400; }
+.gp-body { margin: 4px 0; color: var(--text); }
+.gp-strong { margin: 0; color: var(--text); font-weight: 700; }
+.gp-small { font-size: 12px; }
+.gp-kind { color: var(--muted); font-size: 12px; font-weight: 600; }
+.gp-nowrap { white-space: nowrap; }
+.gp-pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gp-ellipsis { display: block; overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+.gp-clamp {
+  display: -webkit-box;
+  margin: 4px 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+
+.gp-gap-top { margin-top: 10px; }
+.gp-divider { display: grid; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.gp-link { color: var(--primary-dark); text-decoration: underline; overflow-wrap: anywhere; }
+.gp-error-text { margin: 4px 0 0; color: var(--danger); font-size: 13px; }
+.gp-text-danger { color: var(--danger); }
+.gp-error-list { margin: 0; padding-left: 18px; color: var(--danger); font-size: 13px; overflow-wrap: anywhere; }
+.gp-ai-mark { margin-left: 4px; color: var(--muted); font-size: 11px; font-weight: 700; }
+
+.gp-actions,
+.gp-badges,
+.gp-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.gp-inline { flex-wrap: nowrap; }
+.gp-inline input { min-width: 0; }
+.gp-row-between { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
+button.gp-btn {
+  width: auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+button.gp-btn-sm { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+button.gp-back { justify-self: start; }
+
+button.gp-danger {
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--surface));
+  background: var(--surface);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+button.gp-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  box-shadow: none;
+}
+
+button.gp-text-button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--primary-dark);
+  box-shadow: none;
+  font-weight: 700;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+button.gp-text-button:hover:not(:disabled) { opacity: 1; background: none; box-shadow: none; text-decoration: underline; transform: none; }
+button.gp-text-button.gp-text-danger { color: var(--danger); }
+button.gp-text-button.gp-small { font-size: 12px; }
+
+.gp-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 130px), 1fr));
+  gap: 4px 8px;
+}
+
+.gp-check {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.gp-check input { flex: none; width: 18px; height: 18px; padding: 0; }
+.gp-check small { color: var(--muted); font-size: 12px; }
+.gp-check.is-disabled { color: var(--muted); }
+
+.gp-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.gp-fieldset legend { margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.gp-select-sm { width: auto; max-width: 150px; padding: 6px 10px; font-size: 13px; }
+.gp-input-sm { width: 120px; padding: 6px 10px; font-size: 13px; }
+
+.gp-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.gp-filters label { display: grid; min-width: 0; gap: 4px; margin: 0; }
+.gp-filters select { width: auto; max-width: 200px; padding: 6px 10px; font-size: 13px; }
+
+.gp-table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.gp-activity-table { min-width: 860px; }
+
+/* ── 모둠 프로젝트 · 방 머리와 보기 전환 ── */
+.gp-room-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.gp-room-switch { display: grid; width: min(100%, 260px); gap: 4px; margin: 0; }
+.gp-view-tabs { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 2px; }
+.gp-overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 280px); align-items: center; gap: 16px; }
+
+.gp-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+button.gp-pill {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-height: 36px;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+button.gp-pill small { color: var(--muted); }
+button.gp-pill.is-active { border-color: var(--primary); background: var(--primary); color: var(--surface); }
+
+/* ── 모둠 프로젝트 · 할 일 ── */
+.gp-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gp-task-rows { margin: 0; padding: 0; list-style: none; }
+.gp-task-grid .gp-task-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.gp-task-rows .gp-task-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.gp-task-rows .gp-task-item:last-child { border-bottom: 0; }
+
+.gp-status {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gp-status.is-todo { background: color-mix(in srgb, var(--muted) 14%, var(--surface)); color: var(--muted); }
+.gp-status.is-doing { background: var(--primary-soft); color: var(--primary-dark); }
+.gp-status.is-done { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
+.gp-status.is-overdue { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); color: var(--danger); }
+
+.gp-status-toggle {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.gp-status-toggle button {
+  width: auto;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.gp-status-toggle button:hover:not(:disabled) { box-shadow: none; transform: none; }
+.gp-status-toggle button.is-active.is-todo { background: var(--muted); color: var(--surface); }
+.gp-status-toggle button.is-active.is-doing { background: var(--primary); color: var(--surface); }
+.gp-status-toggle button.is-active.is-done { background: var(--ok); color: var(--surface); }
+
+.gp-ai-preview { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
+.gp-ai-row { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--surface); }
+.gp-ai-row.is-excluded { border-style: dashed; opacity: .6; }
+
+/* ── 모둠 프로젝트 · 결과물 ── */
+.gp-attachments { margin: 0; padding: 0; list-style: none; }
+.gp-attachments > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.gp-attachments > li:last-child { border-bottom: 0; }
+.gp-attachment-main { display: flex; flex: 1 1 220px; align-items: center; min-width: 0; gap: 8px; }
+.gp-thumb-sm { flex: none; width: 40px; height: 40px; border-radius: var(--radius-xs); object-fit: cover; }
+.gp-text-result { margin: 4px 0; padding: 8px 12px; border-radius: var(--radius-xs); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }
+.gp-upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.gp-subpanel { align-content: start; padding: 12px; border-radius: var(--radius-sm); background: var(--bg); }
+.gp-link-row { display: grid; gap: 6px; }
+
+.gp-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gp-gallery > li { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.gp-gallery-media { display: flex; align-items: center; justify-content: center; height: 112px; background: var(--bg); font-size: 30px; }
+.gp-gallery-media img { width: 100%; height: 100%; object-fit: cover; }
+
+button.gp-gallery-text {
+  display: block;
+  width: 100%;
+  height: 112px;
+  overflow: hidden;
+  padding: 8px;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+button.gp-gallery-text:hover:not(:disabled) { box-shadow: none; transform: none; }
+.gp-gallery-info { display: grid; gap: 2px; min-width: 0; padding: 8px; font-size: 12px; }
+
+/* ── 모둠 프로젝트 · 공지·구성원 ── */
+.gp-comment { min-width: 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg); overflow-wrap: anywhere; }
+.gp-member { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); }
+.gp-member:last-child { border-bottom: 0; }
+.gp-group-card { display: grid; min-width: 0; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+
+button.gp-topic-card {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+button.gp-topic-card small { color: var(--muted); font-weight: 400; }
+button.gp-topic-card:hover:not(:disabled) { box-shadow: var(--shadow-md); }
+
+/* ── 모둠 프로젝트 · 흐름도 ── */
+.gp-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }
+.gp-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.gp-swatch { display: inline-block; width: 16px; height: 12px; border-radius: 3px; }
+.gp-swatch.is-todo,
+.gp-dot.is-todo { background: var(--muted); }
+.gp-swatch.is-doing,
+.gp-dot.is-doing { background: var(--primary); }
+.gp-swatch.is-done,
+.gp-dot.is-done { background: var(--ok); }
+.gp-swatch.is-overdue { border: 2px solid var(--danger); background: var(--surface); }
+.gp-swatch-today { display: inline-block; width: 2px; height: 12px; background: var(--danger); }
+.gp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+.gp-timeline-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.gp-timeline { position: relative; }
+.gp-timeline-head { display: flex; border-bottom: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 12px; }
+
+.gp-timeline-label {
+  flex: none;
+  overflow: hidden;
+  width: var(--gp-label-w);
+  padding: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.gp-timeline-label.gp-text-button { width: var(--gp-label-w); padding: 8px; color: var(--text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.gp-timeline-axis { position: relative; flex: 1; height: 32px; }
+.gp-timeline-axis span { position: absolute; top: 8px; padding-left: 2px; }
+.gp-timeline-section { padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--primary-soft); color: var(--text); font-size: 13px; font-weight: 700; }
+.gp-timeline-empty { padding: 8px; border-bottom: 1px solid var(--border-soft); color: var(--muted); font-size: 12px; }
+.gp-timeline-row { display: flex; border-bottom: 1px solid var(--border-soft); }
+.gp-timeline-track { position: relative; flex: 1; height: 36px; }
+
+button.gp-bar {
+  position: absolute;
+  top: 6px;
+  overflow: hidden;
+  min-width: 20px;
+  min-height: 0;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--surface);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+button.gp-bar.is-todo { background: var(--muted); }
+button.gp-bar.is-doing { background: var(--primary); }
+button.gp-bar.is-done { background: var(--ok); }
+button.gp-bar.is-overdue { outline: 2px solid var(--danger); outline-offset: 1px; }
+button.gp-bar:hover:not(:disabled) { box-shadow: var(--shadow-md); }
+.gp-timeline-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger); opacity: .8; pointer-events: none; }
+
+@media (max-width: 1024px) {
+  .gp-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .gp-overview { grid-template-columns: minmax(0, 1fr); }
+  .gp-room-switch { width: 100%; }
+  .gp-inline { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.gp-bar,
+  button.gp-topic-card { transition: none; }
+  button.gp-bar:hover:not(:disabled),
+  button.gp-topic-card:hover:not(:disabled) { transform: none; }
 }

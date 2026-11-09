@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { prepareGroupProjectsDelete, removeStoragePaths } from '@/lib/group-project/storage';
 
 type Params = { params: { id: string } };
 
@@ -59,8 +60,18 @@ export async function DELETE(_: Request, { params }: Params) {
     return NextResponse.json({ error: '학급 접근 권한이 없습니다.' }, { status: 403 });
   }
 
+  // 모둠 프로젝트는 cascade에 맡기면 FK 검사에 걸리므로 주제를 먼저 지운다.
+  let groupProjectFiles: string[];
+  try {
+    groupProjectFiles = await prepareGroupProjectsDelete({ classIds: [params.id] });
+  } catch (e) {
+    console.error('[classes] 모둠 프로젝트 정리 실패:', e);
+    return NextResponse.json({ error: '학급을 삭제하지 못했습니다. 잠시 후 다시 시도하십시오.' }, { status: 500 });
+  }
+
   const { error } = await supabaseAdmin.from('classes').delete().eq('id', params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await removeStoragePaths(groupProjectFiles);
   return NextResponse.json({ ok: true });
 }

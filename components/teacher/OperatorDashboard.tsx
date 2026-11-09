@@ -66,6 +66,7 @@ const FEATURE_LABEL: Record<string, string> = {
   growth_report: '성장 분석',
   holland_report: '홀란드 분석',
   subject_report: '종합평가',
+  task_drafts: '모둠 할 일 초안',
 };
 
 type SortKey = 'name' | 'createdAt' | 'aiUsedThisMonth' | 'role';
