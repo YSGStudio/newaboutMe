@@ -1406,7 +1406,7 @@ export default function TeacherPage() {
                 },
                 {
                   key: "groupProject",
-                  label: "모둠 프로젝트",
+                  label: "프로젝트",
                   icon: "🧩",
                   disabled: isOverClassLimit,
                 },

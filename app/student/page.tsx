@@ -1184,7 +1184,7 @@ export default function StudentPage() {
                 { key: 'voyage', label: '별빛여행', icon: '🚀' },
                 { key: 'emotion', label: '마음일기', icon: '💜' },
                 { key: 'learning', label: '배움성찰', icon: '📚' },
-                { key: 'groupProject', label: '모둠 프로젝트', icon: '🧩' },
+                { key: 'groupProject', label: '프로젝트', icon: '🧩' },
                 // 평가피드백은 관리자 선생님의 학급에만 보입니다(lib/features.ts).
                 ...(evalFeedbackEnabled ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
