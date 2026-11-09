@@ -126,6 +126,11 @@ export const noticeUpdateSchema = z.object({
   body: trimmedText(5000, '공지 내용'),
 });
 
+export const topicNoticeSchema = z.object({
+  title: teacherText(100, '공지 제목'),
+  body: teacherText(5000, '공지 내용'),
+});
+
 export const commentSchema = z.object({ body: trimmedText(1000, '댓글') });
 
 /** zod 실패를 화면에 보여 줄 문구 하나로 줄인다. */

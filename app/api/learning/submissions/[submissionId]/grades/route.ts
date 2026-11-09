@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireTeacherSubmission } from '@/lib/learning-access';
+import { ensureProxySubmission, requireTeacherSubmission } from '@/lib/learning-access';
 import { learningGradesSchema } from '@/lib/validators';
 import { isCriterionQuestion } from '@/lib/learning';
 
@@ -19,11 +19,6 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? '입력값을 확인해주세요.' }, { status: 400 });
   }
 
-  // 아직 제출이 끝나지 않은 제출물에는 등급을 매기지 않는다. 등급이 생기면 학생 수정이 잠긴다.
-  if (access.submission.status !== 'submitted') {
-    return NextResponse.json({ error: '제출이 끝난 뒤에 평가할 수 있습니다.' }, { status: 409 });
-  }
-
   // 이 제출물이 속한 활동의 평가요소 질문만 받는다.
   const { data: questions } = await supabaseAdmin
     .from('learning_activity_questions')
@@ -34,6 +29,9 @@ export async function PUT(req: Request, { params }: Params) {
   if (parsed.data.grades.some((item) => !criterionIds.has(item.questionId))) {
     return NextResponse.json({ error: '이 활동의 평가요소가 아닙니다.' }, { status: 400 });
   }
+
+  // 교사는 제출 여부와 상관없이 평가할 수 있다. 평가 결과가 학생과 집계에 보이도록 제출로 맞춘다.
+  await ensureProxySubmission(access.activity.id, access.submission.student_id);
 
   const { error } = await supabaseAdmin
     .from('learning_submission_grades')

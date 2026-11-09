@@ -377,6 +377,8 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - "날짜 미정" — 날짜 없는 할 일은 표 아래 `button.gp-pill` 목록으로 모읍니다
 - 연한 상태 배경은 새 색을 만들지 않고 `color-mix(in srgb, var(--danger) 10%, var(--surface))`처럼 토큰을 섞습니다
 
+- 전체공지(`.card.gp-topic-notice`) — 방 공지 맨 위에 고정. `--primary` 테두리, `--primary-soft`를 섞은 배경, `.badge` "전체공지" 표시
+
 ### 6.4 로그인 — 좌 일러스트 / 우 폼
 
 `.auth-login-shell`은 `minmax(280px,.9fr) / minmax(320px,1.1fr)` 2열 카드. 좌측 `.auth-illustration`은 딥스페이스 그라디언트 위에 SVG 책 일러스트 + 반짝이는 별(`auth-twinkle`)·연필 부유(`auth-pencil-float`) 애니메이션. 720px 이하에서 1열로 접히고 설명 문단은 숨깁니다.

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireTeacherSubmission, SUBMISSION_COLUMNS } from '@/lib/learning-access';
+import { ensureProxySubmission, requireTeacherSubmission, SUBMISSION_COLUMNS } from '@/lib/learning-access';
 import { learningFeedbackSchema } from '@/lib/validators';
 
 // 교사 피드백 저장·수정·삭제
@@ -17,6 +17,9 @@ export async function POST(req: Request, { params }: Params) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? '입력값을 확인해주세요.' }, { status: 400 });
   }
+
+  // 교사는 제출 여부와 상관없이 피드백을 남길 수 있다. 결과가 학생과 집계에 보이도록 제출로 맞춘다.
+  await ensureProxySubmission(access.activity.id, access.submission.student_id);
 
   const { data, error } = await supabaseAdmin
     .from('learning_submissions')

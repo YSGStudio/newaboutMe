@@ -12,6 +12,8 @@ import { formatRange } from '@/lib/group-project/format';
 import type { ProjectStats } from '@/lib/group-project/progress';
 import type { ActivityRow, GpTopic } from '@/lib/group-project/types';
 import ActivityTable from './ActivityTable';
+import DownloadAllButton from './DownloadAllButton';
+import TopicNotices from './TopicNotices';
 import { GpProvider, useGp } from './context';
 import RoomCreateForm from './RoomCreateForm';
 import RoomView, { RoomMenu } from './RoomView';
@@ -107,8 +109,11 @@ function TopicScreen({ topicId, onBack, onOpenRoom, onActivity }: { topicId: str
               <p className="gp-meta">{formatRange(topicData.topic.start_date, topicData.topic.end_date)} · 목표: {topicData.topic.goal}</p>
               <div className="gp-actions gp-gap-top">
                 <button type="button" className="gp-btn" onClick={onActivity}>학생별 활동 모아보기</button>
+                <DownloadAllButton topicId={topicId} label="학생 자료 모두 받기" />
               </div>
             </header>
+
+            <TopicNotices topicId={topicId} />
 
             <section className="card">
               <SectionTitle>프로젝트 방 {rooms.rooms.length}개</SectionTitle>

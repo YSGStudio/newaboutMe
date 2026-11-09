@@ -454,7 +454,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     setOpenCell(cell);
     setFeedback(cell.submission?.feedback_text ?? '');
     const draft: GradeDraft = {};
-    (cell.submission?.answers ?? []).forEach((row) => {
+    answerRowsFor(cell).forEach((row) => {
       if (row.criterion) draft[row.questionId] = { grade: row.criterion.teacherGrade, comment: row.criterion.teacherComment ?? '' };
     });
     setGradeDraft(draft);
@@ -484,11 +484,17 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
   /** 요소별 등급과 최종 피드백을 한 번의 동작으로 저장한다. 과거 요소별 코멘트는 그대로 보존한다. */
   const saveEvaluation = async () => {
-    if (!openCell?.submission) return;
+    if (!openCell) return;
     setGradesSaving(true);
     setModalError('');
     try {
-      await api(`/api/learning/submissions/${openCell.submission.id}/grades`, {
+      // 아직 아무것도 남기지 않은 학생도 바로 평가할 수 있게 제출물을 먼저 확보한다.
+      const submissionId = openCell.submission?.id
+        ?? (await api<{ submissionId: string }>(`/api/learning/activities/${selectedId}/submissions`, {
+          method: 'POST',
+          body: JSON.stringify({ studentId: openCell.student.id }),
+        })).submissionId;
+      await api(`/api/learning/submissions/${submissionId}/grades`, {
         method: 'PUT',
         body: JSON.stringify({
           grades: Object.entries(gradeDraft).map(([questionId, item]) => ({
@@ -498,7 +504,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
           })),
         }),
       });
-      await api(`/api/learning/submissions/${openCell.submission.id}/feedback`, {
+      await api(`/api/learning/submissions/${submissionId}/feedback`, {
         method: 'POST',
         body: JSON.stringify({ feedback }),
       });
@@ -616,6 +622,15 @@ export default function LearningDashboard({ classId }: { classId: string }) {
   const subjectsInUse = [...new Set(listActivities.map((a) => a.subject))];
   const selected = activities.find((a) => a.id === selectedId) ?? null;
   const activityQuestions = [...(selected?.learning_activity_questions ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  /** 제출물이 없는 학생도 평가할 수 있도록 활동의 질문·평가요소로 빈 답안을 만든다. */
+  const answerRowsFor = (cell: StudentCell): AnswerRow[] => cell.submission?.answers ?? activityQuestions.map((q) => ({
+    questionId: q.id,
+    question: q.question,
+    answer: '',
+    criterion: isCriterionQuestion(q)
+      ? { title: q.criterion_title ?? '', levelHigh: q.level_high, levelMid: q.level_mid, levelLow: q.level_low, teacherGrade: null, teacherComment: null }
+      : null,
+  }));
   const editingActivity = activities.find((a) => a.id === editingId) ?? null;
   // 평가가 시작된 활동은 질문·평가요소를 잠근다(라우트도 409로 막는다).
   const questionsLocked = Boolean(
@@ -1004,7 +1019,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                                   })}
                                 </span>
                               )}
-                              {cell.submission?.submitted_by === 'teacher' && (
+                              {cell.submission?.submitted_by === 'teacher' && (cell.submission.files.length + cell.submission.links.length) > 0 && (
                                 <span style={{ fontSize: 10, color: '#78350f' }}>교사 대리 업로드</span>
                               )}
                             </button>
@@ -1195,9 +1210,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
 
               {/* 질문마다 그 아래에 답을 붙여, 무엇에 답한 것인지 바로 보이게 한다 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(openCell.submission?.answers ?? activityQuestions.map((q): AnswerRow => ({
-                  questionId: q.id, question: q.question, answer: '', criterion: null,
-                }))).map((row, index) => (
+                {answerRowsFor(openCell).map((row, index) => (
                   <div key={row.questionId} style={{ borderRadius: 12, border: '1px solid #ddd6fe', overflow: 'hidden' }}>
                     <div style={{ padding: '9px 13px', background: '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
                       <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 800, color: '#7c6bd6', letterSpacing: '0.02em' }}>
@@ -1216,14 +1229,14 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                 ))}
               </div>
 
-              {Object.keys(gradeDraft).length > 0 && openCell.submission && openCell.status !== 'none' && (
+              {Object.keys(gradeDraft).length > 0 && (
                 <section className="learning-teacher-review-section" aria-label="교사 평가">
                   <div className="learning-teacher-review-heading">
                     <span aria-hidden="true">✦</span>
-                    <div><strong>교사 평가</strong><p>학생의 자기점검을 확인한 뒤 평가요소별 등급을 선택합니다.</p></div>
+                    <div><strong>교사 평가</strong><p>평가 대기·결과물·성찰 작성과 관계없이 평가요소별 등급을 바로 저장할 수 있습니다.</p></div>
                   </div>
                   <div className="learning-teacher-review-list">
-                    {(openCell.submission.answers ?? []).filter((row) => row.criterion).map((row, index) => (
+                    {answerRowsFor(openCell).filter((row) => row.criterion).map((row, index) => (
                       <div key={row.questionId} className="learning-teacher-evaluation">
                         <div className="learning-teacher-evaluation-heading">
                           <strong>{index + 1}. {row.criterion!.title}</strong>
@@ -1245,18 +1258,12 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                 </section>
               )}
 
-              {Object.keys(gradeDraft).length > 0 && openCell.submission && openCell.status === 'none' && (
-                <p className="hint" style={{ margin: 0 }}>제출이 끝나면 요소별 평가를 할 수 있습니다.</p>
-              )}
               <div className="learning-teacher-feedback">
                 <div className="learning-teacher-feedback-heading">
                   <strong>종합 피드백</strong>
                   <span>등급 평가를 마친 뒤 학생에게 전할 최종 의견을 입력합니다.</span>
                 </div>
-                {!openCell.submission ? (
-                  <p className="hint" style={{ margin: 0 }}>제출물이 있어야 피드백을 남길 수 있습니다.</p>
-                ) : (
-                  <>
+                <>
                     <textarea
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value.slice(0, MAX_FEEDBACK_LENGTH))}
@@ -1282,7 +1289,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                       >
                         {gradesSaving ? '전체 저장 중...' : '등급과 최종 피드백 저장'}
                       </button>
-                      {openCell.submission.feedback_text && (
+                      {openCell.submission?.feedback_text && (
                         <button
                           type="button"
                           className="outline"
@@ -1294,8 +1301,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                         </button>
                       )}
                     </div>
-                  </>
-                )}
+                </>
               </div>
             </div>
           </div>

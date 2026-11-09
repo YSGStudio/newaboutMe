@@ -9,6 +9,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import { formatDateTime, formatRange } from '@/lib/group-project/format';
 import type { GpNoticeView, RoomBundle, WorkspaceBundle } from '@/lib/group-project/types';
 import AttachmentGallery from './AttachmentGallery';
+import DownloadAllButton from './DownloadAllButton';
 import { useGp } from './context';
 import Linkify from './Linkify';
 import Timeline from './Timeline';
@@ -73,7 +74,7 @@ export default function Dashboard({ room, view, onOpenTask, onGoTo }: Props) {
 
           <div className="gp-split">
             <section className="card">
-              <SectionTitle>자료 모음</SectionTitle>
+              <SectionTitle right={room.scope.isTeacher ? <DownloadAllButton topicId={room.topic.id} roomId={room.project.id} label="이 방 자료 모두 받기" /> : undefined}>자료 모음</SectionTitle>
               <AttachmentGallery items={ws.attachments} tasks={ws.tasks} onOpenTask={onOpenTask} />
             </section>
             <section className="card">

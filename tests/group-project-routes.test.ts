@@ -71,6 +71,9 @@ import * as attachment from '@/app/api/group-projects/attachments/[attachmentId]
 import * as notice from '@/app/api/group-projects/notices/[noticeId]/route';
 import * as noticeComments from '@/app/api/group-projects/notices/[noticeId]/comments/route';
 import * as comment from '@/app/api/group-projects/comments/[commentId]/route';
+import * as topicNotices from '@/app/api/group-projects/topics/[topicId]/notices/route';
+import * as topicNotice from '@/app/api/group-projects/topic-notices/[noticeId]/route';
+import * as archive from '@/app/api/group-projects/topics/[topicId]/archive/route';
 import * as meRooms from '@/app/api/group-projects/me/rooms/route';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -651,5 +654,86 @@ describe('학생 첫 화면', () => {
     login('g1Mem');
     const { json } = await call(meRooms.GET, get());
     expect(json.defaultRoomId).toBe(ROOM_G);
+  });
+});
+
+describe('전체공지', () => {
+  const post = () => req({ title: '전체 안내', body: '내용' });
+  const seedNotice = () => h.db.rows('gp_topic_notices').push({ id: id(90), topic_id: TOPIC, teacher_id: T, title: '전체 안내', body: '내용', created_at: '2026-11-03T00:00:00Z', updated_at: '2026-11-03T00:00:00Z' });
+
+  it.each(ALL)('쓰기·관리는 담임만: %s', async (who) => {
+    login(who);
+    const expected = who === 'teacher' ? 201 : who === 'otherTeacher' || who === 'otherClass' ? 404 : 403;
+    expect(await statusOf(topicNotices.POST, post(), { topicId: TOPIC })).toBe(expected);
+    expect(await statusOf(topicNotices.GET, get(), { topicId: TOPIC })).toBe(expected === 201 ? 200 : expected);
+  });
+  it('세션이 없으면 401', async () => {
+    login('none');
+    expect(await statusOf(topicNotices.POST, post(), { topicId: TOPIC })).toBe(401);
+    expect(await statusOf(topicNotice.DELETE, get(), { noticeId: id(90) })).toBe(401);
+  });
+  it('모든 방 구성원에게 방 공지와 함께 온다(미배치 학생 포함)', async () => {
+    seedNotice();
+    for (const [who, roomId] of [['g1Mem', ROOM_G], ['unassigned', ROOM_G], ['wMem', ROOM_W], ['otherRoom', ROOM_O], ['teacher', ROOM_G]] as const) {
+      login(who);
+      const { json } = await call(roomNotices.GET, get(), { roomId });
+      expect(json.topicNotices.map((n: { title: string }) => n.title)).toEqual(['전체 안내']);
+    }
+  });
+  it('방 밖의 학생은 방 공지 경로로 받을 수 없다', async () => {
+    seedNotice();
+    login('otherClass');
+    expect(await statusOf(roomNotices.GET, get(), { roomId: ROOM_G })).toBe(404);
+    login('wMem');
+    expect(await statusOf(roomNotices.GET, get(), { roomId: ROOM_G })).toBe(404);
+  });
+  it('수정·삭제는 담임만, 다른 교사는 404', async () => {
+    seedNotice();
+    const patch = () => req({ title: '바꿈', body: '내용' }, { method: 'PATCH' });
+    login('g1Lead');
+    expect(await statusOf(topicNotice.PATCH, patch(), { noticeId: id(90) })).toBe(403);
+    expect(await statusOf(topicNotice.DELETE, get(), { noticeId: id(90) })).toBe(403);
+    login('otherTeacher');
+    expect(await statusOf(topicNotice.PATCH, patch(), { noticeId: id(90) })).toBe(404);
+    expect(await statusOf(topicNotice.DELETE, get(), { noticeId: id(90) })).toBe(404);
+    login('teacher');
+    expect(await statusOf(topicNotice.PATCH, patch(), { noticeId: id(90) })).toBe(200);
+    expect(h.db.rows('gp_topic_notices')[0].title).toBe('바꿈');
+    expect(await statusOf(topicNotice.DELETE, get(), { noticeId: id(90) })).toBe(200);
+    expect(h.db.rows('gp_topic_notices')).toHaveLength(0);
+  });
+  it('제목·내용 없이는 저장되지 않는다', async () => {
+    login('teacher');
+    expect(await statusOf(topicNotices.POST, req({ title: ' ', body: 'b' }), { topicId: TOPIC })).toBe(400);
+  });
+});
+
+describe('학생 자료 모두 받기', () => {
+  it.each(ALL)('담임만: %s', async (who) => {
+    login(who);
+    const expected = who === 'teacher' ? 200 : who === 'otherTeacher' || who === 'otherClass' ? 404 : 403;
+    expect(await statusOf(archive.GET, get(), { topicId: TOPIC })).toBe(expected);
+  });
+  it('모든 방의 학생 자료를 방/모둠/할 일 폴더로 묶고 서명 URL은 600초다', async () => {
+    login('teacher');
+    const { json } = await call(archive.GET, get(), { topicId: TOPIC });
+    const paths = json.files.map((f: { path: string }) => f.path).sort();
+    expect(paths).toEqual(['모둠방/1모둠/1모둠 할일/g1Mem_a.pdf', '모둠방/2모둠/2모둠 비밀 할일/g2Mem_2모둠비밀.pdf'].sort());
+    expect(json.files[0].url).toContain('ttl=600');
+    expect(JSON.stringify(json)).not.toContain('storage_path');
+    expect(json.fileName).toBe('주제_학생자료.zip');
+  });
+  it('선생님이 올린 자료는 뺀다', async () => {
+    h.db.rows('gp_task_attachments').push({ id: id(91), task_id: TASK_G1, kind: 'pdf', storage_path: 'x/t.pdf', file_name: '교사.pdf', uploaded_by_teacher_id: T, uploaded_by_student_id: null, created_at: '' });
+    login('teacher');
+    const { json } = await call(archive.GET, get(), { topicId: TOPIC });
+    expect(JSON.stringify(json)).not.toContain('교사.pdf');
+  });
+  it('?room= 은 그 방만, 다른 주제의 방이면 404', async () => {
+    login('teacher');
+    const one = await call(archive.GET, get(`http://test/api?room=${ROOM_W}`), { topicId: TOPIC });
+    expect(one.status).toBe(200);
+    expect(one.json.files).toEqual([]);
+    expect(await statusOf(archive.GET, get(`http://test/api?room=${id(999)}`), { topicId: TOPIC })).toBe(404);
   });
 });

@@ -5171,6 +5171,9 @@ button.gp-topic-card {
 button.gp-topic-card small { color: var(--muted); font-weight: 400; }
 button.gp-topic-card:hover:not(:disabled) { box-shadow: var(--shadow-md); }
 
+.gp-download { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.gp-topic-notice { border-color: var(--primary); background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface)); }
+
 /* ── 모둠 프로젝트 · 흐름도 ── */
 .gp-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }
 .gp-legend span { display: inline-flex; align-items: center; gap: 4px; }

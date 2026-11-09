@@ -9,7 +9,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Notice from '@/components/ui/Notice';
 import SubmitButton from '@/components/ui/SubmitButton';
 import { formatDateTime } from '@/lib/group-project/format';
-import type { GpCommentView, GpNoticeView, RoomBundle } from '@/lib/group-project/types';
+import type { GpCommentView, GpNoticeView, GpTopicNotice, RoomBundle } from '@/lib/group-project/types';
 import { useGp } from './context';
 import { UNASSIGNED_MESSAGE } from './Dashboard';
 import Linkify from './Linkify';
@@ -158,7 +158,7 @@ export default function Notices({ room, view }: { room: RoomBundle; view: string
   const { api } = useGp();
   const roomId = room.project.id;
   const { data, error, loading, reload } = useLoad(
-    () => api<{ notices: GpNoticeView[] }>(`/rooms/${roomId}/notices${view ? `?view=${view}` : ''}`),
+    () => api<{ notices: GpNoticeView[]; topicNotices: GpTopicNotice[] }>(`/rooms/${roomId}/notices${view ? `?view=${view}` : ''}`),
     [api, roomId, view],
   );
   const { busy, run, feedback } = useAction();
@@ -186,7 +186,18 @@ export default function Notices({ room, view }: { room: RoomBundle; view: string
       <div className={scopes.length ? 'gp-split' : 'gp-panel'}>
         <div className="gp-panel">
           <LoadGate loading={loading} error={error} hasData={Boolean(data)}>
-            {data?.notices.length === 0 && <EmptyState title="공지가 없어요" description="새 공지가 올라오면 여기에 보여요." />}
+            {data?.topicNotices.map((n) => (
+              <article key={n.id} className="card gp-topic-notice">
+                <p className="gp-meta">
+                  <span className="badge">전체공지</span> 선생님 · {formatDateTime(n.created_at)}
+                </p>
+                <h3 className="gp-notice-title">{n.title}</h3>
+                <p className="gp-pre">
+                  <Linkify text={n.body} />
+                </p>
+              </article>
+            ))}
+            {data?.notices.length === 0 && data.topicNotices.length === 0 && <EmptyState title="공지가 없어요" description="새 공지가 올라오면 여기에 보여요." />}
             {data?.notices.map((n) => <NoticeCard key={n.id} notice={n} onChanged={reload} />)}
           </LoadGate>
         </div>

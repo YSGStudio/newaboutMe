@@ -5,7 +5,7 @@ import { requireRoom } from '@/lib/group-project/access';
 import { dbError, forbiddenResponse, jsonError, parseBody } from '@/lib/group-project/http';
 import { noticeCreateSchema } from '@/lib/group-project/schemas';
 import { canEditScope } from '@/lib/group-project/scope';
-import { loadNotices } from '@/lib/group-project/workspace';
+import { loadNotices, loadTopicNotices } from '@/lib/group-project/workspace';
 
 type Params = { params: { roomId: string } };
 
@@ -16,7 +16,11 @@ export async function GET(req: Request, { params }: Params) {
   if ('error' in room) return room.error;
   const search = new URL(req.url).searchParams;
   const limit = Number(search.get('limit'));
-  return NextResponse.json({ notices: await loadNotices(room.ctx, search.get('view'), limit > 0 ? limit : undefined) });
+  const [notices, topicNotices] = await Promise.all([
+    loadNotices(room.ctx, search.get('view'), limit > 0 ? limit : undefined),
+    loadTopicNotices(room.ctx.topic.id),
+  ]);
+  return NextResponse.json({ notices, topicNotices });
 }
 
 export async function POST(req: Request, { params }: Params) {

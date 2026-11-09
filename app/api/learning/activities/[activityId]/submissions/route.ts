@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireTeacherActivity } from '@/lib/learning-access';
+import { assertStudentInClass, ensureProxySubmission, requireTeacherActivity } from '@/lib/learning-access';
 import { getLearningStatus, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { signPaths } from '@/lib/learning-storage';
 
@@ -8,6 +8,23 @@ import { signPaths } from '@/lib/learning-storage';
 // 제출한 학생만이 아니라 "학급 전체 학생"을 내려야 미제출이 카드로 보인다.
 
 type Params = { params: { activityId: string } };
+
+// 아직 제출물이 없는 학생을 교사가 바로 평가할 수 있게 제출물을 확보한다.
+export async function POST(req: Request, { params }: Params) {
+  const access = await requireTeacherActivity(params.activityId);
+  if ('error' in access) return access.error;
+
+  const body = await req.json().catch(() => ({}));
+  const studentId = typeof body?.studentId === 'string' ? body.studentId : '';
+  // 다른 학급 학생 id로는 제출물을 만들 수 없다.
+  if (!studentId || !(await assertStudentInClass(studentId, access.activity.class_id))) {
+    return NextResponse.json({ error: '이 학급 학생이 아닙니다.' }, { status: 404 });
+  }
+
+  const submission = await ensureProxySubmission(access.activity.id, studentId);
+  if (!submission) return NextResponse.json({ error: '제출물을 만들지 못했습니다.' }, { status: 500 });
+  return NextResponse.json({ submissionId: submission.id }, { status: 201 });
+}
 
 export async function GET(_: Request, { params }: Params) {
   const access = await requireTeacherActivity(params.activityId);

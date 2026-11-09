@@ -126,7 +126,8 @@ export class FakeDb {
 type Result = { data: unknown; error: { code?: string; message: string } | null; count?: number };
 
 class Query implements PromiseLike<Result> {
-  private op: 'select' | 'insert' | 'update' | 'delete' = 'select';
+  private op: 'select' | 'insert' | 'update' | 'delete' | 'upsert' = 'select';
+  private conflict: string[] = [];
   private selectStr = '*';
   private payload: Row[] = [];
   private patch: Row = {};
@@ -153,6 +154,12 @@ class Query implements PromiseLike<Result> {
   insert(v: Row | Row[]) {
     this.op = 'insert';
     this.payload = Array.isArray(v) ? v : [v];
+    return this;
+  }
+  upsert(v: Row[], opts: { onConflict: string }) {
+    this.op = 'upsert';
+    this.payload = v;
+    this.conflict = opts.onConflict.split(',');
     return this;
   }
   update(v: Row) {
@@ -231,7 +238,15 @@ class Query implements PromiseLike<Result> {
   private run(): Result {
     const embeds = parseEmbeds(this.selectStr);
     let rows: Row[];
-    if (this.op === 'insert') {
+    if (this.op === 'upsert') {
+      rows = this.payload.map((p) => {
+        const hit = this.db.rows(this.table).find((r) => this.conflict.every((c) => r[c] === p[c]));
+        if (hit) return Object.assign(hit, p);
+        const row: Row = { id: this.db.newId(), ...p };
+        this.db.rows(this.table).push(row);
+        return row;
+      });
+    } else if (this.op === 'insert') {
       rows = this.payload.map((p) => {
         const row: Row = { id: this.db.newId(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...p };
         this.db.rows(this.table).push(row);

@@ -96,6 +96,17 @@ export type GpComment = {
   updated_at: string;
 };
 
+/** 주제 전체공지. 그 주제의 모든 방 공지 탭 맨 위에 보인다. */
+export type GpTopicNotice = {
+  id: string;
+  topic_id: string;
+  teacher_id: string | null;
+  title: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type GpCommentView = GpComment & { authorName: string; canEdit: boolean; canDelete: boolean };
 
 export type GpNoticeView = GpNotice & {

@@ -15,6 +15,7 @@ import type {
   GpComment,
   GpNotice,
   GpNoticeView,
+  GpTopicNotice,
   GpTask,
   WorkspaceBundle,
   WorkspaceSection,
@@ -91,6 +92,18 @@ export async function loadWorkspace(ctx: RoomContext, viewParam: string | null):
     today: todayDate(),
     attachments: await toAttachmentViews(ctx, rows, titles),
   };
+}
+
+/** 주제 전체공지. 최신순. 호출하는 라우트가 주제·방 접근을 확인한 뒤에 부른다. */
+export async function loadTopicNotices(topicId: string): Promise<GpTopicNotice[]> {
+  const { data, error } = await supabaseAdmin
+    .from('gp_topic_notices')
+    .select('*')
+    .eq('topic_id', topicId)
+    .order('created_at', { ascending: false });
+  // 전체공지를 못 읽어도 방 공지까지 막히지 않게 한다.
+  if (error) console.error('[group-project] 전체공지 조회 실패:', error.message);
+  return (data ?? []) as GpTopicNotice[];
 }
 
 export async function loadNotices(ctx: RoomContext, viewParam: string | null, limit?: number): Promise<GpNoticeView[]> {
