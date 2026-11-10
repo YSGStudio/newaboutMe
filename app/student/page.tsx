@@ -584,12 +584,16 @@ export default function StudentPage() {
           image_url: string | null;
           created_at: string;
         };
+        newBadges?: AwardedBadge[];
       }>('/api/feeds', {
         method: 'POST',
         body: JSON.stringify({ emotionType, content })
       });
       setMyFeed(data.feed);
       void loadVoyageSummary();
+      // 저장 라우트가 이미 뱃지·연료를 지급하고 새 뱃지를 돌려준다 — 여기서 바로 보여준다.
+      // 아래 claim은 그 지급이 실패했을 때를 위한 안전망이라, 보통은 빈 목록이 온다.
+      handleNewBadges(data.newBadges ?? []);
       void claimReward('emotion', data.feed.id).then((reward) => {
         handleNewBadges(reward.newBadges ?? []);
         void loadVoyageSummary();
@@ -666,7 +670,7 @@ export default function StudentPage() {
     setSendLoading(true);
     setComposeError('');
     try {
-      const letterData = await api<{ letter: { id: string } }>('/api/letters', {
+      const letterData = await api<{ letter: { id: string }; newBadges?: AwardedBadge[] }>('/api/letters', {
         method: 'POST',
         body: JSON.stringify({
           recipientId: composeRecipientId,
@@ -675,6 +679,9 @@ export default function StudentPage() {
         }),
       });
       closeCompose();
+      // 저장 라우트가 돌려준 새 뱃지를 바로 보여준다(claim은 실패 대비 안전망).
+      handleNewBadges(letterData.newBadges ?? []);
+      void loadVoyageSummary();
       void claimReward('letter', letterData.letter.id).then((reward) => {
         handleNewBadges(reward.newBadges ?? []);
         void loadVoyageSummary();
