@@ -6,13 +6,13 @@ import {
   lockedByFeedback,
   recalcSubmissionStatus,
   LOCKED_MESSAGE,
-  SUBMISSION_COLUMNS,
 } from '@/lib/learning-access';
+import { loadStudentLearningDetail } from '@/lib/learning-detail';
 import { learningAnswerSchema } from '@/lib/validators';
-import { rewardLearningSubmission } from '@/lib/learning-rewards';
 
 // 학생 성찰 답변 저장 (질문별로 여러 개를 한 번에)
 // 저장 후 제출 완료 여부를 다시 판정한다 — 모든 질문에 답하면 완료다(결과물은 없어도 된다).
+// 응답에 갱신된 상세(detail)를 함께 실어 보낸다 — 화면이 상세를 다시 GET 하지 않아도 되게.
 
 type Params = { params: { activityId: string } };
 
@@ -28,17 +28,21 @@ export async function PUT(req: Request, { params }: Params) {
   const submission = await getOrCreateSubmission(access.activity.id, access.student.id);
   if (!submission) return NextResponse.json({ error: '제출물을 만들지 못했습니다.' }, { status: 500 });
 
+  // 잠금 확인과 질문 목록은 서로 기다릴 이유가 없어 함께 읽는다.
+  const [locked, { data: questions }] = await Promise.all([
+    lockedByFeedback(submission),
+    supabaseAdmin
+      .from('learning_activity_questions')
+      .select('id')
+      .eq('activity_id', access.activity.id),
+  ]);
+
   // 피드백이 달린 뒤에는 화면 잠금과 별개로 여기서도 막는다.
-  if (await lockedByFeedback(submission)) {
+  if (locked) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
 
   // 이 활동의 질문만 받아들인다 — 다른 활동의 question_id를 섞어 보내도 저장되지 않는다.
-  const { data: questions } = await supabaseAdmin
-    .from('learning_activity_questions')
-    .select('id')
-    .eq('activity_id', access.activity.id);
-
   const validIds = new Set((questions ?? []).map((q) => q.id));
   const rows = parsed.data.answers
     .filter((item) => validIds.has(item.questionId))
@@ -59,14 +63,7 @@ export async function PUT(req: Request, { params }: Params) {
 
   const submitted = await recalcSubmissionStatus(submission);
 
-  const { data: refreshed } = await supabaseAdmin
-    .from('learning_submissions')
-    .select(SUBMISSION_COLUMNS)
-    .eq('id', submission.id)
-    .maybeSingle();
+  const detail = await loadStudentLearningDetail(access.student.id, access.activity);
 
-  // 별빛 퀘스트(뱃지)와 별빛 여행(연료) 연결 — 제출이 완료됐을 때만 지급한다(lib/learning-rewards.ts).
-  const newBadges = submitted ? await rewardLearningSubmission(access.student.id, submission.id) : [];
-
-  return NextResponse.json({ submission: refreshed, submitted, newBadges });
+  return NextResponse.json({ submission: detail.submission, submitted, detail });
 }

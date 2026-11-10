@@ -19,6 +19,7 @@ import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { formatDateInSeoul } from '@/lib/date';
 import { studentApi as api } from '@/lib/api-client';
 import { shrinkImageForUpload } from '@/lib/image-upload';
+import { claimReward } from '@/lib/reward-claim-client';
 import {
   LearningStatus,
   STUDENT_STATUS_LABEL,
@@ -85,13 +86,13 @@ type Detail = {
 };
 
 /** 제출 판정을 하는 학생 라우트(답변·결과물·링크)의 공통 응답 */
-type SubmitResult = { submitted: boolean; newBadges?: { badge: { name: string } }[] };
+/** 답·결과물을 바꾸는 요청의 응답 — 갱신된 상세가 함께 와서 다시 불러오지 않아도 됩니다. */
+type SubmitResult = { submitted: boolean; detail: Detail };
+type RewardResult = { newBadges: { badge: { name: string } }[] };
 
 /** 제출이 끝났으면 연료·뱃지 소식을, 아니면 기본 문구를 돌려준다. */
 const rewardMessage = (result: SubmitResult, fallback: string) => {
-  const badgeNames = (result.newBadges ?? []).map((b) => b.badge.name);
-  if (badgeNames.length > 0) return `성찰을 냈어요! 새 뱃지를 받았어요 — ${badgeNames.join(', ')} 🏅`;
-  if (result.submitted) return '성찰을 냈어요! 별빛 연료가 쌓였어요 ⛽';
+  if (result.submitted) return '성찰을 냈어요! 보상을 확인하고 있어요…';
   return fallback;
 };
 
@@ -195,11 +196,29 @@ export default function LearningContent() {
     }
   };
 
-  const refreshDetail = async (activityId: string) => {
-    const data = await api<Detail>(`/api/learning/my/${activityId}`, { cache: 'no-store' });
+  /**
+   * 저장 응답에 실려 온 상세를 화면에 반영합니다.
+   * 상세를 다시 GET 하지 않고, 목록(제출 상태 배지)은 기다리지 않고 뒤에서 맞춥니다.
+   */
+  const applyDetail = (data: Detail) => {
     setDetail(data);
     setAnswers(Object.fromEntries(data.questions.map((q) => [q.id, q.answer])));
-    await load();
+    void load();
+  };
+
+  const claimLearningReward = (result: SubmitResult) => {
+    const submissionId = result.detail.submission?.id;
+    if (!result.submitted || !submissionId) return;
+    void claimReward('learning', submissionId).then((reward: RewardResult) => {
+      const names = (reward.newBadges ?? []).map((item) => item.badge.name);
+      setModalMsg(names.length > 0
+        ? `성찰을 냈어요! 새 뱃지를 받았어요 — ${names.join(', ')} 🏅`
+        : '성찰을 냈어요! 별빛 연료가 쌓였어요 ⛽');
+    }).catch(() => {
+      // 저장은 이미 성공했다. 보상은 같은 sourceId로 안전하게 재시도할 수 있으므로
+      // 저장 오류처럼 보이지 않게 하고 다음 활동 갱신에 맡긴다.
+      setModalMsg('성찰을 저장했어요.');
+    });
   };
 
   const locked = Boolean(detail?.locked);
@@ -250,7 +269,8 @@ export default function LearningContent() {
           }),
         }
       );
-      await refreshDetail(detail.activity.id);
+      applyDetail(result.detail);
+      claimLearningReward(result);
 
       // 성찰을 내면 별빛 여행 연료와 별빛 퀘스트 뱃지가 함께 쌓입니다.
       setModalMsg(rewardMessage(result, '성찰을 저장했어요.'));
@@ -282,7 +302,8 @@ export default function LearningContent() {
       const form = new FormData();
       form.append('file', file);
       const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/files`, { method: 'POST', body: form });
-      await refreshDetail(detail.activity.id);
+      applyDetail(result.detail);
+      claimLearningReward(result);
       // 결과물이 마지막 조건이었다면 이때 제출이 끝나고 연료·뱃지가 쌓인다.
       setModalMsg(rewardMessage(result, '결과물을 올렸어요.'));
     } catch (err) {
@@ -298,8 +319,8 @@ export default function LearningContent() {
     setModalError('');
     setModalMsg('');
     try {
-      await api(`/api/learning/my/${detail.activity.id}/files/${fileId}`, { method: 'DELETE' });
-      await refreshDetail(detail.activity.id);
+      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/files/${fileId}`, { method: 'DELETE' });
+      applyDetail(result.detail);
     } catch (err) {
       setModalError((err as Error).message);
     }
@@ -324,7 +345,8 @@ export default function LearningContent() {
         method: 'POST',
         body: JSON.stringify({ url: linkUrl, label: linkLabel || undefined }),
       });
-      await refreshDetail(detail.activity.id);
+      applyDetail(result.detail);
+      claimLearningReward(result);
       setLinkUrl('');
       setLinkLabel('');
       setLinkOpen(false);
@@ -341,8 +363,8 @@ export default function LearningContent() {
     setModalError('');
     setModalMsg('');
     try {
-      await api(`/api/learning/my/${detail.activity.id}/links/${linkId}`, { method: 'DELETE' });
-      await refreshDetail(detail.activity.id);
+      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/links/${linkId}`, { method: 'DELETE' });
+      applyDetail(result.detail);
     } catch (err) {
       setModalError((err as Error).message);
     }

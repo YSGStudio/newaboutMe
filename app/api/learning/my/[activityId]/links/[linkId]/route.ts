@@ -7,6 +7,7 @@ import {
   LOCKED_MESSAGE,
   SUBMISSION_COLUMNS,
 } from '@/lib/learning-access';
+import { loadStudentLearningDetail } from '@/lib/learning-detail';
 
 // 학생 결과물 링크 삭제
 // 내 제출물에 달린 링크인지 반드시 확인한다 — linkId만 믿고 지우면 남의 링크도 지워진다.
@@ -26,16 +27,21 @@ export async function DELETE(_: Request, { params }: Params) {
 
   if (!submission) return NextResponse.json({ error: '제출물을 찾을 수 없어요.' }, { status: 404 });
 
-  if (await lockedByFeedback(submission)) {
+  // 잠금 확인과 대상 찾기는 서로 기다릴 이유가 없어 함께 읽는다.
+  // submission_id로 좁혀서 조회 — 다른 학생 링크의 id를 넣어도 여기서 걸린다.
+  const [locked, { data: link }] = await Promise.all([
+    lockedByFeedback(submission),
+    supabaseAdmin
+      .from('learning_submission_links')
+      .select('id')
+      .eq('id', params.linkId)
+      .eq('submission_id', submission.id)
+      .maybeSingle(),
+  ]);
+
+  if (locked) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
-
-  const { data: link } = await supabaseAdmin
-    .from('learning_submission_links')
-    .select('id')
-    .eq('id', params.linkId)
-    .eq('submission_id', submission.id)
-    .maybeSingle();
 
   if (!link) return NextResponse.json({ error: '링크를 찾을 수 없어요.' }, { status: 404 });
 
@@ -44,5 +50,8 @@ export async function DELETE(_: Request, { params }: Params) {
 
   const submitted = await recalcSubmissionStatus(submission);
 
-  return NextResponse.json({ ok: true, submitted });
+  // 갱신된 상세를 함께 실어 보낸다 — 화면이 상세를 다시 GET 하지 않아도 되게.
+  const detail = await loadStudentLearningDetail(access.student.id, access.activity);
+
+  return NextResponse.json({ ok: true, submitted, detail });
 }

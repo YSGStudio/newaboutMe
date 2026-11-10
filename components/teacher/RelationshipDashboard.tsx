@@ -507,11 +507,12 @@ export default function RelationshipDashboard({ classId }: { classId: string }) 
   }, [selectedSurveyId, isSurveyOpen]);
 
   const onRefreshAll = async () => {
-    await loadSurveys('preserve');
-    if (selectedSurveyId) {
-      await loadStudentGrid(selectedSurveyId);
-      if (selectedSurvey?.closed_at) await loadReport(selectedSurveyId);
-    }
+    // 설문 목록·학생 격자·결과 보고서는 서로 기다릴 이유가 없어 함께 다시 읽는다.
+    await Promise.all([
+      loadSurveys('preserve'),
+      selectedSurveyId ? loadStudentGrid(selectedSurveyId) : undefined,
+      selectedSurveyId && selectedSurvey?.closed_at ? loadReport(selectedSurveyId) : undefined,
+    ]);
   };
 
   const onCreateSurvey = async () => {

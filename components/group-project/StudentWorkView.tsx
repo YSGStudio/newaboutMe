@@ -123,7 +123,7 @@ export default function StudentWorkView({ topicId, studentId, today, onBack, onO
                           {isOverdue(task, today) && <OverdueBadge />}
                         </div>
                         <div className="gp-actions gp-gap-top">
-                          <StatusToggle taskId={task.id} status={task.status} canChange onChanged={reload} />
+                          <StatusToggle taskId={task.id} status={task.status} canChange onChanged={() => reload()} />
                           <button type="button" className="ghost gp-btn gp-btn-sm" onClick={() => onOpen(task.project_id, task.id)}>고치기</button>
                           <button type="button" className="gp-btn gp-btn-sm gp-danger" disabled={busy} onClick={() => remove(`/tasks/${task.id}`, `"${task.title}" 할 일을 삭제할까요? 첨부도 함께 지워집니다.`)}>삭제</button>
                         </div>

@@ -49,11 +49,16 @@ export async function requireStudentSession() {
 
   const tokenHash = sha256(token);
 
+  // 세션 → 학생 → 학급을 한 번의 조회로 가져온다.
+  // 모든 학생 API가 이 함수를 먼저 거치므로, 예전처럼 세 번 차례로 물어보면
+  // 요청마다 DB 왕복 두 번이 그대로 지연으로 쌓인다.
   const { data: session, error } = await supabaseAdmin
     .from('student_sessions')
-    .select('id,student_id,expires_at')
+    .select(
+      'id,expires_at,students(id,name,student_number,class_id,classes(id,class_name,class_code,letters_enabled,teacher_id))'
+    )
     .eq('token_hash', tokenHash)
-    .maybeSingle();
+    .maybeSingle<SessionJoinRow>();
 
   if (error || !session) {
     return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
@@ -65,22 +70,12 @@ export async function requireStudentSession() {
     return { error: NextResponse.json({ error: 'Session expired' }, { status: 401 }) };
   }
 
-  const { data: student } = await supabaseAdmin
-    .from('students')
-    .select('id,name,student_number,class_id')
-    .eq('id', session.student_id)
-    .maybeSingle();
-
-  if (!student) {
+  const joined = session.students;
+  if (!joined) {
     return { error: NextResponse.json({ error: 'Student not found' }, { status: 401 }) };
   }
 
-  const { data: classRow } = await supabaseAdmin
-    .from('classes')
-    .select('id,class_name,class_code,letters_enabled,teacher_id')
-    .eq('id', student.class_id)
-    .maybeSingle();
-
+  const { classes: classRow, ...student } = joined;
   if (!classRow) {
     return { error: NextResponse.json({ error: 'Class not found' }, { status: 401 }) };
   }
@@ -92,6 +87,25 @@ export async function requireStudentSession() {
     }
   };
 }
+
+/** requireStudentSession의 한 번짜리 조회 결과 모양. */
+type SessionJoinRow = {
+  id: string;
+  expires_at: string;
+  students: {
+    id: string;
+    name: string;
+    student_number: number;
+    class_id: string;
+    classes: {
+      id: string;
+      class_name: string;
+      class_code: string;
+      letters_enabled: boolean | null;
+      teacher_id: string;
+    } | null;
+  } | null;
+};
 
 /**
  * 학급의 별빛메일이 꺼져 있으면 403 응답을 반환한다.

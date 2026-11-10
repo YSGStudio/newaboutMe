@@ -7,7 +7,7 @@ import {
   recalcSubmissionStatus,
   LOCKED_MESSAGE,
 } from '@/lib/learning-access';
-import { rewardLearningSubmission } from '@/lib/learning-rewards';
+import { loadStudentLearningDetail } from '@/lib/learning-detail';
 import { checkLearningFile } from '@/lib/learning';
 import { LEARNING_BUCKET, buildStoragePath } from '@/lib/learning-storage';
 
@@ -24,18 +24,22 @@ export async function POST(req: Request, { params }: Params) {
   const submission = await getOrCreateSubmission(access.activity.id, access.student.id);
   if (!submission) return NextResponse.json({ error: '제출물을 만들지 못했습니다.' }, { status: 500 });
 
-  if (await lockedByFeedback(submission)) {
+  // 잠금 확인·본문 읽기·현재 개수 세기는 서로 기다릴 이유가 없어 함께 돌린다.
+  const [locked, formData, { count }] = await Promise.all([
+    lockedByFeedback(submission),
+    req.formData(),
+    supabaseAdmin
+      .from('learning_submission_files')
+      .select('id', { count: 'exact', head: true })
+      .eq('submission_id', submission.id),
+  ]);
+
+  if (locked) {
     return NextResponse.json({ error: LOCKED_MESSAGE }, { status: 409 });
   }
 
-  const formData = await req.formData();
   const file = formData.get('file') as File | null;
   if (!file) return NextResponse.json({ error: '파일이 없어요.' }, { status: 400 });
-
-  const { count } = await supabaseAdmin
-    .from('learning_submission_files')
-    .select('id', { count: 'exact', head: true })
-    .eq('submission_id', submission.id);
 
   const currentCount = count ?? 0;
 
@@ -78,7 +82,8 @@ export async function POST(req: Request, { params }: Params) {
   // 결과물이 생겨서 제출 조건을 채웠을 수 있다 — 상태를 다시 판정한다.
   const submitted = await recalcSubmissionStatus(submission);
   // 결과물을 마지막으로 채워 제출이 끝났을 수 있다 — 그때도 연료·뱃지를 준다.
-  const newBadges = submitted ? await rewardLearningSubmission(access.student.id, submission.id) : [];
+  // 갱신된 상세도 함께 실어 보낸다 — 화면이 상세를 다시 GET 하지 않아도 되게.
+  const detail = await loadStudentLearningDetail(access.student.id, access.activity);
 
-  return NextResponse.json({ file: fileRow, submitted, newBadges }, { status: 201 });
+  return NextResponse.json({ file: fileRow, submitted, detail }, { status: 201 });
 }

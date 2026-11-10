@@ -362,8 +362,11 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       setForm(EMPTY_FORM);
       setFormOpen(false);
       setEditingId('');
-      await loadActivities();
-      if (editingId && selectedId === editingId) await loadCells(editingId);
+      // 활동 목록과 펼친 학생 카드는 서로 기다릴 이유가 없어 함께 다시 읽는다.
+      await Promise.all([
+        loadActivities(),
+        editingId && selectedId === editingId ? loadCells(editingId) : undefined,
+      ]);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -470,8 +473,8 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     setModalError('');
     try {
       await api(`/api/learning/submissions/${openCell.submission.id}/feedback`, { method: 'DELETE' });
-      await loadCells(selectedId);
-      await loadActivities();
+      // 학생 카드와 활동 목록은 서로 기다릴 이유가 없어 함께 다시 읽는다.
+      await Promise.all([loadCells(selectedId), loadActivities()]);
       setOpenCell(null);
       setMessage('피드백을 지웠습니다. 학생이 다시 고칠 수 있습니다.');
       notifyLater();
@@ -494,22 +497,26 @@ export default function LearningDashboard({ classId }: { classId: string }) {
           method: 'POST',
           body: JSON.stringify({ studentId: openCell.student.id }),
         })).submissionId;
-      await api(`/api/learning/submissions/${submissionId}/grades`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          grades: Object.entries(gradeDraft).map(([questionId, item]) => ({
-            questionId,
-            grade: item.grade,
-            comment: item.comment.trim() || null,
-          })),
+      // 등급(learning_submission_grades)과 최종 피드백(learning_submissions.feedback_text)은
+      // 서로 다른 곳에 저장돼 순서가 상관없으므로 함께 보낸다.
+      await Promise.all([
+        api(`/api/learning/submissions/${submissionId}/grades`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            grades: Object.entries(gradeDraft).map(([questionId, item]) => ({
+              questionId,
+              grade: item.grade,
+              comment: item.comment.trim() || null,
+            })),
+          }),
         }),
-      });
-      await api(`/api/learning/submissions/${submissionId}/feedback`, {
-        method: 'POST',
-        body: JSON.stringify({ feedback }),
-      });
-      await loadCells(selectedId);
-      await loadActivities();
+        api(`/api/learning/submissions/${submissionId}/feedback`, {
+          method: 'POST',
+          body: JSON.stringify({ feedback }),
+        }),
+      ]);
+      // 학생 카드와 활동 목록은 서로 기다릴 이유가 없어 함께 다시 읽는다.
+      await Promise.all([loadCells(selectedId), loadActivities()]);
       setOpenCell(null);
       setMessage('등급과 최종 피드백을 저장했습니다.');
       notifyLater();
@@ -556,8 +563,8 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       form.append('studentId', proxyTarget.student.id);
       form.append('file', file);
       await api(`/api/learning/activities/${selectedId}/proxy-files`, { method: 'POST', body: form });
-      await loadCells(selectedId);
-      await loadActivities();
+      // 학생 카드와 활동 목록은 서로 기다릴 이유가 없어 함께 다시 읽는다.
+      await Promise.all([loadCells(selectedId), loadActivities()]);
       setMessage(`${proxyTarget.student.name} 학생의 결과물을 대신 올렸습니다.`);
     } catch (err) {
       setError((err as Error).message);
@@ -597,7 +604,8 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       setCells(data.students);
       // 열려 있는 카드도 새 내용으로 바꿔 준다 — 닫았다 다시 열지 않아도 링크가 보인다.
       setOpenCell(data.students.find((cell) => cell.student.id === openCell.student.id) ?? null);
-      await loadActivities();
+      // 활동 카드의 제출 집계는 기다리지 않고 뒤에서 맞춘다.
+      void loadActivities(true);
       setProxyLinkUrl('');
       setProxyLinkLabel('');
       setProxyLinkOpen(false);

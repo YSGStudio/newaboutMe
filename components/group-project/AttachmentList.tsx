@@ -4,6 +4,7 @@
  * AttachmentList — 할 일의 "올린 결과물" 목록
  * 종류, 이름, 올린 사람, 시각을 보여 주고 글 결과물은 맨 위에 복사 버튼과 함께 둡니다.
  */
+import { useState } from 'react';
 import { useAction } from './ui';
 import { useGp } from './context';
 import CopyButton from './CopyButton';
@@ -18,19 +19,31 @@ type Props = { items: GpAttachmentView[]; onChanged: () => void };
 export default function AttachmentList({ items, onChanged }: Props) {
   const { api, confirmDelete } = useGp();
   const { run, feedback, busy } = useAction();
+  // 지우기를 누른 결과물은 서버 응답을 기다리지 않고 바로 감춘다. 실패하면 다시 보인다.
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
 
   async function remove(a: GpAttachmentView) {
     if (!(await confirmDelete(`"${a.file_name}"을(를) 지울까요?`))) return;
-    await run(async () => {
+    setHiddenIds((prev) => new Set(prev).add(a.id));
+    const ok = await run(async () => {
       await api(`/attachments/${a.id}`, { method: 'DELETE' });
-      onChanged();
     });
+    if (ok) {
+      onChanged();
+    } else {
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(a.id);
+        return next;
+      });
+    }
   }
 
-  if (items.length === 0) return <p className="hint">아직 결과물이 없어요</p>;
+  const visible = items.filter((a) => !hiddenIds.has(a.id));
+  if (visible.length === 0) return <p className="hint">아직 결과물이 없어요</p>;
 
   // 글을 먼저 읽도록 글 결과물을 위로 올린다(같은 종류 안에서는 원래 순서 유지)
-  const sorted = [...items].sort((a, b) => Number(b.kind === 'text') - Number(a.kind === 'text'));
+  const sorted = [...visible].sort((a, b) => Number(b.kind === 'text') - Number(a.kind === 'text'));
 
   return (
     <>

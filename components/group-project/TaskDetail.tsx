@@ -32,7 +32,7 @@ type Props = { room: RoomBundle; taskId: string; today: string; onBack: () => vo
 
 export default function TaskDetail({ room, taskId, today, onBack }: Props) {
   const { api, confirmDelete } = useGp();
-  const { data, error, loading, reload } = useLoad(() => api<Detail>(`/tasks/${taskId}`), [api, taskId]);
+  const { data, error, loading, reload, mutate } = useLoad(() => api<Detail>(`/tasks/${taskId}`), [api, taskId]);
   const text = useAction();
   const del = useAction();
 
@@ -41,8 +41,12 @@ export default function TaskDetail({ room, taskId, today, onBack }: Props) {
     const form = e.currentTarget;
     const fd = new FormData(form);
     const ok = await text.run(async () => {
-      await api(`/tasks/${taskId}/texts`, { method: 'POST', body: JSON.stringify({ title: fd.get('title'), body: fd.get('body') }) });
-      await reload();
+      const res = await api<{ attachment: GpAttachmentView }>(`/tasks/${taskId}/texts`, {
+        method: 'POST',
+        body: JSON.stringify({ title: fd.get('title'), body: fd.get('body') }),
+      });
+      // 저장 응답에 실려 온 결과물을 목록에 바로 붙인다 — 상세 전체를 다시 불러오지 않는다.
+      mutate((d) => (d ? { ...d, attachments: [...d.attachments, res.attachment] } : d));
       return '글을 올렸어요';
     });
     if (ok) form.reset();
@@ -85,7 +89,7 @@ export default function TaskDetail({ room, taskId, today, onBack }: Props) {
                   </p>
                 )}
                 <div className="gp-gap-top">
-                  <StatusToggle key={data.task.status} taskId={data.task.id} status={data.task.status} canChange={data.canChangeStatus} onChanged={reload} />
+                  <StatusToggle key={data.task.status} taskId={data.task.id} status={data.task.status} canChange={data.canChangeStatus} onChanged={(next) => mutate((d) => (d ? { ...d, task: { ...d.task, status: next } } : d))} />
                   {!data.canChangeStatus && <p className="hint">상태는 담당자와 팀장·모둠장, 선생님이 바꿀 수 있어요.</p>}
                 </div>
               </section>

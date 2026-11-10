@@ -15,6 +15,10 @@ const PARENT: Record<string, Record<string, string>> = {
   gp_task_attachments: { gp_tasks: 'task_id' },
   gp_notice_comments: { gp_notices: 'notice_id' },
   gp_tasks: { gp_projects: 'project_id' },
+  // 실제 DB의 FK와 같다 — requireStudentSession·requireTeacherSubmission이 한 번에 읽는 관계
+  student_sessions: { students: 'student_id' },
+  students: { classes: 'class_id' },
+  learning_submissions: { learning_activities: 'activity_id' },
 };
 
 /** 부모 테이블 → 자식 목록 FK */

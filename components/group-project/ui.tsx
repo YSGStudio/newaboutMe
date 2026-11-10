@@ -8,7 +8,10 @@ import Notice from '@/components/ui/Notice';
 import { STATUS_LABEL } from '@/lib/group-project/status';
 import type { TaskStatus } from '@/lib/group-project/dates';
 
-/** 화면이 바뀌는 동안 늦게 도착한 이전 응답은 버린다. */
+/**
+ * 화면이 바뀌는 동안 늦게 도착한 이전 응답은 버린다.
+ * mutate는 저장 응답으로 화면을 바로 고칠 때 쓴다 — 전체를 다시 불러오는 왕복을 아낀다.
+ */
 export function useLoad<T>(loader: () => Promise<T>, deps: DependencyList) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
@@ -36,7 +39,7 @@ export function useLoad<T>(loader: () => Promise<T>, deps: DependencyList) {
     reload();
   }, [reload]);
 
-  return { data, error, loading, reload };
+  return { data, error, loading, reload, mutate: setData };
 }
 
 /** 저장·삭제 버튼 하나의 진행 상태와 결과 문구. */

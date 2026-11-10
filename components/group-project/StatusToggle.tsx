@@ -9,7 +9,8 @@ import type { TaskStatus } from '@/lib/group-project/dates';
 import { STATUS_LABEL, STATUSES } from '@/lib/group-project/status';
 import { useGp } from './context';
 
-type Props = { taskId: string; status: TaskStatus; canChange: boolean; onChanged?: () => void };
+/** onChanged는 서버 저장이 끝난 뒤 새 상태와 함께 불립니다 — 부모가 다시 불러오지 않고 그 값만 반영할 수 있게. */
+type Props = { taskId: string; status: TaskStatus; canChange: boolean; onChanged?: (next: TaskStatus) => void };
 
 export default function StatusToggle({ taskId, status, canChange, onChanged }: Props) {
   const { api } = useGp();
@@ -24,7 +25,7 @@ export default function StatusToggle({ taskId, status, canChange, onChanged }: P
     setBusy(true);
     try {
       await api(`/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
-      onChanged?.();
+      onChanged?.(next);
     } catch (e) {
       setCurrent(prev);
       setError(e instanceof Error ? e.message : '바꾸지 못했어요.');

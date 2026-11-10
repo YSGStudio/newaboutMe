@@ -94,6 +94,9 @@ export default function ClassDashboard({
   };
 
   const [loadedClassId, setLoadedClassId] = useState(initialData ? classId : '');
+  // 부트스트랩이 이 학급의 스냅샷을 이미 내려준 첫 마운트에서는 같은 무거운
+  // 집계를 곧바로 한 번 더 실행하지 않는다. 다음 폴링부터 최신값을 맞춘다.
+  const initialDataClassId = useState(() => initialData ? classId : '')[0];
 
   // 이 컴포넌트는 대시보드 탭에서만 렌더되므로 탭을 옮겼다 돌아올 때마다 다시 마운트되고,
   // 그때 state가 initialData(= 로그인 시점 부트스트랩 스냅샷)로 되돌아간다.
@@ -109,6 +112,7 @@ export default function ClassDashboard({
     if (!classId) return;
     const sameClass = classId === loadedClassId;
     setLoadedClassId(classId);
+    if (classId === initialDataClassId && sameClass) return;
     load(sameClass);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);

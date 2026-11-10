@@ -491,6 +491,14 @@ export default function TeacherPage() {
     runBootstrap();
   }, [runBootstrap]);
 
+  // 첫 대시보드 마운트가 스냅샷을 받아 간 뒤에는 부모에 오래 보관하지 않는다.
+  // 그래야 다른 탭에서 돌아올 때 로그인 시점 스냅샷으로 되돌아가지 않고 최신값을 읽는다.
+  useEffect(() => {
+    if (activeTab === "dashboard" && bootstrapDashboard) {
+      setBootstrapDashboard(null);
+    }
+  }, [activeTab, bootstrapDashboard]);
+
   // 평가피드백은 관리자 계정에만 열려 있다(lib/features.ts).
   const evalFeedbackVisible = canSeeEvalFeedback(teacherRole);
 

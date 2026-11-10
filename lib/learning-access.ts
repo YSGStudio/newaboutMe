@@ -36,14 +36,17 @@ const forbidden = (message: string) => NextResponse.json({ error: message }, { s
  * 학급이 다른 교사에게 넘어간 경우를 놓친다.
  */
 export async function requireTeacherActivity(activityId: string) {
-  const auth = await requireTeacher();
+  // 로그인 확인과 활동 읽기는 서로 기다릴 이유가 없어 함께 돌린다.
+  // 활동 내용은 아래 학급 확인을 통과한 뒤에만 돌려준다.
+  const [auth, { data: activity }] = await Promise.all([
+    requireTeacher(),
+    supabaseAdmin
+      .from('learning_activities')
+      .select(ACTIVITY_COLUMNS)
+      .eq('id', activityId)
+      .maybeSingle<LearningActivityRow>(),
+  ]);
   if ('error' in auth && auth.error) return { error: auth.error };
-
-  const { data: activity } = await supabaseAdmin
-    .from('learning_activities')
-    .select(ACTIVITY_COLUMNS)
-    .eq('id', activityId)
-    .maybeSingle<LearningActivityRow>();
 
   if (!activity) return { error: notFound('활동을 찾을 수 없습니다.') };
 
@@ -58,14 +61,17 @@ export async function requireTeacherActivity(activityId: string) {
  * 활동의 class_id와 학생의 class_id가 같아야 한다(학생 → 학급 → 활동).
  */
 export async function requireStudentActivity(activityId: string) {
-  const auth = await requireStudentSession();
+  // 세션 확인과 활동 읽기는 서로 기다릴 이유가 없어 함께 돌린다.
+  // 활동 내용은 아래 학급 대조를 통과한 뒤에만 돌려준다.
+  const [auth, { data: activity }] = await Promise.all([
+    requireStudentSession(),
+    supabaseAdmin
+      .from('learning_activities')
+      .select(ACTIVITY_COLUMNS)
+      .eq('id', activityId)
+      .maybeSingle<LearningActivityRow>(),
+  ]);
   if ('error' in auth && auth.error) return { error: auth.error };
-
-  const { data: activity } = await supabaseAdmin
-    .from('learning_activities')
-    .select(ACTIVITY_COLUMNS)
-    .eq('id', activityId)
-    .maybeSingle<LearningActivityRow>();
 
   if (!activity) return { error: notFound('활동을 찾을 수 없습니다.') };
   if (activity.class_id !== auth.student.class_id) {
@@ -94,23 +100,21 @@ export const SUBMISSION_COLUMNS =
  * 제출물 → 활동 → 학급 → 담당 교사 순으로 거슬러 올라간다.
  */
 export async function requireTeacherSubmission(submissionId: string) {
-  const auth = await requireTeacher();
+  // 로그인 확인과 제출물(+활동) 읽기는 서로 기다릴 이유가 없어 함께 돌린다.
+  // 제출물과 활동은 한 번의 조회로 가져온다. 내용은 아래 학급 확인을 통과한 뒤에만 돌려준다.
+  const [auth, { data: joined }] = await Promise.all([
+    requireTeacher(),
+    supabaseAdmin
+      .from('learning_submissions')
+      .select(`${SUBMISSION_COLUMNS},learning_activities(${ACTIVITY_COLUMNS})`)
+      .eq('id', submissionId)
+      .maybeSingle<LearningSubmissionRow & { learning_activities: LearningActivityRow | null }>(),
+  ]);
   if ('error' in auth && auth.error) return { error: auth.error };
 
-  const { data: submission } = await supabaseAdmin
-    .from('learning_submissions')
-    .select(SUBMISSION_COLUMNS)
-    .eq('id', submissionId)
-    .maybeSingle<LearningSubmissionRow>();
+  if (!joined) return { error: notFound('제출물을 찾을 수 없습니다.') };
 
-  if (!submission) return { error: notFound('제출물을 찾을 수 없습니다.') };
-
-  const { data: activity } = await supabaseAdmin
-    .from('learning_activities')
-    .select(ACTIVITY_COLUMNS)
-    .eq('id', submission.activity_id)
-    .maybeSingle<LearningActivityRow>();
-
+  const { learning_activities: activity, ...submission } = joined;
   if (!activity) return { error: notFound('활동을 찾을 수 없습니다.') };
 
   const classForbidden = await requireTeacherClass(auth.teacher.id, activity.class_id);

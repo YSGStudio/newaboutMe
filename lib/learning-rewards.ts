@@ -1,7 +1,5 @@
 import 'server-only';
-import { supabaseAdmin } from '@/lib/supabase/admin';
-import { checkAndAwardBadge } from '@/lib/badges';
-import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
+import { rewardStudentAction } from '@/lib/rewards';
 
 /**
  * 배움성찰 제출 보상 — 별빛 퀘스트(성찰 뱃지)와 별빛 여행(reflection 연료).
@@ -14,17 +12,5 @@ import { grantBadgeFuel, grantFuel } from '@/lib/voyage';
  * 보상 실패가 학생의 저장을 되돌리지 않도록 오류는 로그만 남긴다.
  */
 export async function rewardLearningSubmission(studentId: string, submissionId: string) {
-  let newBadges: Awaited<ReturnType<typeof checkAndAwardBadge>> = [];
-  try {
-    newBadges = await checkAndAwardBadge(supabaseAdmin, studentId, 'reflection_save');
-  } catch (badgeError) {
-    console.error('[badges] 배움성찰 뱃지 확인 실패:', badgeError);
-  }
-  try {
-    await grantFuel(supabaseAdmin, studentId, 'reflection', submissionId);
-    await grantBadgeFuel(supabaseAdmin, studentId, newBadges);
-  } catch (fuelError) {
-    console.error('[voyage] 배움성찰 연료 지급 실패:', fuelError);
-  }
-  return newBadges;
+  return rewardStudentAction(studentId, 'reflection_save', 'reflection', submissionId, '배움성찰');
 }

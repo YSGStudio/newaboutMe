@@ -13,18 +13,23 @@ export type TeacherProfile = {
 
 export async function requireTeacher() {
   const supabase = await createSupabaseServer();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  // getUser()는 요청마다 Supabase Auth 서버에 물어보는 네트워크 왕복이다.
+  // 이 프로젝트는 비대칭(ES256) JWT 서명 키를 쓰므로, getClaims()는 공개키(JWKS, 프로세스 안에 캐시)로
+  // 서명과 만료를 이 서버 안에서 바로 검증한다.
+  // 대가: 다른 곳에서 로그아웃·세션 폐기를 해도 이미 발급된 access token은 만료(기본 1시간)까지 통과한다.
+  // 역할·결제 상태는 아래에서 매번 teacher_profiles를 읽으므로 바뀌는 즉시 반영된다.
+  // JWT 키를 대칭(HS256)으로 되돌리면 getClaims()가 스스로 getUser()로 물러나므로 동작은 그대로다.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null;
 
-  if (!user) {
+  if (!userId) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
   const { data: profile } = await supabaseAdmin
     .from('teacher_profiles')
     .select('id,name,role,paid_until')
-    .eq('id', user.id)
+    .eq('id', userId)
     .maybeSingle();
 
   if (!profile) {
@@ -38,7 +43,7 @@ export async function requireTeacher() {
     paidUntil: profile.paid_until ?? null,
   };
 
-  return { user, teacher };
+  return { teacher };
 }
 
 /** 교사가 해당 학급의 담당자인지 확인. 아니면 403 응답을 반환한다. */

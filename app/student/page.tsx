@@ -24,6 +24,7 @@ import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } fr
 import type { AwardedBadge } from '@/lib/badges';
 import { studentApi as api } from '@/lib/api-client';
 import usePoll from '@/lib/use-poll';
+import { claimReward, retryPendingRewards } from '@/lib/reward-claim-client';
 
 type VoyageSummary = {
   totalFuel: number;
@@ -503,10 +504,13 @@ export default function StudentPage() {
       setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
       const loginToday = getTodayInSeoul();
       setEmotionDate(loginToday);
-      await Promise.all([loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()]);
-      void loadVoyageSummary(); // 배너용 — 로그인 완료를 막지 않도록 기다리지 않는다
       setActiveTab('voyage');
-      setStudentName(data.student.name); // 데이터가 준비된 뒤 대시보드 노출
+      // 인증이 끝났으면 셸부터 즉시 보여준다. 카드별 데이터는 각자 준비되는 대로 채운다.
+      setStudentName(data.student.name);
+      void loadMyFeed(loginToday).catch(() => null);
+      void loadBadgeProfile();
+      void loadRelationshipStatus();
+      void loadVoyageSummary();
       setMessage('로그인 되었습니다.');
       clearNoticeLater();
     } catch (err) {
@@ -528,6 +532,9 @@ export default function StudentPage() {
 
   const onUpdateFeedEmotion = async (content: string) => {
     setFeedLoading(true);
+    const previousFeed = myFeed;
+    if (myFeed) setMyFeed({ ...myFeed, emotion_type: emotionType, content });
+    setIsEditingEmotion(false);
     try {
       const data = await api<{ feed: NonNullable<MyFeedRow> }>('/api/feeds', {
         method: 'PATCH',
@@ -538,6 +545,8 @@ export default function StudentPage() {
       setMessage('오늘의 기록을 고쳤어요.');
       clearNoticeLater();
     } catch (err) {
+      setMyFeed(previousFeed);
+      setIsEditingEmotion(true);
       setError((err as Error).message);
       clearNoticeLater();
     } finally {
@@ -555,7 +564,18 @@ export default function StudentPage() {
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
     const content = String(form.get('content'));
+    const previousFeed = myFeed;
     try {
+      const optimisticFeed: NonNullable<MyFeedRow> = {
+        id: `optimistic-${Date.now()}`,
+        emotion_type: emotionType,
+        content,
+        image_url: null,
+        created_at: new Date().toISOString(),
+      };
+      setMyFeed(optimisticFeed);
+      formEl.reset();
+
       const data = await api<{
         feed: {
           id: string;
@@ -564,18 +584,20 @@ export default function StudentPage() {
           image_url: string | null;
           created_at: string;
         };
-        newBadges: AwardedBadge[];
       }>('/api/feeds', {
         method: 'POST',
         body: JSON.stringify({ emotionType, content })
       });
-      formEl.reset();
       setMyFeed(data.feed);
       void loadVoyageSummary();
-      handleNewBadges(data.newBadges ?? []);
+      void claimReward('emotion', data.feed.id).then((reward) => {
+        handleNewBadges(reward.newBadges ?? []);
+        void loadVoyageSummary();
+      }).catch(() => null);
       setMessage('감정 피드를 작성했습니다.');
       clearNoticeLater();
     } catch (err) {
+      setMyFeed(previousFeed);
       setError((err as Error).message);
       clearNoticeLater();
     } finally {
@@ -644,7 +666,7 @@ export default function StudentPage() {
     setSendLoading(true);
     setComposeError('');
     try {
-      const letterData = await api<{ newBadges: AwardedBadge[] }>('/api/letters', {
+      const letterData = await api<{ letter: { id: string } }>('/api/letters', {
         method: 'POST',
         body: JSON.stringify({
           recipientId: composeRecipientId,
@@ -653,8 +675,10 @@ export default function StudentPage() {
         }),
       });
       closeCompose();
-      void loadVoyageSummary();
-      handleNewBadges(letterData.newBadges ?? []);
+      void claimReward('letter', letterData.letter.id).then((reward) => {
+        handleNewBadges(reward.newBadges ?? []);
+        void loadVoyageSummary();
+      }).catch(() => null);
       setLetterMsg('편지를 보냈습니다.');
       setSentLoaded(false);
       window.setTimeout(() => setLetterMsg(''), 2500);
@@ -848,14 +872,12 @@ export default function StudentPage() {
         setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
         const loginToday = getTodayInSeoul();
         setEmotionDate(loginToday);
-        await Promise.all([
-          loadMyFeed(loginToday),
-          loadBadgeProfile(),
-          loadRelationshipStatus(),
-        ]);
+        setStudentName(data.student.name);
         if (cancelled) return;
-        void loadVoyageSummary(); // 배너용 — 세션 복원 완료를 막지 않도록 기다리지 않는다
-        setStudentName(data.student.name); // 데이터가 준비된 뒤 대시보드 노출
+        void loadMyFeed(loginToday).catch(() => null);
+        void loadBadgeProfile();
+        void loadRelationshipStatus();
+        void loadVoyageSummary();
       } catch {
         // 유효한 세션이 없으면 로그인 화면을 표시한다.
       } finally {
@@ -910,6 +932,19 @@ export default function StudentPage() {
     const last = newBadges[newBadges.length - 1];
     if (last.newTitle) setStudentTitle(last.newTitle);
   };
+
+  useEffect(() => {
+    if (!studentName) return;
+    void retryPendingRewards().then((badges) => {
+      handleNewBadges(badges);
+      if (badges.length > 0) {
+        void loadBadgeProfile();
+        void loadVoyageSummary();
+      }
+    });
+    // 로그인 직후 한 번만 이전 실패분을 복구한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentName]);
 
   const onChangeEmotionDate = async (nextDate: string) => {
     setEmotionDate(nextDate);
