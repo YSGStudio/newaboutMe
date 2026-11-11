@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -47,7 +48,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (isActive !== undefined) update.is_active = isActive;
 
   const { error } = await supabaseAdmin.from('admin_notices').update(update).eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   await logAdminAction({ id: auth.teacher.id, name: auth.teacher.name }, 'notice_update', `알림 수정: ${params.id}`);
   return NextResponse.json({ ok: true });
 }
@@ -60,7 +61,7 @@ export async function DELETE(_: Request, { params }: Params) {
   if (block) return block;
 
   const { error } = await supabaseAdmin.from('admin_notices').delete().eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   await logAdminAction({ id: auth.teacher.id, name: auth.teacher.name }, 'notice_delete', `알림 삭제: ${params.id}`);
   return NextResponse.json({ ok: true });
 }

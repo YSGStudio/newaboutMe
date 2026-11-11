@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate, getSeoulDayRange } from '@/lib/date';
@@ -50,7 +51,7 @@ export async function GET() {
     supabaseAdmin.from('eval_reflections').select('id', { count: 'exact', head: true }).gte('created_at', weekStartIso),
   ]);
 
-  if (profilesRes.error) return NextResponse.json({ error: profilesRes.error.message }, { status: 500 });
+  if (profilesRes.error) return serverError(profilesRes.error);
 
   const profiles = profilesRes.data ?? [];
   const teacherAdmin = profiles.filter((t) => t.role === 'admin').length;

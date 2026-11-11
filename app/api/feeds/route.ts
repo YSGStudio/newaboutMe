@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSeoulDayRange, todayDate } from '@/lib/date';
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ feed: data, date: targetDate });
 }
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     .select('id,emotion_type,content,image_url,created_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 저장 성공을 먼저 돌려준다. 뱃지·연료는 클라이언트가 /api/rewards/claim으로
   // 이어서 요청하며, 원장/뱃지 unique 제약 덕분에 재시도해도 중복 지급되지 않는다.
@@ -98,7 +99,7 @@ export async function PATCH(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  if (findError) return NextResponse.json({ error: findError.message }, { status: 500 });
+  if (findError) return serverError(findError);
   if (!todayFeed) {
     return NextResponse.json({ error: '오늘 쓴 감정 기록만 고칠 수 있어요.' }, { status: 404 });
   }
@@ -111,6 +112,6 @@ export async function PATCH(req: Request) {
     .select('id,emotion_type,content,image_url,created_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ feed: data });
 }

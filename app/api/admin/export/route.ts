@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/adminSettings';
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
     .select('id, class_name, grade, section, class_code, created_at')
     .eq('id', classId)
     .maybeSingle();
-  if (clsError) return NextResponse.json({ error: clsError.message }, { status: 500 });
+  if (clsError) return serverError(clsError);
   if (!cls) return NextResponse.json({ error: '학급을 찾을 수 없습니다.' }, { status: 404 });
 
   const { data: students } = await supabaseAdmin

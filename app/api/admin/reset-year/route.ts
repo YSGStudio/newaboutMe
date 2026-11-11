@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   }
 
   const { error } = await supabaseAdmin.from('classes').delete().gte('created_at', '1970-01-01');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   await removeStoragePaths(groupProjectFiles);
 

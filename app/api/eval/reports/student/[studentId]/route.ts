@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -35,7 +36,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const { data: reports, error } = await query.order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   if (!reports || reports.length === 0) return NextResponse.json({ reports: [] });
 
   const reportIds = reports.map((r) => r.id);

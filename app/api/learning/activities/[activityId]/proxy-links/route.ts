@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireTeacherActivity,
@@ -59,7 +60,7 @@ export async function POST(req: Request, { params }: Params) {
     .select('id,url,label,sort_order')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ link: linkRow, submissionId: submission.id }, { status: 201 });
 }

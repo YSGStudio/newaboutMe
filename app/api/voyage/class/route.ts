@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getStars, voyagePosition } from '@/lib/voyage';
@@ -23,7 +24,7 @@ export async function GET() {
     .select('voyage_map_enabled')
     .eq('id', classId)
     .maybeSingle();
-  if (classError) return NextResponse.json({ error: classError.message }, { status: 500 });
+  if (classError) return serverError(classError);
   if (!classRow?.voyage_map_enabled) return NextResponse.json({ enabled: false });
 
   const [{ data: students, error }, stars] = await Promise.all([
@@ -34,7 +35,7 @@ export async function GET() {
       .order('student_number'),
     getStars(supabaseAdmin),
   ]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const crew = ((students ?? []) as CrewRow[]).map((student) => {
     const state = Array.isArray(student.voyage_state) ? student.voyage_state[0] : student.voyage_state;

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
@@ -105,7 +106,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select('id, title, content, updated_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ letter: data });
 }
@@ -128,7 +129,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (forbidden) return forbidden;
 
   const { error } = await supabaseAdmin.from('letters').delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ ok: true });
 }

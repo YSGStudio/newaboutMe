@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
     .select('id,title,created_at')
     .single();
 
-  if (reportError) return NextResponse.json({ error: reportError.message }, { status: 500 });
+  if (reportError) return serverError(reportError);
 
   const itemRows = parsed.data.items.map((item, idx) => ({
     report_id: report.id,
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
   const { error: itemsError } = await supabaseAdmin.from('eval_report_items').insert(itemRows);
   if (itemsError) {
     await supabaseAdmin.from('eval_reports').delete().eq('id', report.id);
-    return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    return serverError(itemsError);
   }
 
   return NextResponse.json({ report }, { status: 201 });

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -29,6 +30,6 @@ export async function DELETE(_: Request, { params }: Params) {
     .eq('id', params.linkId)
     .eq('report_id', params.reportId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ ok: true });
 }

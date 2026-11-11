@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { z } from 'zod';
@@ -34,6 +35,6 @@ export async function PUT(req: Request) {
     .from('class_badge_settings')
     .upsert(rows, { onConflict: 'class_id,badge_id' });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getLearningStatus } from '@/lib/learning';
@@ -17,7 +18,7 @@ export async function GET() {
     .eq('class_id', auth.student.class_id)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const rows = activities ?? [];
   if (rows.length === 0) return NextResponse.json({ activities: [] });

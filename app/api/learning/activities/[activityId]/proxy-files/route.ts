@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireTeacherActivity,
@@ -61,7 +62,7 @@ export async function POST(req: Request, { params }: Params) {
     .from(LEARNING_BUCKET)
     .upload(storagePath, file, { contentType: file.type, upsert: false });
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  if (uploadError) return serverError(uploadError);
 
   const { data: fileRow, error: dbError } = await supabaseAdmin
     .from('learning_submission_files')
@@ -78,7 +79,7 @@ export async function POST(req: Request, { params }: Params) {
 
   if (dbError) {
     await supabaseAdmin.storage.from(LEARNING_BUCKET).remove([storagePath]);
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return serverError(dbError);
   }
 
   // 제출 상태는 ensureProxySubmission에서 이미 세웠다(대리 등록은 성찰 답변 없이도 제출로 인정).

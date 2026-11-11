@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getAiUsage } from '@/lib/ai/usage';
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     .eq('class_id', classId)
     .order('student_number', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const roster = students ?? [];
   const [saved, usage] = await Promise.all([

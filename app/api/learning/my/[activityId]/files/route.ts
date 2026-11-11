@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireStudentActivity,
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: Params) {
     .from(LEARNING_BUCKET)
     .upload(storagePath, file, { contentType: file.type, upsert: false });
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  if (uploadError) return serverError(uploadError);
 
   const { data: fileRow, error: dbError } = await supabaseAdmin
     .from('learning_submission_files')
@@ -76,7 +77,7 @@ export async function POST(req: Request, { params }: Params) {
   if (dbError) {
     // DB 기록에 실패하면 방금 올린 객체를 되돌린다(고아 파일 방지).
     await supabaseAdmin.storage.from(LEARNING_BUCKET).remove([storagePath]);
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return serverError(dbError);
   }
 
   // 결과물이 생겨서 제출 조건을 채웠을 수 있다 — 상태를 다시 판정한다.

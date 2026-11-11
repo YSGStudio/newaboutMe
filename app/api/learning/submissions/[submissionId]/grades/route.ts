@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ensureProxySubmission, requireTeacherSubmission } from '@/lib/learning-access';
 import { learningGradesSchema } from '@/lib/validators';
@@ -46,7 +47,7 @@ export async function PUT(req: Request, { params }: Params) {
       { onConflict: 'submission_id,question_id' },
     );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const { data: grades } = await supabaseAdmin
     .from('learning_submission_grades')

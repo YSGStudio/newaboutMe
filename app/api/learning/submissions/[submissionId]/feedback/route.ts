@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ensureProxySubmission, requireTeacherSubmission, SUBMISSION_COLUMNS } from '@/lib/learning-access';
 import { learningFeedbackSchema } from '@/lib/validators';
@@ -31,7 +32,7 @@ export async function POST(req: Request, { params }: Params) {
     .select(SUBMISSION_COLUMNS)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ submission: data });
 }
 
@@ -47,6 +48,6 @@ export async function DELETE(_: Request, { params }: Params) {
     .select(SUBMISSION_COLUMNS)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ submission: data });
 }

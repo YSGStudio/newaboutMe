@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
 
@@ -15,7 +16,7 @@ export async function GET() {
     .neq('id', auth.student.id)
     .order('student_number', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ classmates: data ?? [] });
 }

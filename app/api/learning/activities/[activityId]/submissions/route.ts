@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { assertStudentInClass, ensureProxySubmission, requireTeacherActivity } from '@/lib/learning-access';
 import { getLearningStatus, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
@@ -44,7 +45,7 @@ export async function GET(_: Request, { params }: Params) {
     .eq('class_id', activity.class_id)
     .order('student_number', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const roster = students ?? [];
 

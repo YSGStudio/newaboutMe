@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, hasActivePaidPlan } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { classCreateSchema } from '@/lib/validators';
@@ -14,7 +15,7 @@ export async function GET() {
     .eq('teacher_id', auth.teacher.id)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ classes: data });
 }
 
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     .select('id', { count: 'exact', head: true })
     .eq('teacher_id', auth.teacher.id);
 
-  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+  if (countError) return serverError(countError);
   const { freeClassLimit } = await getAppSettings();
   if (!hasActivePaidPlan(auth.teacher) && (classCount ?? 0) >= freeClassLimit) {
     return NextResponse.json(
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     .eq('class_code', classCode)
     .maybeSingle();
 
-  if (duplicateCheckError) return NextResponse.json({ error: duplicateCheckError.message }, { status: 500 });
+  if (duplicateCheckError) return serverError(duplicateCheckError);
   if (duplicatedCode) {
     return NextResponse.json({ error: '이미 사용 중인 학급코드입니다. 다른 코드를 입력해주세요.' }, { status: 400 });
   }
@@ -70,6 +71,6 @@ export async function POST(req: Request) {
   if (error?.code === '23505') {
     return NextResponse.json({ error: '이미 사용 중인 학급코드입니다. 다른 코드를 입력해주세요.' }, { status: 400 });
   }
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ class: data }, { status: 201 });
 }

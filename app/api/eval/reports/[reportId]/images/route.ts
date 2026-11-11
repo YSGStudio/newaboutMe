@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -53,7 +54,7 @@ export async function POST(req: Request, { params }: Params) {
     .from('eval-images')
     .upload(storagePath, file, { contentType: file.type, upsert: false });
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  if (uploadError) return serverError(uploadError);
 
   const { data: imageRow, error: dbError } = await supabaseAdmin
     .from('eval_report_images')
@@ -63,7 +64,7 @@ export async function POST(req: Request, { params }: Params) {
 
   if (dbError) {
     await supabaseAdmin.storage.from('eval-images').remove([storagePath]);
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return serverError(dbError);
   }
 
   return NextResponse.json({ image: imageRow }, { status: 201 });

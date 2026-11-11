@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { SEOUL_UTC_OFFSET_HOURS } from '@/lib/date';
@@ -27,6 +28,6 @@ export async function GET(req: Request) {
     .lte('created_at', endUtc.toISOString())
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ feeds: data ?? [] });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentBulkCreateSchema } from '@/lib/validators';
@@ -89,7 +90,7 @@ export async function POST(req: Request, { params }: Params) {
     })))
     .select('id,name,student_number');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ created: data?.length ?? 0, skipped, students: data ?? [] }, { status: 201 });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { hasAnyGrade, requireTeacherActivity, sameQuestions, toQuestionRows } from '@/lib/learning-access';
 import { ACTIVITY_LOCKED_MESSAGE, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
@@ -43,7 +44,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .select('id,class_id,subject,unit,title,created_at,archived_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 질문이 그대로면 건드리지 않는다.
   if (!questionsChanged) {
@@ -59,7 +60,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .insert(toQuestionRows(params.activityId, parsed.data.reflectionQuestions))
     .select(QUESTION_COLUMNS);
 
-  if (questionError) return NextResponse.json({ error: questionError.message }, { status: 500 });
+  if (questionError) return serverError(questionError);
 
   return NextResponse.json({ activity: { ...data, learning_activity_questions: questions ?? [] } });
 }
@@ -90,7 +91,7 @@ export async function DELETE(_: Request, { params }: Params) {
     .delete()
     .eq('id', params.activityId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 파일 정리는 best-effort — 실패해도 활동 삭제는 이미 끝났으므로 로그만 남긴다.
   if (storagePaths.length > 0) {

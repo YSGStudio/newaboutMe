@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { learningActivityCreateSchema } from '@/lib/validators';
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
     .eq('class_id', classId)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const rows = activities ?? [];
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     .select('id,class_id,subject,unit,title,created_at,archived_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 질문(평가요소 포함)은 별도 테이블에 순서대로 넣는다. 실패하면 활동만 남아 질문 없는 활동이 되므로 되돌린다.
   const { data: questions, error: questionError } = await supabaseAdmin
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
 
   if (questionError) {
     await supabaseAdmin.from('learning_activities').delete().eq('id', data.id);
-    return NextResponse.json({ error: questionError.message }, { status: 500 });
+    return serverError(questionError);
   }
 
   return NextResponse.json({

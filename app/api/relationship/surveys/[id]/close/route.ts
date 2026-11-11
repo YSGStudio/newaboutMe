@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -27,7 +28,7 @@ export async function POST(_: Request, { params }: Params) {
     .update({ closed_at: new Date().toISOString() })
     .eq('id', params.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ ok: true });
 }

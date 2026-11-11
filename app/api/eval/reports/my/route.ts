@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { denyEvalStudent } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -23,6 +24,6 @@ export async function GET() {
     .eq('student_id', auth.student.id)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ reports: data ?? [] });
 }

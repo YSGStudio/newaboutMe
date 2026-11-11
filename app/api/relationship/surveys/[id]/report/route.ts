@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { buildSociogram, type RelationshipNominationRow } from '@/lib/relationship';
@@ -15,7 +16,7 @@ export async function GET(_: Request, { params }: Params) {
     .eq('id', params.id)
     .maybeSingle();
 
-  if (surveyError) return NextResponse.json({ error: surveyError.message }, { status: 500 });
+  if (surveyError) return serverError(surveyError);
   if (!survey || survey.teacher_id !== auth.teacher.id) {
     return NextResponse.json({ error: '설문을 찾을 수 없습니다.' }, { status: 404 });
   }
@@ -41,9 +42,9 @@ export async function GET(_: Request, { params }: Params) {
         .order('created_at', { ascending: true })
     ]);
 
-  if (rosterError) return NextResponse.json({ error: rosterError.message }, { status: 500 });
-  if (nominationError) return NextResponse.json({ error: nominationError.message }, { status: 500 });
-  if (openError) return NextResponse.json({ error: openError.message }, { status: 500 });
+  if (rosterError) return serverError(rosterError);
+  if (nominationError) return serverError(nominationError);
+  if (openError) return serverError(openError);
 
   const rosterList = (roster ?? []).map((s) => ({ id: s.id, name: s.name, studentNumber: s.student_number }));
   const nominations: RelationshipNominationRow[] = (nominationRows ?? []).map((n) => ({

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate } from '@/lib/stats';
@@ -27,7 +28,7 @@ export async function GET(req: Request, { params }: Params) {
     .lte('created_at', range.endIso)
     .limit(1000);
 
-  if (feedError) return NextResponse.json({ error: feedError.message }, { status: 500 });
+  if (feedError) return serverError(feedError);
 
   const totalFeeds = (feeds ?? []).length;
   const emotionCounts = new Map<string, number>();

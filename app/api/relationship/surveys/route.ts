@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { relationshipSurveyCreateSchema } from '@/lib/validators';
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const { count: totalStudents } = await supabaseAdmin
     .from('students')

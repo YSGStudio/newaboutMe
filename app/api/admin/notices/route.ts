@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -23,7 +24,7 @@ export async function GET() {
     .select('id, title, content, starts_on, ends_on, is_active, created_at')
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const ids = (notices ?? []).map((n) => n.id);
   const { data: dismissals } = ids.length
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     .select('id')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   await logAdminAction({ id: auth.teacher.id, name: auth.teacher.name }, 'notice_create', `알림 등록: ${title}`);
   return NextResponse.json({ id: data.id });

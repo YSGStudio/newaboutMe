@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireTeacherActivity } from '@/lib/learning-access';
 
@@ -14,7 +15,7 @@ const setArchived = async (activityId: string, archivedAt: string | null) => {
     .eq('id', activityId)
     .select('id,archived_at')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ activity: data });
 };
 

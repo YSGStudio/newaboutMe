@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireStudentActivity,
@@ -58,7 +59,7 @@ export async function PUT(req: Request, { params }: Params) {
       .from('learning_submission_answers')
       .upsert(rows, { onConflict: 'submission_id,question_id' });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return serverError(error);
   }
 
   const submitted = await recalcSubmissionStatus(submission);

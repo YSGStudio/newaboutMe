@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { relationshipResponseSubmitSchema } from '@/lib/validators';
@@ -22,7 +23,7 @@ export async function POST(req: Request, { params }: Params) {
     .eq('id', params.id)
     .maybeSingle();
 
-  if (surveyError) return NextResponse.json({ error: surveyError.message }, { status: 500 });
+  if (surveyError) return serverError(surveyError);
   if (!survey || survey.class_id !== auth.student.class_id) {
     return NextResponse.json({ error: '설문을 찾을 수 없습니다.' }, { status: 404 });
   }
@@ -62,7 +63,7 @@ export async function POST(req: Request, { params }: Params) {
     .select('id')
     .eq('class_id', auth.student.class_id);
 
-  if (classmatesError) return NextResponse.json({ error: classmatesError.message }, { status: 500 });
+  if (classmatesError) return serverError(classmatesError);
 
   const validIds = new Set((classmates ?? []).map((c) => c.id));
   if (nominations.some((n) => !validIds.has(n.targetId))) {

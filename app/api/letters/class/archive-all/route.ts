@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 
@@ -19,7 +20,7 @@ export async function PATCH(req: Request) {
     .eq('class_id', classId)
     .is('teacher_archived_at', null);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ ok: true });
 }

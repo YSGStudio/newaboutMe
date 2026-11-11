@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -49,7 +50,7 @@ export async function PATCH(req: Request, { params }: Params) {
   );
 
   const failed = results.find((r) => r.error);
-  if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 500 });
+  if (failed?.error) return serverError(failed.error);
 
   return NextResponse.json({ ok: true });
 }

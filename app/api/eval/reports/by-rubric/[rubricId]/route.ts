@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -46,7 +47,7 @@ export async function GET(req: Request, { params }: Params) {
     .in('student_id', studentIds)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 학생별로 해당 채점기준이 포함된 가장 최근 보고서 1건만 채택
   const latestByStudent = new Map<string, { reportId: string; title: string; createdAt: string; items: { grade: string; teacherFeedback: string | null; criterionTitleSnapshot: string | null; sortOrder: number }[] }>();

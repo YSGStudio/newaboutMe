@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -78,7 +79,7 @@ export async function requireTeacherStudent(teacherId: string, studentId: string
     .maybeSingle();
 
   if (error) {
-    return { error: NextResponse.json({ error: error.message }, { status: 500 }) };
+    return { error: serverError(error) };
   }
   if (!data) {
     return { error: NextResponse.json({ error: '학생 접근 권한이 없습니다.' }, { status: 403 }) };

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { hashPassword, DEFAULT_STUDENT_PASSWORD } from '@/lib/password';
@@ -18,7 +19,7 @@ export async function POST(_: Request, { params }: Params) {
     .eq('class_id', params.id)
     .select('id');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ ok: true, count: data?.length ?? 0 });
 }

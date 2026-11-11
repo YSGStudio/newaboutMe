@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { denyEvalTeacher } from '@/lib/eval-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -45,7 +46,7 @@ export async function GET() {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ rubrics: data ?? [] });
 }
 
@@ -89,6 +90,6 @@ export async function POST(req: Request) {
     .select('id,title,subject,goal,task,criteria,sort_order,created_at,link_url')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ rubric: data }, { status: 201 });
 }

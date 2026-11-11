@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { safeRate } from '@/lib/stats';
@@ -23,7 +24,7 @@ export async function GET() {
     .gte('created_at', startIso)
     .lte('created_at', endIso);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const totalFeeds = (feeds ?? []).length;
   const emotionCounts = new Map<string, number>();

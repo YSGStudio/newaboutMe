@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
     .select('id')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   return NextResponse.json({ letter: data }, { status: 201 });
 }

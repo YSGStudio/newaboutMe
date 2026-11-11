@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentCreateSchema } from '@/lib/validators';
@@ -19,7 +20,7 @@ export async function GET(_: Request, { params }: Params) {
     .eq('class_id', params.id)
     .order('student_number', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ students: data ?? [] });
 }
 

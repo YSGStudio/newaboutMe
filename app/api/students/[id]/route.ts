@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -12,7 +13,7 @@ export async function DELETE(_: Request, { params }: Params) {
   if ('error' in owned) return owned.error;
 
   const { error: deleteError } = await supabaseAdmin.from('students').delete().eq('id', params.id);
-  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  if (deleteError) return serverError(deleteError);
 
   return NextResponse.json({ ok: true });
 }

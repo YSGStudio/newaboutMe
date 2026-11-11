@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { requireTeacher, requireTeacherClass, hasActivePaidPlan } from '@/lib/auth';
 import { getAiUsage, logAiUsage } from '@/lib/ai/usage';
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     .eq('class_id', parsed.data.classId)
     .order('student_number', { ascending: true });
 
-  if (studentsError) return NextResponse.json({ error: studentsError.message }, { status: 500 });
+  if (studentsError) return serverError(studentsError);
   if (!students || students.length === 0) {
     return NextResponse.json({ results: [], total: 0, succeeded: 0, failed: 0 });
   }

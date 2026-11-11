@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { studentPasswordChangeSchema } from '@/lib/validators';
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .update({ password_hash: await hashPassword(parsed.data.password) })
     .eq('id', params.id);
 
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (updateError) return serverError(updateError);
 
   return NextResponse.json({ ok: true });
 }

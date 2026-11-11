@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { denyLettersDisabled, requireStudentSession } from '@/lib/student-session';
 
@@ -14,7 +15,7 @@ export async function GET() {
     .eq('recipient_id', auth.student.id)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const rows = letters ?? [];
   const senderIds = [...new Set(rows.map((l) => l.sender_id))];

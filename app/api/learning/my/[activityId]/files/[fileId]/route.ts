@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireStudentActivity,
@@ -47,7 +48,7 @@ export async function DELETE(_: Request, { params }: Params) {
   if (!file) return NextResponse.json({ error: '파일을 찾을 수 없어요.' }, { status: 404 });
 
   const { error } = await supabaseAdmin.from('learning_submission_files').delete().eq('id', file.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // 질문이 없는 활동은 마지막 결과물을 지우면 제출 조건이 깨진다 — 상태를 다시 판정한다.
   // 저장소 객체 지우기는 판정과 무관해서 함께 돌린다.

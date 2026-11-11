@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { teacherSignupSchema } from '@/lib/validators';
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   });
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    return serverError(profileError);
   }
 
   return NextResponse.json({ ok: true, userId: data.user.id });

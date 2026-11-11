@@ -145,58 +145,9 @@ alter table plans enable row level security;
 alter table plan_checks enable row level security;
 alter table teacher_comments enable row level security;
 
-create policy "teacher profile self"
-on teacher_profiles for all
-using (auth.uid() = id)
-with check (auth.uid() = id);
-
-create policy "teacher class access"
-on classes for all
-using (auth.uid() = teacher_id)
-with check (auth.uid() = teacher_id);
-
-create policy "teacher student access"
-on students for all
-using (
-  exists (
-    select 1 from classes c
-    where c.id = students.class_id and c.teacher_id = auth.uid()
-  )
-)
-with check (
-  exists (
-    select 1 from classes c
-    where c.id = students.class_id and c.teacher_id = auth.uid()
-  )
-);
-
-create policy "teacher feed access"
-on emotion_feeds for select
-using (
-  exists (
-    select 1
-    from students s
-    join classes c on c.id = s.class_id
-    where s.id = emotion_feeds.student_id and c.teacher_id = auth.uid()
-  )
-);
-
-create policy "teacher comment access"
-on teacher_comments for all
-using (teacher_id = auth.uid())
-with check (teacher_id = auth.uid());
-
-create policy "teacher reaction read"
-on feed_reactions for select
-using (
-  exists (
-    select 1
-    from emotion_feeds f
-    join students s on s.id = f.student_id
-    join classes c on c.id = s.class_id
-    where f.id = feed_reactions.feed_id and c.teacher_id = auth.uid()
-  )
-);
+-- 정책 없음(deny-all). 앱은 service role로만 DB에 붙고 권한은 라우트가 확인한다.
+-- 예전 정책들은 anon 키로 teacher_profiles.role을 스스로 바꾸는 경로를 열어 두어
+-- 20261111_security_hardening.sql에서 지웠다.
 
 create policy "teacher plan read"
 on plans for select

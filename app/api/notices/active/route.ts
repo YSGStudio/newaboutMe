@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { todayDate } from '@/lib/date';
@@ -19,7 +20,7 @@ export async function GET() {
     .gte('ends_on', today)
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const ids = (notices ?? []).map((n) => n.id);
   if (ids.length === 0) return NextResponse.json({ notices: [] });

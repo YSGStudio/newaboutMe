@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireStudentSession } from '@/lib/student-session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -15,7 +16,7 @@ export async function GET() {
     .limit(1)
     .maybeSingle();
 
-  if (surveyError) return NextResponse.json({ error: surveyError.message }, { status: 500 });
+  if (surveyError) return serverError(surveyError);
   if (!survey) return NextResponse.json({ survey: null });
 
   const { data: completion } = await supabaseAdmin
@@ -32,7 +33,7 @@ export async function GET() {
     .neq('id', auth.student.id)
     .order('student_number', { ascending: true });
 
-  if (classmatesError) return NextResponse.json({ error: classmatesError.message }, { status: 500 });
+  if (classmatesError) return serverError(classmatesError);
 
   return NextResponse.json({
     survey: {

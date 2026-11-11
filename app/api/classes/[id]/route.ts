@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { prepareGroupProjectsDelete, removeStoragePaths } from '@/lib/group-project/storage';
@@ -41,7 +42,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .update(updates)
     .eq('id', params.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ ok: true, ...updates });
 }
 
@@ -70,7 +71,7 @@ export async function DELETE(_: Request, { params }: Params) {
   }
 
   const { error } = await supabaseAdmin.from('classes').delete().eq('id', params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   await removeStoragePaths(groupProjectFiles);
   return NextResponse.json({ ok: true });

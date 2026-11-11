@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
 import { requireTeacher } from '@/lib/auth';
 import { getMonthlyUsageByTeacher } from '@/lib/ai/usage';
@@ -25,7 +26,7 @@ export async function GET() {
     .select('id, name, role, paid_until, created_at')
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   // auth.users에서 이메일 일괄 조회 + 이번 달 AI 사용량 집계 + 등급별 한도 설정
   const [{ data: usersData }, usageByTeacher, settings] = await Promise.all([
@@ -86,7 +87,7 @@ export async function PATCH(req: Request) {
     .update(updateData)
     .eq('id', teacherId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   await logAdminAction(
     { id: auth.teacher.id, name: auth.teacher.name },

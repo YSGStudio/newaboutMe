@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getStars } from '@/lib/voyage';
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
       .order('student_number'),
     getStars(supabaseAdmin),
   ]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
   return NextResponse.json({ students: students ?? [], stars });
 }
 

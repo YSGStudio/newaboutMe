@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherStudent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate, type Period } from '@/lib/stats';
@@ -44,7 +45,7 @@ export async function GET(req: Request, { params }: Params) {
     .lte('created_at', range.endIso)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const rows = (activities ?? []) as ActivityRow[];
   if (rows.length === 0) {
@@ -63,7 +64,7 @@ export async function GET(req: Request, { params }: Params) {
     .eq('student_id', student.id)
     .in('activity_id', rows.map((row) => row.id));
 
-  if (submissionError) return NextResponse.json({ error: submissionError.message }, { status: 500 });
+  if (submissionError) return serverError(submissionError);
 
   const byActivity = new Map((submissions ?? []).map((row) => [row.activity_id, row]));
   // 평가 대기 판정에 필요한 요소 수·등급 수를 한 번에 모은다(학급 PDF가 학생마다 부르므로 N+1 금지).

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireStudentActivity,
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: Params) {
     .select('id,url,label,sort_order')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const submitted = await recalcSubmissionStatus(submission);
   // 결과물을 마지막으로 채워 제출이 끝났을 수 있다 — 그때도 연료·뱃지를 준다.

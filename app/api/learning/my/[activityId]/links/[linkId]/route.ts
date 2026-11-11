@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   requireStudentActivity,
@@ -46,7 +47,7 @@ export async function DELETE(_: Request, { params }: Params) {
   if (!link) return NextResponse.json({ error: '링크를 찾을 수 없어요.' }, { status: 404 });
 
   const { error } = await supabaseAdmin.from('learning_submission_links').delete().eq('id', link.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error);
 
   const submitted = await recalcSubmissionStatus(submission);
 

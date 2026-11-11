@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { prepareGroupProjectsDelete, removeStoragePaths } from '@/lib/group-project/storage';
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
   const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    return serverError(deleteError);
   }
 
   await removeStoragePaths(groupProjectFiles);

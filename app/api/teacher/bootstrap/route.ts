@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { serverError } from '@/lib/api-error';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { TeacherProfile, TeacherRole } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Teacher profile not found' }, { status: 403 });
   }
   if (classesRes.error) {
-    return NextResponse.json({ error: classesRes.error.message }, { status: 500 });
+    return serverError(classesRes.error);
   }
 
   const teacher: TeacherProfile = {
