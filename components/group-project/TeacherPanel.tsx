@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
+import Tabs from '@/components/ui/Tabs';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { todayDate } from '@/lib/date';
 import { formatRange } from '@/lib/group-project/format';
@@ -77,6 +78,19 @@ type RoomsData = {
   leaderCandidates: { id: string; name: string; otherRoom: string | null }[];
 };
 
+type TopicMenu = 'rooms' | 'notices' | 'settings';
+
+const TOPIC_MENU = [
+  { key: 'rooms', label: '프로젝트 방' },
+  { key: 'notices', label: '전체공지' },
+  { key: 'settings', label: '주제 설정' },
+];
+
+/**
+ * 주제 화면 — 머리 카드(기간·목표·전체 진행률·바로가기) 아래를 탭으로 나눈다.
+ * 가장 자주 쓰는 방 목록을 첫 탭에 두고, 방 만들기 폼은 버튼을 눌렀을 때만 펼친다.
+ * 공지 작성과 주제 수정·삭제는 각자 탭으로 옮겨 한 화면에 폼이 겹쳐 보이지 않게 한다.
+ */
 function TopicScreen({ topicId, onBack, onOpenRoom, onActivity }: { topicId: string; onBack: () => void; onOpenRoom: (roomId: string, menu?: RoomMenu) => void; onActivity: () => void }) {
   const { api, confirmDelete } = useGp();
   const { data, error, loading, reload } = useLoad(
@@ -84,6 +98,8 @@ function TopicScreen({ topicId, onBack, onOpenRoom, onActivity }: { topicId: str
     [api, topicId],
   );
   const del = useAction();
+  const [menu, setMenu] = useState<TopicMenu>('rooms');
+  const [creating, setCreating] = useState(false);
 
   async function remove() {
     if (!(await confirmDelete('이 주제를 삭제할까요? 모든 방·할 일·자료·공지가 함께 지워집니다.', '삭제'))) return;
@@ -95,6 +111,11 @@ function TopicScreen({ topicId, onBack, onOpenRoom, onActivity }: { topicId: str
 
   const topicData = data?.[0];
   const rooms = data?.[1];
+  const totals = (rooms?.rooms ?? []).reduce(
+    (acc, r) => ({ done: acc.done + r.stats.done, total: acc.total + r.stats.total, members: acc.members + r.stats.members }),
+    { done: 0, total: 0, members: 0 },
+  );
+  const leaderless = rooms?.rooms.filter((r) => !r.leader_names).length ?? 0;
 
   return (
     <div className="gp-panel">
@@ -104,68 +125,94 @@ function TopicScreen({ topicId, onBack, onOpenRoom, onActivity }: { topicId: str
       <LoadGate loading={loading} error={error} hasData={Boolean(data)}>
         {topicData && rooms && (
           <>
-            <header className="card">
-              <h2 className="gp-title">{topicData.topic.title}</h2>
-              <p className="gp-meta">{formatRange(topicData.topic.start_date, topicData.topic.end_date)} · 목표: {topicData.topic.goal}</p>
-              <div className="gp-actions gp-gap-top">
-                <button type="button" className="gp-btn" onClick={onActivity}>학생별 활동 모아보기</button>
-                <DownloadAllButton topicId={topicId} label="학생 자료 모두 받기" />
+            <header className="card gp-overview">
+              <div className="gp-min">
+                <h2 className="gp-title">{topicData.topic.title}</h2>
+                <p className="gp-meta">
+                  {formatRange(topicData.topic.start_date, topicData.topic.end_date)} · 방 {rooms.rooms.length}개 · 참여 {totals.members}명
+                  {topicData.leaders.length > 0 && ` · 팀장 ${topicData.leaders.map((l) => l.name).join(', ')}`}
+                </p>
+                <p className="gp-pre">목표: {topicData.topic.goal}</p>
+                <div className="gp-actions gp-gap-top">
+                  <button type="button" className="ghost gp-btn" onClick={onActivity}>학생별 활동 모아보기</button>
+                  <DownloadAllButton topicId={topicId} label="학생 자료 모두 받기" />
+                </div>
               </div>
+              <ProgressBar value={totals.total ? (totals.done / totals.total) * 100 : 0} label={`전체 진행률 ${totals.done}/${totals.total}`} />
             </header>
 
-            <TopicNotices topicId={topicId} />
+            <Tabs items={TOPIC_MENU} value={menu} onChange={(key) => setMenu(key as TopicMenu)} />
 
-            <section className="card">
-              <SectionTitle>프로젝트 방 {rooms.rooms.length}개</SectionTitle>
-              {rooms.rooms.length === 0 ? (
-                <EmptyState title="아직 방 없음" description="팀장이 직접 만들거나 아래에서 만들 수 있습니다." />
-              ) : (
-                <div className="gp-columns">
-                  {rooms.rooms.map((r) => (
-                    <div key={r.id} className="gp-group-card">
-                      <div className="gp-badges">
-                        <button type="button" className="gp-text-button" onClick={() => onOpenRoom(r.id)}>{r.name}</button>
-                        {!r.leader_names && <span className="gp-status is-overdue">팀장 없는 방</span>}
-                      </div>
-                      <p className="gp-meta">
-                        팀장 {r.leader_names || '없음'} · {r.stats.members}명 · 모둠 {r.stats.groups}개 · {formatRange(r.start_date, r.end_date)}
-                      </p>
-                      <ProgressBar value={r.stats.total ? (r.stats.done / r.stats.total) * 100 : 0} label={`진행률 ${r.stats.done}/${r.stats.total}`} />
-                      <div className="gp-actions gp-gap-top">
-                        <button type="button" className="ghost gp-btn gp-btn-sm" onClick={() => onOpenRoom(r.id)}>대시보드</button>
-                        <button type="button" className="ghost gp-btn gp-btn-sm" onClick={() => onOpenRoom(r.id, 'members')}>구성원·모둠</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <div className="gp-columns">
+            {menu === 'rooms' && (
               <section className="card">
-                <SectionTitle>방 만들기</SectionTitle>
-                <RoomCreateForm topic={topicData.topic} leaderChoices={rooms.leaderCandidates.filter((c) => !c.otherRoom)} onCreated={(id) => onOpenRoom(id, 'members')} />
+                <SectionTitle
+                  right={
+                    <button type="button" className={creating ? 'ghost gp-btn gp-btn-sm' : 'gp-btn gp-btn-sm'} onClick={() => setCreating((v) => !v)}>
+                      {creating ? '닫기' : '+ 방 만들기'}
+                    </button>
+                  }
+                >
+                  프로젝트 방 {rooms.rooms.length}개{' '}
+                  {leaderless > 0 && <span className="gp-status is-overdue">팀장 없는 방 {leaderless}개</span>}
+                </SectionTitle>
+                {creating && (
+                  <div className="gp-subpanel">
+                    <RoomCreateForm topic={topicData.topic} leaderChoices={rooms.leaderCandidates.filter((c) => !c.otherRoom)} onCreated={(id) => onOpenRoom(id, 'members')} />
+                  </div>
+                )}
+                {rooms.rooms.length === 0 ? (
+                  !creating && <EmptyState title="아직 방 없음" description="팀장이 직접 만들거나 위의 방 만들기로 만들 수 있습니다." />
+                ) : (
+                  <div className={creating ? 'gp-columns gp-gap-top' : 'gp-columns'}>
+                    {rooms.rooms.map((r) => (
+                      <div key={r.id} className="gp-group-card">
+                        <div className="gp-badges">
+                          <button type="button" className="gp-text-button" onClick={() => onOpenRoom(r.id)}>{r.name}</button>
+                          {!r.leader_names && <span className="gp-status is-overdue">팀장 없음</span>}
+                        </div>
+                        <p className="gp-meta">팀장 {r.leader_names || '없음'} · {r.stats.members}명 · 모둠 {r.stats.groups}개</p>
+                        <p className="gp-meta">{formatRange(r.start_date, r.end_date)}</p>
+                        <ProgressBar value={r.stats.total ? (r.stats.done / r.stats.total) * 100 : 0} label={`진행률 ${r.stats.done}/${r.stats.total}`} />
+                        <div className="gp-actions gp-gap-top">
+                          <button type="button" className="gp-btn gp-btn-sm" onClick={() => onOpenRoom(r.id)}>방 열기</button>
+                          <button type="button" className="ghost gp-btn gp-btn-sm" onClick={() => onOpenRoom(r.id, 'members')}>구성원·모둠</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
-              <section className="card">
-                <SectionTitle>주제 정보·팀장 수정</SectionTitle>
-                <p className="hint">팀장에서 빠진 학생은 맡던 방의 팀장에서도 빠집니다.</p>
-                <TopicForm
-                  key={topicData.topic.title + topicData.topic.start_date + topicData.topic.end_date + topicData.leaders.length}
-                  students={topicData.students}
-                  topic={topicData.topic}
-                  leaderIds={topicData.leaders.map((l) => l.id)}
-                  submitLabel="저장"
-                  onSubmit={async (body) => {
-                    await api(`/topics/${topicId}`, { method: 'PATCH', body: JSON.stringify(body) });
-                    await reload();
-                  }}
-                />
-                <div className="gp-divider">
+            )}
+
+            {menu === 'notices' && <TopicNotices topicId={topicId} />}
+
+            {menu === 'settings' && (
+              <>
+                <section className="card">
+                  <SectionTitle>주제 정보·팀장 수정</SectionTitle>
+                  <p className="hint">팀장에서 빠진 학생은 맡던 방의 팀장에서도 빠집니다.</p>
+                  <TopicForm
+                    key={topicData.topic.title + topicData.topic.start_date + topicData.topic.end_date + topicData.leaders.length}
+                    students={topicData.students}
+                    topic={topicData.topic}
+                    leaderIds={topicData.leaders.map((l) => l.id)}
+                    submitLabel="저장"
+                    onSubmit={async (body) => {
+                      await api(`/topics/${topicId}`, { method: 'PATCH', body: JSON.stringify(body) });
+                      await reload();
+                    }}
+                  />
+                </section>
+                <section className="card">
+                  <SectionTitle>주제 삭제</SectionTitle>
+                  <p className="hint">모든 방·할 일·자료·공지가 함께 지워지며 되돌릴 수 없습니다.</p>
+                  <div className="gp-actions gp-gap-top">
+                    <button type="button" className="gp-btn gp-danger" disabled={del.busy} onClick={remove}>주제 삭제</button>
+                  </div>
                   {del.feedback}
-                  <button type="button" className="gp-btn gp-danger" disabled={del.busy} onClick={remove}>주제 삭제</button>
-                </div>
-              </section>
-            </div>
+                </section>
+              </>
+            )}
           </>
         )}
       </LoadGate>
