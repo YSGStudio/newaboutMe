@@ -23,9 +23,11 @@ export type LearningActivityRow = {
   unit: string;
   title: string;
   created_at: string;
+  /** 교사가 "완료"를 눌러 보관한 시각. 있으면 학생 자기점검도 잠긴다(answerLockedByArchive). */
+  archived_at: string | null;
 };
 
-const ACTIVITY_COLUMNS = 'id,class_id,teacher_id,subject,unit,title,created_at';
+const ACTIVITY_COLUMNS = 'id,class_id,teacher_id,subject,unit,title,created_at,archived_at';
 
 const notFound = (message: string) => NextResponse.json({ error: message }, { status: 404 });
 const forbidden = (message: string) => NextResponse.json({ error: message }, { status: 403 });
@@ -264,6 +266,18 @@ export async function lockedByFeedback(submission: { id: string; feedback_text: 
 }
 
 export const LOCKED_MESSAGE = '선생님 피드백이 등록되어 더 이상 고칠 수 없어요.';
+
+/**
+ * 자기점검(질문 답)은 피드백·등급이 달려도 잠그지 않고, 교사가 활동을 "완료"(보관)할 때 잠근다.
+ * 결과물(파일·링크)은 위 lockedByFeedback 규칙을 그대로 따른다.
+ * 교사가 보관함에서 "되돌리기"를 누르면(archived_at = null) 다시 쓸 수 있다.
+ */
+export function answerLockedByArchive(activity: { archived_at: string | null }) {
+  return Boolean(activity.archived_at);
+}
+
+export const ANSWER_LOCKED_MESSAGE = '선생님이 활동을 마쳐서 이제 고칠 수 없어요.';
+export const ANSWER_BLANK_AFTER_FEEDBACK_MESSAGE = '선생님 피드백이 온 뒤에는 답을 비워 둘 수 없어요.';
 
 /**
  * 이 활동에 교사 등급이 하나라도 저장됐는지.

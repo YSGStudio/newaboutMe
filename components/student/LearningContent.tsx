@@ -81,8 +81,10 @@ type Detail = {
     links: SubmissionLink[];
   } | null;
   status: LearningStatus;
-  /** 선생님 피드백이나 평가가 있어 더 고칠 수 없는지 */
+  /** 선생님 피드백이나 평가가 있어 결과물(사진·PDF·링크)을 더 바꿀 수 없는지 */
   locked: boolean;
+  /** 선생님이 활동을 완료해서 자기점검을 더 고칠 수 없는지 — 피드백이 와도 완료 전까지는 고칠 수 있어요 */
+  answerLocked: boolean;
 };
 
 /** 제출 판정을 하는 학생 라우트(답변·결과물·링크)의 공통 응답 */
@@ -222,9 +224,10 @@ export default function LearningContent() {
   };
 
   const locked = Boolean(detail?.locked);
+  const answerLocked = Boolean(detail?.answerLocked);
   /** 제출이 끝나려면 아직 무엇이 빠졌는지 — 저장 버튼 아래에 쉬운 말로 알려줍니다. */
   const missingItems = (() => {
-    if (!detail || locked) return [];
+    if (!detail || answerLocked) return [];
     const items: string[] = [];
     // 결과물은 질문이 없는 활동에서만 꼭 필요해요 — 질문이 있으면 답만 써도 낼 수 있어요.
     const materialCount = (detail.submission?.files.length ?? 0) + (detail.submission?.links.length ?? 0);
@@ -519,15 +522,17 @@ export default function LearningContent() {
               {modalError && <Notice type="error" message={modalError} />}
               {modalMsg && <Notice type="success" message={modalMsg} />}
 
-              {locked && (
+              {(locked || answerLocked) && (
                 <p style={{
                   margin: 0, padding: '10px 12px', borderRadius: 10,
                   background: '#ecfdf5', border: '1px solid #6ee7b7', color: '#047857',
                   fontSize: 13, lineHeight: 1.6,
                 }}>
-                  {detail.submission?.feedback_text || detail.status === 'reviewed'
-                    ? '선생님 피드백이 도착해서 이제 고칠 수 없어요. 피드백을 읽어보세요.'
-                    : '선생님이 평가하고 있어서 이제 고칠 수 없어요.'}
+                  {answerLocked
+                    ? '선생님이 활동을 마쳐서 이제 고칠 수 없어요. 피드백을 읽어보세요.'
+                    : detail.submission?.feedback_text || detail.status === 'reviewed'
+                      ? '선생님 피드백이 도착했어요. 결과물은 이제 바꿀 수 없지만, 자기점검은 선생님이 활동을 마치기 전까지 더 고쳐 쓸 수 있어요.'
+                      : '선생님이 평가하고 있어요. 결과물은 이제 바꿀 수 없지만, 자기점검은 선생님이 활동을 마치기 전까지 더 고쳐 쓸 수 있어요.'}
                 </p>
               )}
 
@@ -740,7 +745,7 @@ export default function LearningContent() {
                     </div>
                     <div className="learning-reflection-response">
                       <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 13, color: '#374151' }}>자기점검</p>
-                      {locked ? (
+                      {answerLocked ? (
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: '#1f2937', whiteSpace: 'pre-wrap' }}>
                           {(answers[question.id] ?? '').trim() || '쓴 내용이 없어요.'}
                         </p>
@@ -766,7 +771,7 @@ export default function LearningContent() {
                   </div>
                 ))}
 
-                {!locked && detail.questions.length > 0 && (
+                {!answerLocked && detail.questions.length > 0 && (
                   <div className="learning-reflection-submit">
                     <button
                       type="button"

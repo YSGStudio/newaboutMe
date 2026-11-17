@@ -7,7 +7,7 @@ import { isCriterionQuestion } from '@/lib/learning';
 
 // 교사 요소별 등급·코멘트 저장 (평가요소 질문마다)
 // 등급을 null로 보내면 그 요소의 교사 등급을 지운다. 등급과 서술 피드백이 모두 없어지면
-// 학생 수정 잠금도 풀린다(lockedByFeedback). 과거 자기평가 컬럼은 건드리지 않는다.
+// 학생 결과물(파일·링크) 잠금도 풀린다(lockedByFeedback). 자기점검은 활동 완료 전까지 늘 열려 있다. 과거 자기평가 컬럼은 건드리지 않는다.
 
 type Params = { params: { submissionId: string } };
 

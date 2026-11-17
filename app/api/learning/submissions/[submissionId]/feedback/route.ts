@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: Params) {
   return NextResponse.json({ submission: data });
 }
 
-// 피드백을 지우면 학생의 수정 잠금도 함께 풀린다.
+// 피드백을 지우면 학생의 결과물(파일·링크) 잠금도 함께 풀린다. 자기점검은 활동 완료(archived_at)로만 잠긴다.
 export async function DELETE(_: Request, { params }: Params) {
   const access = await requireTeacherSubmission(params.submissionId);
   if ('error' in access) return access.error;

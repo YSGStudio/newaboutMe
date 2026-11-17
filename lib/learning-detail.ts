@@ -7,7 +7,7 @@
  * 권한 확인(requireStudentActivity)을 이미 통과한 student·activity만 받는다.
  */
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { SUBMISSION_COLUMNS, type LearningActivityRow, type LearningSubmissionRow } from '@/lib/learning-access';
+import { answerLockedByArchive, SUBMISSION_COLUMNS, type LearningActivityRow, type LearningSubmissionRow } from '@/lib/learning-access';
 import { getLearningStatus, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { signPaths } from '@/lib/learning-storage';
 
@@ -88,9 +88,11 @@ export async function loadStudentLearningDetail(studentId: string, activity: Lea
     }),
     submission: submission ? { ...submission, files, links } : null,
     status,
-    // 서술 피드백이나 교사 등급이 하나라도 있으면 고칠 수 없다(lockedByFeedback과 같은 조건).
-    // 등급 값은 숨겨도 잠겼다는 사실은 알려야 화면이 저장 버튼을 감출 수 있다.
+    // 결과물(파일·링크) 잠금 — 서술 피드백이나 교사 등급이 하나라도 있으면 고칠 수 없다(lockedByFeedback과 같은 조건).
+    // 등급 값은 숨겨도 잠겼다는 사실은 알려야 화면이 올리기 버튼을 감출 수 있다.
     locked: Boolean(submission?.feedback_text) || grades.some((g) => g.teacher_grade),
+    // 자기점검 잠금 — 교사가 활동을 "완료"한 뒤에만 잠근다(answerLockedByArchive와 같은 조건).
+    answerLocked: answerLockedByArchive(activity),
   };
 }
 

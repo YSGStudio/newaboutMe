@@ -476,7 +476,7 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       // 학생 카드와 활동 목록은 서로 기다릴 이유가 없어 함께 다시 읽는다.
       await Promise.all([loadCells(selectedId), loadActivities()]);
       setOpenCell(null);
-      setMessage('피드백을 지웠습니다. 학생이 다시 고칠 수 있습니다.');
+      setMessage('피드백을 지웠습니다. 학생 결과물 수정 가능.');
       notifyLater();
     } catch (err) {
       setModalError((err as Error).message);
