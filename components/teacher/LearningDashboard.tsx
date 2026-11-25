@@ -46,6 +46,7 @@ import {
 } from '@/lib/learning';
 import { GradePicker } from '@/components/learning/GradeParts';
 import { learningItemFromCriterion, type Criterion } from '@/lib/starboard/criteria';
+import StarboardEvidence, { type EvidenceBoard } from '@/components/learning/StarboardEvidence';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -96,6 +97,8 @@ type Submission = {
   feedback_updated_at: string | null;
   files: SubmissionFile[];
   links: SubmissionLink[];
+  /** 근거로 붙인 별빛보드 작업장 — 옛 응답에는 없을 수 있다 */
+  boards?: EvidenceBoard[];
   answers: AnswerRow[];
 };
 
@@ -596,6 +599,16 @@ export default function LearningDashboard({ classId }: { classId: string }) {
       if (proxyInputRef.current) proxyInputRef.current.value = '';
       notifyLater();
     }
+  };
+
+  /** 열린 학생 카드를 새 내용으로 — 닫았다 다시 열지 않아도 바뀐 결과물이 보인다 */
+  const refreshOpenCell = async (studentId: string) => {
+    if (!selectedId) return;
+    const data = await api<{ students: StudentCell[] }>(`/api/learning/activities/${selectedId}/submissions`, { cache: 'no-store' });
+    setCells(data.students);
+    setOpenCell(data.students.find((cell) => cell.student.id === studentId) ?? null);
+    void loadActivities(true);
+    notifyLater();
   };
 
   const addProxyLink = async () => {
@@ -1187,8 +1200,30 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     </div>
                   </div>
                 )}
+                {/* 별빛보드 작업장 근거 — 교사도 학생 대신 붙이고 뗄 수 있다. 열면 그 작업장과 하위만 보인다 */}
+                <div style={{ marginBottom: 8 }}>
+                  <StarboardEvidence
+                    kind="teacher"
+                    boards={openCell.submission?.boards ?? []}
+                    canEdit
+                    loadOptions={() => api(`/api/learning/activities/${selectedId}/proxy-boards?studentId=${openCell.student.id}`)}
+                    onAdd={async (boardId) => {
+                      await api(`/api/learning/activities/${selectedId}/proxy-boards`, {
+                        method: 'POST',
+                        body: JSON.stringify({ studentId: openCell.student.id, boardId }),
+                      });
+                      await refreshOpenCell(openCell.student.id);
+                      setMessage(`${openCell.student.name} 학생의 근거 작업장을 붙였습니다.`);
+                    }}
+                    onRemove={async (linkId) => {
+                      await api(`/api/learning/activities/${selectedId}/proxy-boards/${linkId}`, { method: 'DELETE' });
+                      await refreshOpenCell(openCell.student.id);
+                    }}
+                    loadViews={(linkId) => api(`/api/learning/activities/${selectedId}/proxy-boards/${linkId}`)}
+                  />
+                </div>
                 {!openCell.submission || (openCell.submission.files.length === 0 && openCell.submission.links.length === 0) ? (
-                  <p className="hint" style={{ margin: 0 }}>제출된 결과물이 없습니다.</p>
+                  (openCell.submission?.boards?.length ?? 0) === 0 && <p className="hint" style={{ margin: 0 }}>제출된 결과물이 없습니다.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {/* 사진은 썸네일로 미리 보고, 누르면 원본을 새 탭으로 엽니다 */}

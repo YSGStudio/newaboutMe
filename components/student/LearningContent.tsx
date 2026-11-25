@@ -8,6 +8,9 @@
  * 선생님이 적은 평가요소는 여기서 그대로 "선생님 질문"으로 보입니다. 질문 아래에 잘함/보통/노력요함
  * 기준을 보여주고, 선생님이 모든 요소를 평가하면 등급과 코멘트가 나타납니다.
  *
+ * 책을 누르면 먼저 읽기 화면이 열리고, 닫기 옆 ✏️ 수정하기를 눌러야 결과물을 올리거나 자기점검을 고칠 수 있어요.
+ * 결과물에는 사진·PDF·링크와 함께 별빛보드 작업장도 붙일 수 있어요(StarboardEvidence).
+ *
  * 문구는 모두 해요체입니다. 상태 판정과 파일 규칙은 lib/learning.ts 한 곳에서 가져옵니다.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +39,7 @@ import {
   type Grade,
 } from '@/lib/learning';
 import { CriterionGuide, GradeChip } from '@/components/learning/GradeParts';
+import StarboardEvidence, { type EvidenceBoard } from '@/components/learning/StarboardEvidence';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -79,6 +83,8 @@ type Detail = {
     feedback_updated_at: string | null;
     files: SubmissionFile[];
     links: SubmissionLink[];
+    /** 근거로 붙인 별빛보드 작업장 — 옛 응답에는 없을 수 있다 */
+    boards?: EvidenceBoard[];
   } | null;
   status: LearningStatus;
   /** 선생님 피드백이나 평가가 있어 결과물(사진·PDF·링크)을 더 바꿀 수 없는지 */
@@ -128,6 +134,8 @@ export default function LearningContent() {
   const [uploading, setUploading] = useState(false);
   const [modalError, setModalError] = useState('');
   const [modalMsg, setModalMsg] = useState('');
+  // 책을 열면 읽기 화면부터 — ✏️ 수정하기를 눌러야 고칠 수 있다.
+  const [editing, setEditing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -186,6 +194,8 @@ export default function LearningContent() {
     setOpeningId(activityId);
     setModalError('');
     setModalMsg('');
+    setEditing(false);
+    setLinkOpen(false);
     try {
       const data = await api<Detail>(`/api/learning/my/${activityId}`, { cache: 'no-store' });
       setDetail(data);
@@ -225,13 +235,17 @@ export default function LearningContent() {
 
   const locked = Boolean(detail?.locked);
   const answerLocked = Boolean(detail?.answerLocked);
+  // 수정 화면에서만 고칠 수 있다(잠금 규칙은 그대로).
+  const canEditMaterial = editing && !locked;
+  const canEditAnswer = editing && !answerLocked;
+  const boardCount = detail?.submission?.boards?.length ?? 0;
   /** 제출이 끝나려면 아직 무엇이 빠졌는지 — 저장 버튼 아래에 쉬운 말로 알려줍니다. */
   const missingItems = (() => {
     if (!detail || answerLocked) return [];
     const items: string[] = [];
     // 결과물은 질문이 없는 활동에서만 꼭 필요해요 — 질문이 있으면 답만 써도 낼 수 있어요.
-    const materialCount = (detail.submission?.files.length ?? 0) + (detail.submission?.links.length ?? 0);
-    if (detail.questions.length === 0 && materialCount === 0) items.push('결과물(사진·PDF·링크)을 1개 이상 올려요.');
+    const materialCount = (detail.submission?.files.length ?? 0) + (detail.submission?.links.length ?? 0) + boardCount;
+    if (detail.questions.length === 0 && materialCount === 0) items.push('결과물(사진·PDF·링크·별빛보드 작업장)을 1개 이상 올려요.');
     const unanswered = detail.questions
       .map((q, index) => ((answers[q.id] ?? '').trim() ? null : index + 1))
       .filter((n): n is number => n !== null);
@@ -274,6 +288,8 @@ export default function LearningContent() {
       );
       applyDetail(result.detail);
       claimLearningReward(result);
+      // 다 고쳤으면 읽기 화면으로 돌아간다.
+      setEditing(false);
 
       // 성찰을 내면 별빛 여행 연료와 별빛 퀘스트 뱃지가 함께 쌓입니다.
       setModalMsg(rewardMessage(result, '성찰을 저장했어요.'));
@@ -514,7 +530,27 @@ export default function LearningContent() {
                     {detail.submission?.submitted_at && ` · 낸 날 ${formatDay(detail.submission.submitted_at)}`}
                   </p>
                 </div>
-                <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={() => setDetail(null)}>닫기</button>
+                <div className="row" style={{ gap: 6, flexShrink: 0 }}>
+                  {(!locked || !answerLocked) && (
+                    <button
+                      type="button"
+                      className={editing ? 'outline' : 'ghost'}
+                      style={{ width: 'auto', flexShrink: 0 }}
+                      aria-pressed={editing}
+                      onClick={() => {
+                        if (editing) {
+                          // 저장하지 않은 자기점검은 마지막으로 저장한 내용으로 되돌린다.
+                          setAnswers(Object.fromEntries(detail.questions.map((q) => [q.id, q.answer])));
+                          setLinkOpen(false);
+                        }
+                        setEditing((v) => !v);
+                      }}
+                    >
+                      {editing ? '📖 읽기' : '✏️ 수정하기'}
+                    </button>
+                  )}
+                  <button type="button" className="outline" style={{ width: 'auto', flexShrink: 0 }} onClick={() => setDetail(null)}>닫기</button>
+                </div>
               </div>
             </div>
 
@@ -543,7 +579,7 @@ export default function LearningContent() {
                     <span aria-hidden="true">1</span>
                     <div><h4 id="learning-material-title">나의 결과물</h4><p>활동한 사진·PDF나 링크를 올려요.</p></div>
                   </div>
-                  {!locked && (
+                  {canEditMaterial && (
                     <div className="row" style={{ gap: 6, flexShrink: 0 }}>
                       <button
                         type="button"
@@ -573,7 +609,7 @@ export default function LearningContent() {
                 </p>
 
                 {/* 링크 등록 칸 — 버튼을 눌렀을 때만 열립니다 */}
-                {linkOpen && !locked && (
+                {linkOpen && canEditMaterial && (
                   <div style={{
                     marginBottom: 10, padding: '10px 12px', borderRadius: 12,
                     border: '1px solid #ddd6fe', background: '#faf9ff',
@@ -623,7 +659,11 @@ export default function LearningContent() {
                   }}
                 />
                 {(detail.submission?.files.length ?? 0) === 0 && (detail.submission?.links.length ?? 0) === 0 ? (
-                  <p className="hint" style={{ margin: 0 }}>아직 올린 결과물이 없어요.</p>
+                  boardCount === 0 && (
+                    <p className="hint" style={{ margin: 0 }}>
+                      {editing ? '아직 올린 결과물이 없어요.' : '아직 올린 결과물이 없어요. ✏️ 수정하기를 눌러 올려 보세요.'}
+                    </p>
+                  )
                 ) : (
                   /* 사진은 썸네일로 미리 보여주고, PDF는 아이콘 타일로 대신합니다 */
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 8 }}>
@@ -663,7 +703,7 @@ export default function LearningContent() {
                               {file.file_name}
                             </span>
                           </button>
-                          {!locked && (
+                          {canEditMaterial && (
                             <button
                               type="button"
                               onClick={() => deleteFile(file.id)}
@@ -704,7 +744,7 @@ export default function LearningContent() {
                         >
                           🔗 {link.label || link.url}
                         </a>
-                        {!locked && (
+                        {canEditMaterial && (
                           <button
                             type="button"
                             className="outline"
@@ -717,6 +757,30 @@ export default function LearningContent() {
                       </div>
                     ))}
                   </div>
+                )}
+
+                {/* 별빛보드 작업장 근거 — 읽기 화면에서는 붙인 것만, 수정 화면에서는 고르고 뗄 수 있어요 */}
+                {(canEditMaterial || boardCount > 0) && (
+                  <StarboardEvidence
+                    kind="student"
+                    boards={detail.submission?.boards ?? []}
+                    canEdit={canEditMaterial}
+                    loadOptions={() => api(`/api/learning/my/${detail.activity.id}/boards`)}
+                    onAdd={async (boardId) => {
+                      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/boards`, {
+                        method: 'POST',
+                        body: JSON.stringify({ boardId }),
+                      });
+                      applyDetail(result.detail);
+                      claimLearningReward(result);
+                      setModalMsg(rewardMessage(result, '작업장을 붙였어요.'));
+                    }}
+                    onRemove={async (linkId) => {
+                      const result = await api<SubmitResult>(`/api/learning/my/${detail.activity.id}/boards/${linkId}`, { method: 'DELETE' });
+                      applyDetail(result.detail);
+                    }}
+                    loadViews={(linkId) => api(`/api/learning/my/${detail.activity.id}/boards/${linkId}`)}
+                  />
                 )}
               </section>
 
@@ -745,7 +809,7 @@ export default function LearningContent() {
                     </div>
                     <div className="learning-reflection-response">
                       <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 13, color: '#374151' }}>자기점검</p>
-                      {answerLocked ? (
+                      {!canEditAnswer ? (
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: '#1f2937', whiteSpace: 'pre-wrap' }}>
                           {(answers[question.id] ?? '').trim() || '쓴 내용이 없어요.'}
                         </p>
@@ -771,7 +835,7 @@ export default function LearningContent() {
                   </div>
                 ))}
 
-                {!answerLocked && detail.questions.length > 0 && (
+                {canEditAnswer && detail.questions.length > 0 && (
                   <div className="learning-reflection-submit">
                     <button
                       type="button"

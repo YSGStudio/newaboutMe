@@ -410,9 +410,13 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - **평가 기준** — 배움성찰 평가요소와 같은 3단계(노력요함·보통·잘함) 고정. 기준 폼의 단계 입력은 배움성찰 폼의 `.learning-criterion-levels` + `.learning-criterion-level`(등급색 `--grade-color`/`--grade-soft`)을 그대로 쓰고, 입력 순서도 잘함 → 보통 → 노력요함으로 맞춘다
 - **배움성찰 연동** — 기준 목록·작업장 설정의 "배움성찰에서 불러오기"는 `<details>` + `.sb-inline-form`(select + 버튼), 배움성찰 활동 폼의 "별빛보드 기준에서 불러오기"는 옆의 "지난 활동에서 불러오기"와 같은 작은 select. 프로젝트 과목은 폼의 select, 목록 카드에는 `.badge`
 - **배움성찰 활동 연결** — 작업장 설정 "평가 기준" 탭 맨 위. 연결 전에는 `<details className="sb-subpanel">` + `.sb-inline-form`, 연결 후에는 `.notice.info` 안내 + "연결 끊기"(`.sb-btn.ghost.is-small`)를 보여 주고 기준 붙이기·떼기·순서 조작은 숨긴다. 평가 화면에도 같은 `.notice.info`로 "배움성찰에 함께 저장" 안내
-- **작업장 화면 시작선** — 경로·제목 줄을 그리지 않아 칸반이 왼쪽 사이드바와 같은 높이에서 시작한다(제목은 `.sb-sr-only`로만). 교사 버튼(모두 공개·학생별 보기·설정)과 가리기 상태는 사이드바 맨 아래 `.sb-sidebar-actions`(포털)에 `sb-btn-dark`/`sb-btn-gold`로. 내 평가·평가 기준 패널은 칸반 아래
+- **사이드바 머리** — 프로젝트 이름(누르면 첫 작업장) 옆 🏠 `button.sb-sidebar-projects`(40px, 흰 반투명 테두리)로 프로젝트 목록에 돌아간다
+- **작업장 화면 시작선** — 경로·제목 줄을 그리지 않아 칸반이 왼쪽 사이드바와 같은 높이에서 시작한다(제목은 `.sb-sr-only`로만). 교사 버튼(모두 공개·학생별 보기·설정)과 가리기 상태는 사이드바 맨 아래 `.sb-sidebar-board-actions`(포털)에 `sb-btn-dark`/`sb-btn-gold`로. 내 평가·평가 기준 패널은 칸반 아래
 - **학생의 내 카드** — 학생 화면에서는 자기 멤버 섹션이 맨 앞, 섹션 안에서도 자기 카드가 맨 앞. `.sb-kanban.is-student .sb-card.is-mine`은 금빛 맥동(`sb-mine-glow`, 3초, `#ffe47b` 링 + `rgba(251,191,36,.55)` 18px 번짐) — 2026-11-26 승인, `prefers-reduced-motion`에서 멈춤
 - **카드 첨부** — 이미지(10MB)·PDF(20MB)·영상(MP4·WebM·MOV 50MB)·링크. 새 카드 쓰기에서도 "📎 사진·PDF·영상 넣기"(`.sb-file-label`)와 링크 넣기로 고르면 `.sb-pending-list`에 96×72 미리보기(이미지·영상, PDF·링크는 `.sb-file-chip`)와 빼기 ×(`.sb-pending-remove`)가 보이고, 카드를 올린 뒤 차례로 올린다. 카드 위 영상 썸네일은 `.sb-thumb-wrap.is-video`(가운데 ▶), 카드 상세에서는 `video.sb-attachment-video`로 재생
+- **카드 창** — 학생은 자기 카드도 먼저 읽기 화면(`.sb-modal.is-reading`, 최대 880px · 제목 24px)으로 연다. 닫기 × 옆(`.sb-modal-head-actions`) ✏️ 수정하기(`sb-icon-btn`)를 누르면 편집 화면, 저장·취소하면 읽기로 돌아간다. 교사는 쓸 수 있는 카드를 바로 편집 화면으로 연다. 읽기 화면에서 첨부가 없으면 첨부 칸을 그리지 않는다. 체크리스트 칸은 `STARBOARD_CHECKLIST_ENABLED`(lib/features.ts)로 감춤
+- **배움성찰 근거 작업장** — 배움성찰 결과물에 별빛보드 작업장을 붙인다(`StarboardEvidence`, 학생·교사 공용). 칩 `.learning-board-chip`(연 것은 `.is-active`), 고르기 `.learning-board-picker`(사진·PDF·링크 입력 칸과 같은 `#ddd6fe`/`#faf9ff`), 열면 `.learning-board-viewer` 안에 그 작업장과 하위 작업장만 읽기 전용 칸반으로(하위는 ↳ + 들여쓰기). 같은 층의 다른 작업장은 보이지 않는다
+- **학생 배움성찰 창** — 책을 누르면 읽기 화면부터. 닫기 옆 ✏️ 수정하기(`ghost`)를 누르면 결과물 올리기·자기점검 쓰기가 열리고 버튼은 📖 읽기(`outline`)로 바뀐다. 성찰을 저장하면 읽기 화면으로 돌아간다
 - **상단 헤더 없음** — 별빛보드 탭에서는 교사·학생 화면 모두 `PageHeader`를 그리지 않고, 학생 화면의 별빛 캐릭터·현재 향하는 곳·뱃지 배너도 그리지 않는다(작업 화면을 넓게 쓰려고). 학생 로그아웃은 다른 탭으로 옮겨 가서 한다
 - **학생의 평가 기준 보기** — 학생 화면에는 작업장 위 평가 기준 칸(`CriteriaPanel`)·선생님 평가 칸을 따로 두지 않는다. 자기 섹션 머리의 📊(`is-active`로 반전)를 누르면 섹션 안에 `.sb-column-review`(금색 테두리 `#ffe47b` · `#fffdf5` 배경)가 펼쳐져 기준별 단계 문장(잘함→노력요함, 선생님이 고른 단계는 `--primary` 링), 선생님·친구 별점, 선생님 한마디를 칸 폭에 맞춰 세로로 보여 준다. 자기 섹션이 없는 보드에서만 예전 칸을 보여 준다
 

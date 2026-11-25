@@ -5250,6 +5250,17 @@ button.gp-bar:hover:not(:disabled) { box-shadow: var(--shadow-md); }
   button.gp-topic-card:hover:not(:disabled) { transform: none; }
 }
 
+/* ── 배움성찰 근거 · 별빛보드 작업장 (components/learning/StarboardEvidence) ── */
+.learning-board-evidence { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.learning-board-picker { padding: 10px 12px; border: 1px solid #ddd6fe; border-radius: 12px; background: #faf9ff; }
+.learning-board-chip { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.learning-board-chip.is-active { border-color: var(--primary); background: var(--primary-soft); }
+button.learning-board-chip-open { flex: 1; min-width: 0; width: auto; padding: 4px 0; overflow: hidden; background: transparent; color: var(--primary-dark); box-shadow: none; font-size: 13px; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+button.learning-board-chip-open:hover:not(:disabled) { transform: none; box-shadow: none; text-decoration: underline; }
+.learning-board-viewer { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow: auto; padding: 12px; border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.learning-board-viewer-item h5 { margin: 0 0 6px; color: var(--text); font-size: 14px; font-weight: 700; }
+.learning-board-viewer-item .sb-column { width: min(72vw, 260px); }
+
 /* ── 별빛보드 · 계층형 칸반 (components/starboard) ── */
 /*
  * 원본 클래스보드의 레이아웃·버튼 배치를 그대로 두고 색·글꼴·그림자만 별빛로그 토큰으로 옮겼다(design.md §6.3.3).
@@ -5423,6 +5434,11 @@ button.sb-sidebar-home {
   text-align: left;
 }
 button.sb-sidebar-home.is-active { background: rgba(255, 255, 255, .15); }
+/* 프로젝트 이름 줄 — 이름 옆 🏠로 프로젝트 목록에 돌아간다 */
+.sb-sidebar-top { display: flex; align-items: center; gap: 6px; }
+.sb-sidebar-top button.sb-sidebar-home { flex: 1; min-width: 0; }
+button.sb-sidebar-projects { display: grid; flex-shrink: 0; place-items: center; width: 40px; min-height: 40px; padding: 0; border: 1.5px solid rgba(255, 255, 255, .45); border-radius: var(--radius-sm); background: transparent; color: #fff; box-shadow: none; font-size: 18px; }
+button.sb-sidebar-projects:hover:not(:disabled) { background: rgba(255, 255, 255, .12); transform: none; box-shadow: none; }
 button.sb-sidebar-home:hover:not(:disabled) { background: rgba(255, 255, 255, .1); transform: none; box-shadow: none; }
 .sb-sidebar-title { overflow: hidden; flex: 1; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
 .sb-sidebar-head { display: flex; flex-direction: column; gap: 8px; padding: 12px 4px 0; border-top: 1.5px solid rgba(255, 255, 255, .15); }
@@ -5548,9 +5564,9 @@ button.sb-recent-card:hover:not(:disabled) { opacity: 1; filter: brightness(.97)
 .sb-board-head h1 { margin: 0; color: var(--text); font-size: clamp(22px, 3vw, 30px); font-weight: 700; word-break: keep-all; letter-spacing: -.02em; }
 .sb-board-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 /* 작업장 화면의 교사 버튼 자리 — 사이드바 맨 아래(작업장 화면 위 머리 줄을 없애고 옮겨 옴) */
-.sb-sidebar-actions:empty { display: none; }
-.sb-sidebar-actions { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .16); }
-.sb-sidebar-actions .sb-board-actions { margin-left: 0; }
+.sb-sidebar-board-actions:empty { display: none; }
+.sb-sidebar-board-actions { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .16); }
+.sb-sidebar-board-actions .sb-board-actions { margin-left: 0; }
 .sb-no-access { color: var(--muted); text-align: center; }
 .sb-criteria-panel summary { font-weight: 700; cursor: pointer; }
 .sb-criteria-panel > ul { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; }
@@ -5670,6 +5686,11 @@ button.sb-card-open:hover:not(:disabled) { opacity: 1; transform: none; box-shad
   box-shadow: var(--shadow-lg);
 }
 .sb-modal.is-narrow { max-width: 560px; }
+/* 카드 읽기 화면 — 넓게 펼쳐 내용·첨부를 크게 본다 */
+.sb-modal.is-reading { max-width: 880px; }
+.sb-modal.is-reading .sb-modal-title { font-size: 24px; }
+.sb-modal-head-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.sb-modal-head-actions button.sb-icon-btn.sb-close { margin-left: 0; }
 .sb-drawer { display: flex; flex-direction: column; overflow-y: auto; width: 100%; max-width: 580px; height: 100%; padding: 20px; background: var(--surface); box-shadow: var(--shadow-lg); }
 .sb-modal-head { display: flex; align-items: center; gap: 8px; }
 .sb-modal-title { overflow-wrap: anywhere; flex: 1; min-width: 0; margin: 0; color: #30276d; font-size: 20px; font-weight: 700; word-break: keep-all; }

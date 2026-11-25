@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadSubmissionBoards, type SubmissionBoard } from '@/lib/learning-boards';
 import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { assertStudentInClass, ensureProxySubmission, requireTeacherActivity } from '@/lib/learning-access';
@@ -126,6 +127,9 @@ export async function GET(_: Request, { params }: Params) {
     });
   }
 
+  // 별빛보드 작업장 근거 — 실패해도 나머지 결과물은 보여 준다.
+  const boardsBySubmission = await loadSubmissionBoards(submissionIds).catch(() => new Map<string, SubmissionBoard[]>());
+
   const questionRows = (questions ?? []) as LearningQuestionRow[];
   const criterionIds = questionRows.filter(isCriterionQuestion).map((q) => q.id);
 
@@ -142,6 +146,7 @@ export async function GET(_: Request, { params }: Params) {
       const inProgress = status === 'none' && Boolean(submission) && (
         (filesBySubmission.get(submission!.id)?.length ?? 0) > 0
         || (linksBySubmission.get(submission!.id)?.length ?? 0) > 0
+        || (boardsBySubmission.get(submission!.id)?.length ?? 0) > 0
         || [...(answerMap?.values() ?? [])].some((answer) => answer.trim().length > 0)
       );
       return {
@@ -153,6 +158,7 @@ export async function GET(_: Request, { params }: Params) {
               ...submission,
               files: filesBySubmission.get(submission.id) ?? [],
               links: linksBySubmission.get(submission.id) ?? [],
+              boards: boardsBySubmission.get(submission.id) ?? [],
               // 질문 순서대로 답을 붙여 보낸다 — 교사 화면에서 질문·답을 짝지어 그리기 위해서다.
               // 평가요소 질문에는 요소·기준·교사 등급을 함께 붙인다.
               answers: questionRows.map((q) => ({

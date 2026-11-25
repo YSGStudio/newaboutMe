@@ -33,16 +33,17 @@ export async function GET() {
 
   const submissionIds = (submissions ?? []).map((row) => row.id);
   const stats = await loadGradingStats(rows.map((row) => row.id), submissionIds);
-  // 결과물 개수 = 파일 + 링크. 카드에 "몇 개 냈는지" 보여주는 용도다.
+  // 결과물 개수 = 파일 + 링크 + 별빛보드 작업장. 카드에 "몇 개 냈는지" 보여주는 용도다.
   const materialCounts = new Map<string, number>();
 
   if (submissionIds.length > 0) {
-    const [filesRes, linksRes] = await Promise.all([
+    const [filesRes, linksRes, boardsRes] = await Promise.all([
       supabaseAdmin.from('learning_submission_files').select('submission_id').in('submission_id', submissionIds),
       supabaseAdmin.from('learning_submission_links').select('submission_id').in('submission_id', submissionIds),
+      supabaseAdmin.from('learning_submission_boards').select('submission_id').in('submission_id', submissionIds),
     ]);
 
-    [...(filesRes.data ?? []), ...(linksRes.data ?? [])].forEach((row) => {
+    [...(filesRes.data ?? []), ...(linksRes.data ?? []), ...(boardsRes.data ?? [])].forEach((row) => {
       materialCounts.set(row.submission_id, (materialCounts.get(row.submission_id) ?? 0) + 1);
     });
   }

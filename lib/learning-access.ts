@@ -222,9 +222,11 @@ export async function assertStudentInClass(studentId: string, classId: string) {
  * 계산을 여기 한 곳에 둔다.
  */
 export async function recalcSubmissionStatus(submission: LearningSubmissionRow) {
-  const [{ count: fileCount }, { count: linkCount }, { data: questions }, { data: answers }] = await Promise.all([
+  const [{ count: fileCount }, { count: linkCount }, { count: boardCount }, { data: questions }, { data: answers }] = await Promise.all([
     supabaseAdmin.from('learning_submission_files').select('id', { count: 'exact', head: true }).eq('submission_id', submission.id),
     supabaseAdmin.from('learning_submission_links').select('id', { count: 'exact', head: true }).eq('submission_id', submission.id),
+    // 별빛보드 작업장 근거도 결과물 1개로 센다(lib/learning-boards.ts).
+    supabaseAdmin.from('learning_submission_boards').select('id', { count: 'exact', head: true }).eq('submission_id', submission.id),
     supabaseAdmin.from('learning_activity_questions').select('id,criterion_title').eq('activity_id', submission.activity_id),
     supabaseAdmin.from('learning_submission_answers').select('question_id,answer').eq('submission_id', submission.id),
   ]);
@@ -232,7 +234,7 @@ export async function recalcSubmissionStatus(submission: LearningSubmissionRow) 
   const questionRows = questions ?? [];
   const answerMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer]));
   const submitted = isSubmittable(
-    (fileCount ?? 0) + (linkCount ?? 0),
+    (fileCount ?? 0) + (linkCount ?? 0) + (boardCount ?? 0),
     questionRows.length,
     questionRows.map((q) => answerMap.get(q.id)),
   );

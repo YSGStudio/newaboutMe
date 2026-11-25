@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { answerLockedByArchive, SUBMISSION_COLUMNS, type LearningActivityRow, type LearningSubmissionRow } from '@/lib/learning-access';
 import { getLearningStatus, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { signPaths } from '@/lib/learning-storage';
+import { loadSubmissionBoards, type SubmissionBoard } from '@/lib/learning-boards';
 
 export async function loadStudentLearningDetail(studentId: string, activity: LearningActivityRow) {
   // 질문과 제출물은 서로 기다릴 이유가 없어 함께 읽는다.
@@ -30,11 +31,12 @@ export async function loadStudentLearningDetail(studentId: string, activity: Lea
   // 파일마다 따로 서명 URL을 요청하지 않도록, 소유권 확인이 끝난 여기서 한 번에 붙여 보낸다.
   let files: { id: string; file_name: string; mime_type: string; sort_order: number; url: string | null }[] = [];
   let links: { id: string; url: string; label: string | null; sort_order: number }[] = [];
+  let boards: SubmissionBoard[] = [];
   let answers: { question_id: string; answer: string }[] = [];
   let grades: { question_id: string; teacher_grade: string | null; teacher_comment: string | null }[] = [];
 
   if (submission) {
-    const [filesRes, linksRes, answersRes, gradesRes] = await Promise.all([
+    const [filesRes, linksRes, answersRes, gradesRes, boardMap] = await Promise.all([
       supabaseAdmin
         .from('learning_submission_files')
         .select('id,file_name,mime_type,sort_order,storage_path')
@@ -53,12 +55,14 @@ export async function loadStudentLearningDetail(studentId: string, activity: Lea
         .from('learning_submission_grades')
         .select('question_id,teacher_grade,teacher_comment')
         .eq('submission_id', submission.id),
+      loadSubmissionBoards([submission.id]).catch(() => new Map<string, SubmissionBoard[]>()),
     ]);
 
     const rows = filesRes.data ?? [];
     const signed = await signPaths(rows.map((row) => row.storage_path));
     files = rows.map(({ storage_path, ...row }) => ({ ...row, url: signed.get(storage_path) ?? null }));
     links = linksRes.data ?? [];
+    boards = boardMap.get(submission.id) ?? [];
     answers = answersRes.data ?? [];
     grades = gradesRes.data ?? [];
   }
@@ -86,7 +90,7 @@ export async function loadStudentLearningDetail(studentId: string, activity: Lea
           : {}),
       };
     }),
-    submission: submission ? { ...submission, files, links } : null,
+    submission: submission ? { ...submission, files, links, boards } : null,
     status,
     // 결과물(파일·링크) 잠금 — 서술 피드백이나 교사 등급이 하나라도 있으면 고칠 수 없다(lockedByFeedback과 같은 조건).
     // 등급 값은 숨겨도 잠겼다는 사실은 알려야 화면이 올리기 버튼을 감출 수 있다.
