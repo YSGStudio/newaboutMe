@@ -4,7 +4,8 @@
  * ProjectSidebar — 프로젝트 방 왼쪽 작업장 사이드바(원본 ProjectSidebar)
  * 프로젝트 제목(누르면 메인), "작업장 N", 교사에게 "＋ 작업장 추가"·"⚙ 작업장 설정", 작업장 트리.
  * 좁은 화면에서는 트리를 "작업장 목록 펼치기/접기"로 감쌉니다.
- * 맨 아래 .sb-sidebar-actions는 작업장 화면의 교사 버튼 자리입니다(작업장 화면 위 머리 줄을 없애서 옮겨 옴).
+ * 맨 위 프로젝트 이름 옆 🏠는 프로젝트 목록으로 돌아갑니다(이름을 누르면 첫 작업장으로).
+ * 맨 아래 .sb-sidebar-board-actions는 작업장 화면의 교사 버튼 자리입니다(작업장 화면 위 머리 줄을 없애서 옮겨 옴).
  */
 import { useState } from 'react';
 import type { TreeNode } from '@/lib/starboard/types';
@@ -29,16 +30,27 @@ export default function ProjectSidebar({ projectId, title, nodes, counts, curren
   const tree = <BoardTree projectId={projectId} nodes={nodes} currentId={currentId} counts={counts} onChanged={onChanged} />;
   return (
     <aside className="sb-sidebar" data-testid="project-sidebar">
-      <button
-        type="button"
-        className={onHome ? 'sb-sidebar-home is-active' : 'sb-sidebar-home'}
-        aria-current={onHome ? 'page' : undefined}
-        onClick={() => go({ name: 'home', projectId })}
-        title={title}
-      >
-        <span aria-hidden="true">🏠</span>
-        <span className="sb-sidebar-title">{title}</span>
-      </button>
+      <div className="sb-sidebar-top">
+        <button
+          type="button"
+          className={onHome ? 'sb-sidebar-home is-active' : 'sb-sidebar-home'}
+          aria-current={onHome ? 'page' : undefined}
+          onClick={() => go({ name: 'home', projectId })}
+          title={title}
+        >
+          <span className="sb-sidebar-title">{title}</span>
+        </button>
+        <button
+          type="button"
+          className="sb-sidebar-projects"
+          onClick={() => go({ name: 'projects' })}
+          aria-label="프로젝트 목록으로 돌아가기"
+          title="프로젝트 목록"
+          data-testid="back-to-projects"
+        >
+          <span aria-hidden="true">🏠</span>
+        </button>
+      </div>
       <div className="sb-sidebar-head">
         <h2>
           작업장 <span className="sb-gold">{boardCount}</span>
@@ -65,7 +77,7 @@ export default function ProjectSidebar({ projectId, title, nodes, counts, curren
         {tree}
       </details>
       <div className="sb-sidebar-desktop">{tree}</div>
-      {actionsRef && <div ref={actionsRef} className="sb-sidebar-actions" />}
+      {actionsRef && <div ref={actionsRef} className="sb-sidebar-board-actions" />}
     </aside>
   );
 }

@@ -24,7 +24,7 @@ type Props = {
   tree: TreeNode[];
   signals: RoomSignals;
   onTreeChanged: () => void;
-  /** 사이드바 아래 교사 버튼 자리(ProjectSidebar의 .sb-sidebar-actions) */
+  /** 사이드바 아래 교사 버튼 자리(ProjectSidebar의 .sb-sidebar-board-actions) */
   actionsSlot: HTMLDivElement | null;
 };
 

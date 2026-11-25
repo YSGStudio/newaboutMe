@@ -2,8 +2,11 @@
 
 /**
  * CardModal — 카드 상세(원본 kanban/CardModal.tsx)
- * 머리: 섹션 배지·작성자·닫기(Esc). 쓸 수 있으면 제목·내용(또는 형식 항목)·라벨·마감일 편집과 "카드 삭제 → 정말 삭제",
- * 아니면 보기만. 아래에 체크리스트(바로 저장), 첨부(목록·올리기), 활동 기록을 보여 줍니다.
+ * 머리: 섹션 배지·작성자·(수정하기)·닫기(Esc).
+ * 학생은 자기 카드도 먼저 넓은 읽기 화면으로 열고, 닫기 옆 ✏️ 수정하기를 눌러야 편집 화면(제목·내용·라벨·마감일·첨부 올리기·카드 삭제)이 됩니다.
+ * 저장하거나 취소하면 다시 읽기 화면으로 돌아갑니다. 교사는 예전처럼 쓸 수 있는 카드를 바로 편집 화면으로 엽니다.
+ * 아래에 첨부(목록 — 읽기 화면에서는 첨부가 있을 때만), 활동 기록을 보여 줍니다.
+ * 체크리스트는 lib/features.ts STARBOARD_CHECKLIST_ENABLED로 화면에서 내렸습니다(저장된 항목은 그대로 유지).
  */
 import { useEffect, useState } from 'react';
 import type { Activity, CardView, ChecklistItem, ColumnView } from '@/lib/starboard/types';
@@ -14,13 +17,14 @@ import { json, useSb } from './context';
 import { AttachmentDetail } from './attachments/AttachmentList';
 import AttachmentUploader from './attachments/AttachmentUploader';
 import { CardContentInputs, CardContentView } from './CardContent';
+import { STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 
 const ACTION_LABEL: Record<Activity['action'], string> = { create: '만듦', update: '수정함', move: '옮김', delete: '삭제함' };
 
 type Props = { card: CardView; boardId: string; template: CardField[]; columns: ColumnView[]; onClose: () => void; onChanged: () => void };
 
 export default function CardModal({ card, boardId, template, columns, onClose, onChanged }: Props) {
-  const { api } = useSb();
+  const { api, isTeacher } = useSb();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [title, setTitle] = useState(card.title);
@@ -33,6 +37,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
   const [activities, setActivities] = useState<Activity[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const editable = card.can_edit;
+  const [editing, setEditing] = useState(editable && isTeacher);
   const col = columns.find((c) => c.id === card.column_id);
 
   useEffect(() => {
@@ -61,7 +66,19 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
     }
   };
 
-  const save = (patch?: { checklist?: ChecklistItem[] }) =>
+  /** 편집을 그만두고 읽기 화면으로 — 고치던 값은 카드에 저장된 값으로 되돌린다 */
+  const stopEditing = () => {
+    setTitle(card.title);
+    setBody(card.body);
+    setValues(card.fields ?? {});
+    setLabels(card.labels.join(', '));
+    setDue(card.due_date ?? '');
+    setConfirmDelete(false);
+    setError('');
+    setEditing(false);
+  };
+
+  const save = (patch?: { checklist?: ChecklistItem[] }, after?: () => void) =>
     run(() =>
       api(
         `/cards/${card.id}`,
@@ -74,27 +91,36 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
           checklist: patch?.checklist ?? checklist,
         }),
       ),
+      after,
     );
 
   return (
     <div className="sb-overlay" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="카드 상세" className="sb-modal" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="카드 상세" className={editing ? 'sb-modal' : 'sb-modal is-reading'} onClick={(e) => e.stopPropagation()}>
         <div className="sb-modal-head">
           <span className="sb-column-badge" style={{ background: col ? columnTint(col.color) : undefined }}>
             {col?.name}
           </span>
           <span className="sb-meta">{card.author_name ?? (card.is_mine ? '나' : '익명')}</span>
-          <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
-            ×
-          </button>
+          <div className="sb-modal-head-actions">
+            {editable && !editing && (
+              <button type="button" className="sb-icon-btn" onClick={() => setEditing(true)} aria-label="수정하기" title="수정하기" data-testid="card-edit">
+                <span aria-hidden="true">✏️</span>
+              </button>
+            )}
+            <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
+              ×
+            </button>
+          </div>
         </div>
 
-        {editable ? (
+        {editable && editing ? (
           <form
             className="sb-stack"
             onSubmit={(e) => {
               e.preventDefault();
-              save();
+              // 학생은 저장하면 읽기 화면으로 돌아간다.
+              save(undefined, isTeacher ? undefined : () => setEditing(false));
             }}
           >
             <div>
@@ -124,6 +150,11 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
                 </button>
               )}
               <span className="sb-flex-1" />
+              {!isTeacher && (
+                <button type="button" className="sb-btn ghost" onClick={stopEditing} disabled={pending}>
+                  취소
+                </button>
+              )}
               <button className="sb-btn" disabled={pending}>
                 저장
               </button>
@@ -147,6 +178,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
           </div>
         )}
 
+        {STARBOARD_CHECKLIST_ENABLED && (
         <section className="sb-modal-section">
           <h3>체크리스트</h3>
           <ul className="sb-checklist">
@@ -164,7 +196,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
                   }}
                 />
                 <span className={item.done ? 'is-done' : undefined}>{item.text}</span>
-                {editable && (
+                {editable && editing && (
                   <button
                     type="button"
                     className="sb-text-btn"
@@ -180,7 +212,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
               </li>
             ))}
           </ul>
-          {editable && (
+          {editable && editing && (
             <form
               className="sb-inline-form"
               onSubmit={(e) => {
@@ -197,17 +229,21 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
             </form>
           )}
         </section>
+        )}
 
+        {/* 첨부가 없으면 읽기 화면에서는 첨부 칸을 그리지 않는다(수정 화면에서는 올리려고 보여 준다). */}
+        {(editing || card.attachments.length > 0) && (
         <section className="sb-modal-section">
           <h3>첨부</h3>
           <AttachmentDetail
             boardId={boardId}
             items={card.attachments}
-            canEdit={editable}
+            canEdit={editable && editing}
             onDelete={(id) => run(() => api(`/attachments/${id}`, json('DELETE')))}
           />
-          {editable && <AttachmentUploader cardId={card.id} onDone={onChanged} />}
+          {editable && editing && <AttachmentUploader cardId={card.id} onDone={onChanged} />}
         </section>
+        )}
 
         <section className="sb-modal-section">
           <h3>활동 기록</h3>

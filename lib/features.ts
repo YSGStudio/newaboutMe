@@ -42,3 +42,19 @@ export function canSeeEvalFeedback(role: string | null | undefined): boolean {
   if (!EVAL_FEEDBACK_ADMIN_ONLY) return true;
   return role === 'admin';
 }
+
+/**
+ * 별빛보드 카드 체크리스트 — 화면에서만 내림 (2026-11-26)
+ *
+ * 왜 내렸나: 원본 클래스보드에서 옮겨 온 카드별 할 일 목록인데, 별빛로그 수업에서는 쓰지 않아
+ * 카드 창을 단순하게 하려고 사용자 요청으로 감췄습니다.
+ *
+ * 감춘 곳: 카드 창(components/starboard/CardModal.tsx)의 체크리스트 칸,
+ * 칸반 카드(components/starboard/Kanban.tsx) 아래의 "☑ 완료/전체" 표시.
+ *
+ * **자료는 지우지 않았습니다.** sb_cards.checklist 컬럼과 저장된 항목은 그대로이고,
+ * 카드를 저장할 때도 기존 항목을 그대로 다시 보냅니다(지워지지 않음).
+ *
+ * 되돌리려면 — 이 값을 true로 바꿉니다.
+ */
+export const STARBOARD_CHECKLIST_ENABLED = false;
