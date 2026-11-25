@@ -5393,13 +5393,49 @@ button.sb-add-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .6); tr
 .sb-create-card summary { padding: 12px 16px; color: var(--muted); font-weight: 700; text-align: center; cursor: pointer; list-style: none; }
 .sb-create[open] summary { color: var(--text); text-align: left; }
 .sb-create-body { padding: 0 16px 16px; }
-.sb-project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
-.sb-project-card { display: flex; flex-direction: column; gap: 10px; }
-.sb-project-card.is-archived { background: #fafbff; box-shadow: none; }
-button.sb-project-title { color: var(--text); font-size: 18px; font-weight: 700; word-break: keep-all; letter-spacing: -.02em; }
-.sb-project-goal { margin: 0; color: var(--muted); font-size: 13px; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sb-project-actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
-.sb-archived h3 { margin: 8px 0 12px; color: var(--muted); font-size: 16px; }
+.sb-project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; margin: 0; padding: 0; list-style: none; }
+/* 프로젝트 목록 — project-list.html 시안 배치 · 별빛로그 토큰(2026-11-26 승인) */
+.sb-projects-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 16px; }
+.sb-projects-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--text); font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.sb-projects-head .sb-count-pill { background: var(--primary-soft); color: var(--primary-dark); }
+.sb-projects-head p { margin: 4px 0 0; }
+.sb-filter-chips { display: flex; gap: 6px; }
+button.sb-filter-chip { width: auto; min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); box-shadow: none; font-size: 13px; font-weight: 500; }
+button.sb-filter-chip.is-active { border-color: var(--text); background: var(--text); color: #fff; }
+.sb-project-card { position: relative; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); list-style: none; transition: transform .18s ease, box-shadow .18s ease; }
+.sb-project-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
+.sb-project-card.is-archived { opacity: .82; }
+button.sb-project-main { display: flex; flex-direction: column; width: 100%; padding: 0; border-radius: 0; background: transparent; color: inherit; box-shadow: none; text-align: left; }
+button.sb-project-main:hover:not(:disabled) { transform: none; box-shadow: none; }
+.sb-project-cover { position: relative; display: block; height: 112px; padding: 16px; background: radial-gradient(120px 90px at 85% 20%, rgba(255, 255, 255, .35), transparent 70%), linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+.sb-project-cover::after { position: absolute; right: -24px; bottom: -40px; width: 150px; height: 150px; border: 22px solid rgba(255, 255, 255, .12); border-radius: 50%; content: ''; }
+.sb-project-card.is-archived .sb-project-cover { background: linear-gradient(135deg, #94a3b8, #64748b); }
+.sb-project-subject { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255, 255, 255, .22); color: #fff; font-size: 12px; font-weight: 600; }
+.sb-project-status { position: absolute; top: 16px; right: 16px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: #fff; color: var(--ok); font-size: 12px; font-weight: 600; }
+.sb-project-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.sb-project-status.is-archived { color: var(--muted); }
+.sb-project-status.is-archived i { background: var(--muted); }
+.sb-project-emblem { position: absolute; bottom: -26px; left: 20px; z-index: 1; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: #fff; box-shadow: var(--shadow-md); font-size: 28px; }
+.sb-project-content { display: flex; flex-direction: column; padding: 38px 20px 0; }
+.sb-project-title { color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.01em; word-break: keep-all; }
+.sb-project-meta { margin-top: 6px; color: var(--muted); font-size: 13px; }
+.sb-project-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sb-project-stats > span { display: flex; flex-direction: column; padding: 10px 12px; color: var(--muted); font-size: 12px; }
+.sb-project-stats > span + span { border-left: 1px solid var(--border); }
+.sb-project-stats b { color: var(--text); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-project-foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px 12px 20px; border-top: 1px solid var(--border-soft); }
+button.sb-project-open { width: auto; min-height: 36px; padding: 0; background: transparent; color: var(--primary-dark); box-shadow: none; font-weight: 600; }
+button.sb-project-open span { display: inline-block; transition: transform .18s ease; }
+.sb-project-card:hover button.sb-project-open span { transform: translateX(3px); }
+.sb-project-icons { display: flex; gap: 2px; margin-left: auto; }
+.sb-project-icons button.sb-icon-btn.is-danger:hover:not(:disabled) { background: #fef2f2; }
+.sb-project-new-wrap { display: flex; list-style: none; }
+button.sb-project-new { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 318px; gap: 12px; border: 1.5px dashed #c7d2fe; border-radius: 16px; background: rgba(255, 255, 255, .5); color: var(--muted); box-shadow: none; }
+button.sb-project-new:hover:not(:disabled) { border-color: var(--primary); background: var(--surface); color: var(--primary-dark); transform: none; box-shadow: none; }
+button.sb-project-new b { font-size: 15px; font-weight: 600; }
+button.sb-project-new > span:last-child { color: var(--muted); font-size: 12.5px; }
+.sb-project-plus { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--primary-soft); color: var(--primary); font-size: 24px; transition: transform .18s ease; }
+button.sb-project-new:hover .sb-project-plus { transform: scale(1.08) rotate(90deg); }
 
 /* 프로젝트 방: 사이드바 + 본문 */
 .sb-room { display: flex; align-items: flex-start; gap: 20px; }
@@ -5929,7 +5965,13 @@ button.sb-group-toggle:hover:not(:disabled) { background: var(--bg); transform: 
   .sb-link-card,
   button.sb-star,
   button.sb-tree-add,
-  button.sb-drag-handle { transition: none; }
+  button.sb-drag-handle,
+  .sb-project-card,
+  .sb-project-plus,
+  button.sb-project-open span { transition: none; }
+  .sb-project-card:hover,
+  .sb-project-card:hover button.sb-project-open span,
+  button.sb-project-new:hover .sb-project-plus { transform: none; }
   button.sb-star:hover:not(:disabled) { transform: none; }
   .sb-kanban.is-student .sb-card.is-mine { animation: none; }
 }

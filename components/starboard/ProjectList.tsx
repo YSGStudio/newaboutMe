@@ -2,77 +2,217 @@
 
 /**
  * ProjectList — 별빛보드 프로젝트 목록(원본 projects/page.tsx + ProjectForm + ProjectActions)
- * 교사: 학급의 프로젝트(진행 중 / 보관됨), 새 프로젝트 만들기, 수정·보관·삭제.
+ * 배치는 .dev/starboard-port/project-list.html 시안, 색은 별빛로그 토큰(2026-11-26).
+ * 프로젝트마다 표지(과목 · 상태 · 과목 그림) + 이름 · 기간 + 숫자 3칸 + 열기 줄을 가진 카드로 보여 줍니다.
+ * 교사: 진행 중 / 보관됨 칩으로 거르고, 새 프로젝트 만들기(맨 끝 점선 타일·머리 버튼), 카드에서 수정 ✏️ · 보관 🗄 · 삭제 🗑.
+ *   숫자는 작업장 · 카드 · 참여 학생(카드를 쓴 학생).
+ * 학생: 우리 반의 진행 중인 프로젝트만, 누르면 들어가기만 합니다. 숫자는 작업장 · 내 카드 · 우리 반 친구.
  * 과목을 고른 프로젝트의 교사 평가는 배움성찰 결과(교과발달상황·성장리포트)로 이어집니다.
- * 학생: 우리 반의 진행 중인 프로젝트만 봅니다.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Notice from '@/components/ui/Notice';
 import { useLoad } from '@/components/group-project/ui';
 import type { Project } from '@/lib/starboard/types';
 import { SUBJECT_LIST } from '@/lib/subjects';
 import { json, useSb } from './context';
 
+type Stats = { boards: number; cards: number; people: number };
+
+/** 표지 그림 — 과목마다 하나, 과목이 없으면 🗂️ */
+const SUBJECT_EMOJI: Record<string, string> = {
+  국어: '📖', 영어: '🔤', 수학: '🔢', 사회: '🌏', 과학: '🔬', 역사: '🏛️',
+  도덕: '🤝', 실과: '🛠️', 정보: '💻', 음악: '🎵', 미술: '🎨', 체육: '⚽',
+};
+const emblemOf = (p: Project) => (p.subject && SUBJECT_EMOJI[p.subject]) || '🗂️';
+
+/** "11.3 ~ 11.28" · 한쪽만 있으면 그쪽만, 둘 다 없으면 null */
+function periodOf(p: Project): string | null {
+  const short = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`;
+  if (p.start_date && p.end_date) return `${short(p.start_date)} ~ ${short(p.end_date)}`;
+  if (p.start_date) return `${short(p.start_date)}부터`;
+  if (p.end_date) return `${short(p.end_date)}까지`;
+  return null;
+}
+
 export default function ProjectList({ classId }: { classId?: string }) {
-  const { api, isTeacher, go } = useSb();
+  const { api, isTeacher, go, confirm } = useSb();
   const url = isTeacher ? `/classes/${classId}/projects` : '/me/projects';
-  const { data, error, loading, reload } = useLoad(() => api<{ projects: Project[] }>(url), [api, url]);
+  const { data, error, loading, reload } = useLoad(() => api<{ projects: Project[]; stats?: Record<string, Stats> }>(url), [api, url]);
+  const [filter, setFilter] = useState<'active' | 'archived'>('active');
+  const [form, setForm] = useState<{ project?: Project } | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [pending, setPending] = useState(false);
   const projects = data?.projects ?? [];
+  const stats = data?.stats ?? {};
   const active = projects.filter((p) => !p.archived_at);
   const archived = projects.filter((p) => p.archived_at);
+  const shown = isTeacher && filter === 'archived' ? archived : active;
 
   if (isTeacher && !classId) return <p className="hint">학급을 먼저 선택하세요.</p>;
 
+  const run = async (work: () => Promise<unknown>) => {
+    setPending(true);
+    try {
+      await work();
+      setActionError('');
+      reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : '처리하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
     <div className="sb-projects">
-      <div className="sb-page-title">
-        <h2>프로젝트</h2>
-        <span className="sb-count-pill">{active.length}</span>
+      <div className="sb-projects-head">
+        <div>
+          <h2>
+            프로젝트 <span className="sb-count-pill">{active.length}</span>
+          </h2>
+          <p className="hint">{isTeacher ? '수업마다 프로젝트를 만들고, 그 안에 작업장을 꾸려 보세요.' : '들어가고 싶은 프로젝트를 눌러 보세요.'}</p>
+        </div>
+        {isTeacher && (
+          <button type="button" className="sb-btn" onClick={() => setForm({})}>
+            ＋ 새 프로젝트
+          </button>
+        )}
       </div>
+
       {isTeacher && (
-        <details className="sb-create">
-          <summary>＋ 새 프로젝트 만들기</summary>
-          <div className="sb-create-body">
-            <ProjectForm classId={classId} onDone={reload} />
-          </div>
-        </details>
+        <div className="sb-filter-chips" role="group" aria-label="프로젝트 거르기">
+          <button type="button" className={filter === 'active' ? 'sb-filter-chip is-active' : 'sb-filter-chip'} aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>
+            진행 중 {active.length}
+          </button>
+          <button type="button" className={filter === 'archived' ? 'sb-filter-chip is-active' : 'sb-filter-chip'} aria-pressed={filter === 'archived'} onClick={() => setFilter('archived')}>
+            보관됨 {archived.length}
+          </button>
+        </div>
       )}
-      <Notice type="error" message={error} />
+
+      <Notice type="error" message={error || actionError} />
       {loading && !data ? (
         <p className="hint">불러오는 중...</p>
       ) : (
         <ul className="sb-project-grid" data-testid="project-list">
-          {active.map((p) => (
-            <li key={p.id} className="card sb-project-card">
-              <button type="button" className="sb-link sb-project-title" onClick={() => go({ name: 'home', projectId: p.id })}>
-                {p.title}
+          {shown.map((p) => {
+            const st = stats[p.id] ?? { boards: 0, cards: 0, people: 0 };
+            const period = periodOf(p);
+            const open = () => go({ name: 'home', projectId: p.id });
+            return (
+              <li key={p.id} className={p.archived_at ? 'sb-project-card is-archived' : 'sb-project-card'}>
+                <button type="button" className="sb-project-main" onClick={open} aria-label={`${p.title} 열기`}>
+                  <span className="sb-project-cover">
+                    {p.subject && <span className="sb-project-subject">{p.subject}</span>}
+                    <span className={p.archived_at ? 'sb-project-status is-archived' : 'sb-project-status'}>
+                      <i aria-hidden="true" />
+                      {p.archived_at ? '보관됨' : '진행 중'}
+                    </span>
+                    <span className="sb-project-emblem" aria-hidden="true">
+                      {emblemOf(p)}
+                    </span>
+                  </span>
+                  <span className="sb-project-content">
+                    <span className="sb-project-title">{p.title}</span>
+                    <span className="sb-project-meta">🗓 {period ?? '기간 미정'}</span>
+                    <span className="sb-project-stats">
+                      <span>
+                        <b>{st.boards}</b>작업장
+                      </span>
+                      <span>
+                        <b>{st.cards}</b>
+                        {isTeacher ? '카드' : '내 카드'}
+                      </span>
+                      <span>
+                        <b>{st.people}</b>
+                        {isTeacher ? '참여 학생' : '우리 반'}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+                <div className="sb-project-foot">
+                  <button type="button" className="sb-project-open" onClick={open} tabIndex={-1} aria-hidden="true">
+                    열기 <span>→</span>
+                  </button>
+                  {isTeacher && !period && !p.archived_at && (
+                    <button type="button" className="sb-text-btn" onClick={() => setForm({ project: p })}>
+                      기간 설정
+                    </button>
+                  )}
+                  {isTeacher && (
+                    <span className="sb-project-icons">
+                      {!p.archived_at && (
+                        <button type="button" className="sb-icon-btn" aria-label={`${p.title} 수정`} title="수정" onClick={() => setForm({ project: p })}>
+                          ✏️
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="sb-icon-btn"
+                        aria-label={p.archived_at ? `${p.title} 보관 해제` : `${p.title} 보관`}
+                        title={p.archived_at ? '보관 해제' : '보관'}
+                        disabled={pending}
+                        onClick={() => run(() => api(`/projects/${p.id}`, json('PATCH', { archived: !p.archived_at })))}
+                      >
+                        {p.archived_at ? '📤' : '🗄️'}
+                      </button>
+                      <button
+                        type="button"
+                        className="sb-icon-btn is-danger"
+                        aria-label={`${p.title} 삭제`}
+                        title="삭제"
+                        disabled={pending}
+                        onClick={async () => {
+                          if (!(await confirm(`'${p.title}' 프로젝트를 지울까요? 작업장과 카드가 모두 지워지고 되돌릴 수 없습니다.`, '삭제'))) return;
+                          run(() => api(`/projects/${p.id}`, json('DELETE')));
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+          {isTeacher && filter === 'active' && (
+            <li className="sb-project-new-wrap">
+              <button type="button" className="sb-project-new" onClick={() => setForm({})}>
+                <span className="sb-project-plus" aria-hidden="true">＋</span>
+                <b>새 프로젝트 만들기</b>
+                <span>과목·단원별로 새 공간을 열어요</span>
               </button>
-              {p.subject && <span className="badge">{p.subject}</span>}
-              {p.goal && <p className="sb-project-goal">{p.goal}</p>}
-              <p className="sb-meta">
-                {p.start_date ?? '?'} ~ {p.end_date ?? '?'}
-              </p>
-              {isTeacher && <ProjectActions project={p} onChanged={reload} />}
             </li>
-          ))}
-          {active.length === 0 && <li className="sb-empty-row">프로젝트가 없습니다.</li>}
+          )}
+          {shown.length === 0 && !(isTeacher && filter === 'active') && (
+            <li className="sb-empty-row">{isTeacher ? '보관된 프로젝트가 없습니다.' : '아직 열린 프로젝트가 없어요.'}</li>
+          )}
         </ul>
       )}
-      {isTeacher && archived.length > 0 && (
-        <section className="sb-archived">
-          <h3>보관된 프로젝트</h3>
-          <ul className="sb-project-grid">
-            {archived.map((p) => (
-              <li key={p.id} className="card sb-project-card is-archived">
-                <button type="button" className="sb-link sb-project-title" onClick={() => go({ name: 'home', projectId: p.id })}>
-                  {p.title}
-                </button>
-                <ProjectActions project={p} onChanged={reload} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+
+      {form && isTeacher && <ProjectFormModal classId={classId} project={form.project} onClose={() => setForm(null)} onDone={() => { setForm(null); reload(); }} />}
+    </div>
+  );
+}
+
+/** 새 프로젝트·수정 창 — 별빛보드 공용 모달(.sb-overlay / .sb-modal) 안에 ProjectForm */
+function ProjectFormModal({ classId, project, onClose, onDone }: { classId?: string; project?: Project; onClose: () => void; onDone: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="sb-overlay" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={project ? '프로젝트 수정' : '새 프로젝트'} className="sb-modal is-narrow" onClick={(e) => e.stopPropagation()}>
+        <div className="sb-modal-head">
+          <h2 className="sb-modal-title">{project ? '프로젝트 수정' : '새 프로젝트'}</h2>
+          <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
+            ×
+          </button>
+        </div>
+        <ProjectForm classId={classId} project={project} onDone={onDone} />
+      </div>
     </div>
   );
 }
@@ -143,64 +283,5 @@ export function ProjectForm({ classId, project, onDone }: { classId?: string; pr
         </button>
       </div>
     </form>
-  );
-}
-
-/** 수정·보관·삭제(원본 ProjectActions). 삭제는 두 번 눌러야 한다. */
-function ProjectActions({ project, onChanged }: { project: Project; onChanged: () => void }) {
-  const { api } = useSb();
-  const [pending, setPending] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [confirm, setConfirm] = useState(false);
-  const [error, setError] = useState('');
-  const run = async (work: () => Promise<unknown>) => {
-    setPending(true);
-    try {
-      await work();
-      setError('');
-      onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '처리하지 못했습니다.');
-    } finally {
-      setPending(false);
-    }
-  };
-  return (
-    <div className="sb-project-actions">
-      <div className="sb-row-wrap">
-        {!project.archived_at && (
-          <button type="button" className="sb-btn ghost" onClick={() => setEditing(!editing)}>
-            수정
-          </button>
-        )}
-        <button
-          type="button"
-          className="sb-btn ghost"
-          disabled={pending}
-          onClick={() => run(() => api(`/projects/${project.id}`, json('PATCH', { archived: !project.archived_at })))}
-        >
-          {project.archived_at ? '보관 해제' : '보관'}
-        </button>
-        {confirm ? (
-          <button type="button" className="sb-btn is-danger" disabled={pending} onClick={() => run(() => api(`/projects/${project.id}`, json('DELETE')))}>
-            정말 삭제(되돌릴 수 없음)
-          </button>
-        ) : (
-          <button type="button" className="sb-btn is-danger" onClick={() => setConfirm(true)}>
-            삭제
-          </button>
-        )}
-      </div>
-      {error && <p className="sb-error">{error}</p>}
-      {editing && (
-        <ProjectForm
-          project={project}
-          onDone={() => {
-            setEditing(false);
-            onChanged();
-          }}
-        />
-      )}
-    </div>
   );
 }
