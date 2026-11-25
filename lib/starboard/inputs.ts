@@ -3,8 +3,11 @@
  * 문자열을 돌려주면 사용자에게 보여 줄 오류 문구다.
  */
 import { sanitizeFieldValues, type CardFieldValues } from './card-fields';
-import { validateLevels, type CriterionLevel } from './criteria';
+import { buildLevels, LEVEL_COUNT, LEVEL_GRADES, MAX_CRITERION_NAME, validateLevels, type CriterionLevel, type LevelTexts } from './criteria';
 import type { ChecklistItem } from './types';
+import { SUBJECT_LIST } from '@/lib/subjects';
+
+const isSubject = (v: string) => (SUBJECT_LIST as readonly string[]).includes(v);
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 const dateOrNull = (v: unknown) => {
@@ -12,7 +15,7 @@ const dateOrNull = (v: unknown) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 };
 
-export type ProjectInput = { title: string; goal: string; start_date: string | null; end_date: string | null };
+export type ProjectInput = { title: string; goal: string; subject: string | null; start_date: string | null; end_date: string | null };
 
 /** 원본 actions/projects.ts clean */
 export function cleanProject(raw: unknown): ProjectInput | string {
@@ -24,7 +27,10 @@ export function cleanProject(raw: unknown): ProjectInput | string {
   const start_date = dateOrNull(r.start_date);
   const end_date = dateOrNull(r.end_date);
   if (start_date && end_date && end_date < start_date) return '종료일이 시작일보다 빠릅니다.';
-  return { title, goal, start_date, end_date };
+  // 과목 — 평가 결과를 배움성찰 교과발달상황에 넣을 때 과목별로 묶는 기준. 비워 두면 연동하지 않는다.
+  const subjectRaw = str(r.subject).trim();
+  if (subjectRaw && !isSubject(subjectRaw)) return '과목을 목록에서 골라 주세요.';
+  return { title, goal, subject: subjectRaw || null, start_date, end_date };
 }
 
 export function cleanBoardTitle(raw: unknown): string | { error: string } {
@@ -77,24 +83,23 @@ export type CriterionInput = { name: string; description: string; levels: Criter
 export function cleanCriterion(raw: unknown): CriterionInput | string {
   const r = (raw ?? {}) as Record<string, unknown>;
   const name = str(r.name).trim();
-  if (!name || name.length > 60) return '기준 이름은 1~60자여야 합니다.';
+  if (!name || name.length > MAX_CRITERION_NAME) return `기준 이름은 1~${MAX_CRITERION_NAME}자여야 합니다.`;
   const description = str(r.description);
   if (description.length > 1000) return '설명은 1000자 이하여야 합니다.';
-  const levels = (Array.isArray(r.levels) ? r.levels : []).map((l) => {
-    const x = (l ?? {}) as Record<string, unknown>;
-    return { name: str(x.name).trim(), score: Number(x.score), description: str(x.description).slice(0, 500) };
-  });
-  const err = validateLevels(levels);
+  const descriptions = (Array.isArray(r.levels) ? r.levels : []).map((l) => str(((l ?? {}) as Record<string, unknown>).description));
+  const err = validateLevels(descriptions.map((d) => ({ description: d })));
   if (err) return err;
-  return { name, description, levels };
+  // 단계 이름·점수는 받은 값을 쓰지 않고 고정값으로 다시 만든다(노력요함 1 · 보통 2 · 잘함 3).
+  const texts = Object.fromEntries(LEVEL_GRADES.map((grade, i) => [grade, descriptions[i]])) as LevelTexts;
+  return { name, description, levels: buildLevels(texts) };
 }
 
-/** 원본 actions/evaluations.ts saveEvaluation 정리: 단계 index 0..4 정수만 */
+/** 원본 actions/evaluations.ts saveEvaluation 정리: 단계 index 0..2(3단계 고정) 정수만 */
 export function cleanEvaluationLevels(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 5) out[k] = v;
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < LEVEL_COUNT) out[k] = v;
   }
   return out;
 }

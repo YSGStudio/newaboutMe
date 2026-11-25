@@ -67,6 +67,8 @@ type LearningReport = {
   summary: { total: number; submitted: number; grading?: number; reviewed: number; none: number; rate: number };
   activities: {
     id: string;
+    /** 별빛보드 평가(과목을 고른 프로젝트)는 'starboard' — 옛 응답에는 없을 수 있다 */
+    source?: 'learning' | 'starboard';
     subject: string;
     unit: string;
     title: string;
@@ -234,9 +236,10 @@ const buildStudentHtmlBlock = (
       </div>`;
   }).join('');
 
-  const learningInnerHtml = learningSummary.total === 0
+  // 별빛보드 평가만 있는 기간도 있다 — 제출률·상태 칩은 배움성찰 활동이 있을 때만 그린다.
+  const learningInnerHtml = learningSummary.total === 0 && (learning?.activities ?? []).length === 0
     ? '<p style="color:#6b7280;font-size:13px;margin:0">이 기간에 열린 배움성찰 활동이 없어요.</p>'
-    : `${learningRateHtml}<div style="display:flex;gap:6px;margin:8px 0 6px">${learningChipsHtml}</div>${learningGradeHtml}${learningListHtml}`;
+    : `${learningSummary.total > 0 ? `${learningRateHtml}<div style="display:flex;gap:6px;margin:8px 0 6px">${learningChipsHtml}</div>` : ''}${learningGradeHtml}${learningListHtml}`;
 
   const summaryTile = (icon: string, value: string, label: string, accent: string) => `
     <div style="flex:1;background:${accent}0d;border:1px solid ${accent}26;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px">
@@ -420,6 +423,7 @@ const AI_SUGGESTION_ACCENT = '#0284c7';
 /**
  * LearningSection — 성장리포트의 "배움성찰 현황" 블록
  * 기간 안에 열린 활동 대비 제출률, 활동별 상태, 그리고 활동 안의 요소별 교사 평가(잘함·보통·노력요함)를 보여줍니다.
+ * 과목을 고른 별빛보드 프로젝트의 교사 평가도 목록과 요소별 평가에 함께 들어갑니다(단원 자리에 "별빛보드"). 제출률에는 넣지 않습니다.
  * 배움성찰의 성찰과 요소별 평가는 한 활동에 함께 있으므로 한 블록에서 같이 보여줍니다.
  * 상태 판정과 색·문구는 lib/learning.ts를 그대로 쓰므로 교사 카드·학생 책배지와 어긋나지 않습니다.
  */
@@ -442,10 +446,12 @@ function LearningSection({ report }: { report: LearningReport | null }) {
           제출 {learningSubmittedCount(summary)}/{summary.total}
         </span>
       </div>
-      {summary.total === 0 ? (
+      {summary.total === 0 && activities.length === 0 ? (
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>이 기간에 열린 배움성찰 활동이 없어요.</p>
       ) : (
         <>
+          {/* 별빛보드 평가만 있는 기간도 있다 — 제출률·상태 칩은 배움성찰 활동이 있을 때만 그린다. */}
+          {summary.total > 0 && (<>
           <div style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>제출률</span>
@@ -469,6 +475,7 @@ function LearningSection({ report }: { report: LearningReport | null }) {
               </span>
             ))}
           </div>
+          </>)}
           {presentGrades(report?.grades).length > 0 && (
             <>
               <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: '#9a3412' }}>요소별 평가</p>

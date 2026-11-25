@@ -18,6 +18,8 @@ export type Project = {
   teacher_id: string;
   title: string;
   goal: string;
+  /** 과목(SUBJECT_LIST). 있으면 평가 결과가 배움성찰 교과발달상황·성장리포트에 들어간다. */
+  subject: string | null;
   start_date: string | null;
   end_date: string | null;
   archived_at: string | null;

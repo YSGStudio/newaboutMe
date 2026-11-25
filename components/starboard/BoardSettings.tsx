@@ -15,6 +15,7 @@ import { descendants } from '@/lib/starboard/tree';
 import { FIELD_TYPE_LABEL, MAX_CARD_FIELDS, MAX_FIELD_LABEL, newFieldId, type CardField, type CardFieldType } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
 import CriterionForm from './CriterionForm';
+import LearningCriteriaImport from './LearningCriteriaImport';
 
 const ACCESS_LABEL: Record<Access, string> = { none: '없음', read: '읽기', edit: '수정' };
 const TABS = ['일반', '열', '카드 형식', '가리기', '권한', '개인 보드', '평가 기준'] as const;
@@ -610,7 +611,7 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
         {view.criteria.map((c, i) => (
           <li key={c.id} className="sb-criterion-row">
             <span className="sb-flex-1">
-              {i + 1}. {c.name} <span className="sb-meta">({c.levels.length}단계)</span>
+              {i + 1}. {c.name}
             </span>
             <button type="button" className="sb-icon-btn" disabled={i === 0} onClick={() => crit('PATCH', { criterionId: c.id, direction: 'up' })} aria-label="위로">
               ▲
@@ -662,6 +663,10 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
           ＋ 새 기준 만들어 붙이기
         </button>
       )}
+      <details className="sb-subpanel">
+        <summary>배움성찰 평가요소 불러와서 붙이기</summary>
+        <LearningCriteriaImport attachToBoardId={b.id} onDone={onChanged} />
+      </details>
     </>
   );
 }

@@ -986,6 +986,8 @@ export default function StudentPage() {
 
   return (
     <main className={`grid${isLoggedIn ? ` dashboard-layout student-dashboard-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}` : ''}`} style={{ gap: 16 }}>
+      {/* 별빛보드는 화면을 넓게 쓰려고 상단 헤더를 그리지 않는다 */}
+      {activeTab !== 'starBoard' && (
       <PageHeader
         title="학생 홈"
         subtitle={isLoggedIn ? `${studentName} 학생, 오늘도 화이팅!` : '학급코드와 이름으로 로그인하세요'}
@@ -997,6 +999,7 @@ export default function StudentPage() {
           ) : null
         }
       />
+      )}
 
       <Notice type="success" message={message} />
       <Notice type="error" message={error} />

@@ -46,6 +46,8 @@ type ViewQuestion = {
 
 type ViewActivity = {
   id: string;
+  /** 별빛보드 평가는 학생 답변이 없어 답변 줄을 그리지 않는다 */
+  source?: 'learning' | 'starboard';
   unit: string;
   title: string;
   createdAt: string;
@@ -363,7 +365,7 @@ export default function AiReportTab({ classId, onAiUsageChanged }: Props) {
                     {/* 과목별 기록 */}
                     <section className="ai-report-sources" aria-labelledby="ai-report-sources-title">
                       <div className="ai-report-section-heading">
-                        <div><span aria-hidden="true">3</span><div><strong id="ai-report-sources-title">참고할 배움성찰 기록</strong><small>AI 생성에 활용되는 교사 평가 자료입니다.</small></div></div>
+                        <div><span aria-hidden="true">3</span><div><strong id="ai-report-sources-title">참고할 배움성찰 기록</strong><small>AI 생성에 활용되는 교사 평가 자료입니다. 과목을 고른 별빛보드 프로젝트의 평가도 함께 들어갑니다.</small></div></div>
                       </div>
                       {subjects.map((s) => (
                         <details key={s.subject} className="ai-report-subject" open={!savedBySubject.has(s.subject)}>
@@ -400,9 +402,11 @@ export default function AiReportTab({ classId, onAiUsageChanged }: Props) {
                                     ) : (
                                       <strong style={{ color: '#475569' }}>질문 {index + 1}</strong>
                                     )}
-                                    <div style={{ color: '#94a3b8' }}>
-                                      답변(참고): {q.answer.trim() || '없음'}
-                                    </div>
+                                    {activity.source !== 'starboard' && (
+                                      <div style={{ color: '#94a3b8' }}>
+                                        답변(참고): {q.answer.trim() || '없음'}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                                 {activity.feedback && (

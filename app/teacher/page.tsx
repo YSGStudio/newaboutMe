@@ -1097,6 +1097,8 @@ export default function TeacherPage() {
       }`}
       style={{ gap: 16 }}
     >
+      {/* 별빛보드는 화면을 넓게 쓰려고 상단 헤더를 그리지 않는다 */}
+      {activeTab !== "starBoard" && (
       <PageHeader
         title="교사 대시보드"
         subtitle="학급과 학생을 빠르게 관리하세요"
@@ -1206,6 +1208,7 @@ export default function TeacherPage() {
           ) : null
         }
       />
+      )}
 
       {isAuthed && (
         <div className="teacher-dashboard-notices">

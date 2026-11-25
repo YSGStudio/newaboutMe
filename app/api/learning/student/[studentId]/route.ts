@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPeriodRange, isPeriod, safeRate, type Period } from '@/lib/stats';
 import { getLearningStatus, isGrade, type Grade, type LearningStatus } from '@/lib/learning';
 import { gradingFor, loadGradingStats } from '@/lib/learning-access';
+import { countGrades, loadStarboardRecords, starboardRecordTitle } from '@/lib/starboard/learning-link';
 
 // 성장리포트용 — 한 학생의 배움성찰 현황과 요소별 교사 평가를 활동을 가로질러 모은다 (교사 전용).
 //
@@ -13,6 +14,9 @@ import { gradingFor, loadGradingStats } from '@/lib/learning-access';
 //
 // 기간의 분모는 **그 기간에 열린 활동**이다. 제출 시각으로 좁히면 미제출이 분모에서
 // 빠져 제출률이 늘 100%가 된다.
+//
+// 과목을 고른 별빛보드 프로젝트의 교사 평가도 활동 목록과 요소별 평가 합계에 넣는다(source: 'starboard').
+// 별빛보드에는 제출 개념이 없으므로 summary(제출률·상태 수)에는 넣지 않는다. 기간은 평가를 고친 시각으로 거른다.
 
 type Params = { params: { studentId: string } };
 
@@ -47,13 +51,34 @@ export async function GET(req: Request, { params }: Params) {
 
   if (error) return serverError(error);
 
+  let starboard: Awaited<ReturnType<typeof loadStarboardRecords>>;
+  try {
+    starboard = await loadStarboardRecords(student.id, student.class_id, range);
+  } catch (e) {
+    return serverError(e as Error);
+  }
+  const starboardItems = starboard
+    .filter((record) => record.items.length > 0)
+    .reverse() // 최신순 — 배움성찰 활동 목록과 같은 순서
+    .map((record) => ({
+      id: `starboard:${record.boardId}`,
+      source: 'starboard' as const,
+      subject: record.subject,
+      unit: '별빛보드',
+      title: starboardRecordTitle(record),
+      createdAt: record.updatedAt,
+      submittedAt: null,
+      status: (record.published ? 'reviewed' : 'grading') as LearningStatus,
+      grades: countGrades(record.items),
+    }));
+
   const rows = (activities ?? []) as ActivityRow[];
   if (rows.length === 0) {
     return NextResponse.json({
       range,
       summary: { total: 0, submitted: 0, grading: 0, reviewed: 0, none: 0, rate: 0 },
-      grades: { high: 0, mid: 0, low: 0 },
-      activities: [],
+      grades: sumGrades(starboardItems),
+      activities: starboardItems,
     });
   }
 
@@ -93,6 +118,7 @@ export async function GET(req: Request, { params }: Params) {
     const status = getLearningStatus(submission, gradingFor(stats, activity.id, submission?.id));
     return {
       id: activity.id,
+      source: 'learning' as const,
       subject: activity.subject,
       unit: activity.unit,
       title: activity.title,
@@ -120,10 +146,14 @@ export async function GET(req: Request, { params }: Params) {
       // 제출률 — 평가 대기·피드백까지 받은 것도 낸 것이다.
       rate: safeRate(submitted + grading + reviewed, items.length),
     },
-    grades: items.reduce(
-      (sum, item) => ({ high: sum.high + item.grades.high, mid: sum.mid + item.grades.mid, low: sum.low + item.grades.low }),
-      { high: 0, mid: 0, low: 0 },
-    ),
-    activities: items,
+    grades: sumGrades([...items, ...starboardItems]),
+    activities: [...items, ...starboardItems],
   });
+}
+
+function sumGrades(list: { grades: Record<Grade, number> }[]): Record<Grade, number> {
+  return list.reduce(
+    (sum, item) => ({ high: sum.high + item.grades.high, mid: sum.mid + item.grades.mid, low: sum.low + item.grades.low }),
+    { high: 0, mid: 0, low: 0 },
+  );
 }

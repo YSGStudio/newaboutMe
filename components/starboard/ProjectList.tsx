@@ -3,12 +3,14 @@
 /**
  * ProjectList — 별빛보드 프로젝트 목록(원본 projects/page.tsx + ProjectForm + ProjectActions)
  * 교사: 학급의 프로젝트(진행 중 / 보관됨), 새 프로젝트 만들기, 수정·보관·삭제.
+ * 과목을 고른 프로젝트의 교사 평가는 배움성찰 결과(교과발달상황·성장리포트)로 이어집니다.
  * 학생: 우리 반의 진행 중인 프로젝트만 봅니다.
  */
 import { useState } from 'react';
 import Notice from '@/components/ui/Notice';
 import { useLoad } from '@/components/group-project/ui';
 import type { Project } from '@/lib/starboard/types';
+import { SUBJECT_LIST } from '@/lib/subjects';
 import { json, useSb } from './context';
 
 export default function ProjectList({ classId }: { classId?: string }) {
@@ -45,6 +47,7 @@ export default function ProjectList({ classId }: { classId?: string }) {
               <button type="button" className="sb-link sb-project-title" onClick={() => go({ name: 'home', projectId: p.id })}>
                 {p.title}
               </button>
+              {p.subject && <span className="badge">{p.subject}</span>}
               {p.goal && <p className="sb-project-goal">{p.goal}</p>}
               <p className="sb-meta">
                 {p.start_date ?? '?'} ~ {p.end_date ?? '?'}
@@ -79,9 +82,11 @@ export function ProjectForm({ classId, project, onDone }: { classId?: string; pr
   const { api } = useSb();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const empty = { title: '', goal: '', start_date: '', end_date: '' };
+  const empty = { title: '', goal: '', subject: '', start_date: '', end_date: '' };
   const [v, setV] = useState(
-    project ? { title: project.title, goal: project.goal, start_date: project.start_date ?? '', end_date: project.end_date ?? '' } : empty,
+    project
+      ? { title: project.title, goal: project.goal, subject: project.subject ?? '', start_date: project.start_date ?? '', end_date: project.end_date ?? '' }
+      : empty,
   );
   return (
     <form
@@ -90,7 +95,7 @@ export function ProjectForm({ classId, project, onDone }: { classId?: string; pr
         e.preventDefault();
         setPending(true);
         try {
-          const input = { ...v, start_date: v.start_date || null, end_date: v.end_date || null };
+          const input = { ...v, subject: v.subject || null, start_date: v.start_date || null, end_date: v.end_date || null };
           if (project) await api(`/projects/${project.id}`, json('PATCH', input));
           else await api(`/classes/${classId}/projects`, json('POST', input));
           setError('');
@@ -110,6 +115,18 @@ export function ProjectForm({ classId, project, onDone }: { classId?: string; pr
       <div className="sb-span-2">
         <label htmlFor={`p-goal-${project?.id ?? 'new'}`}>목표</label>
         <textarea id={`p-goal-${project?.id ?? 'new'}`} value={v.goal} onChange={(e) => setV({ ...v, goal: e.target.value })} maxLength={2000} />
+      </div>
+      <div className="sb-span-2">
+        <label htmlFor={`p-subject-${project?.id ?? 'new'}`}>과목</label>
+        <select id={`p-subject-${project?.id ?? 'new'}`} value={v.subject} onChange={(e) => setV({ ...v, subject: e.target.value })}>
+          <option value="">고르지 않음</option>
+          {SUBJECT_LIST.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <p className="hint">과목을 고르면 이 프로젝트의 평가가 배움성찰 교과발달상황과 성장리포트에 함께 들어갑니다.</p>
       </div>
       <div>
         <label htmlFor={`p-start-${project?.id ?? 'new'}`}>시작일</label>

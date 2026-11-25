@@ -10,6 +10,8 @@ import {
   type LearningQuestionRow,
   type LearningStatus,
 } from '@/lib/learning';
+import { levelTexts } from '@/lib/starboard/criteria';
+import { loadStarboardRecords, starboardRecordTitle, type StarboardRecord } from '@/lib/starboard/learning-link';
 
 // AI생성 탭 — 한 학생의 배움성찰 기록을 과목별로 모은다.
 //
@@ -20,6 +22,9 @@ import {
 //
 // 기간을 거르지 않는다 — 이 기능 전에 쌓인 배움성찰 기록(서술 피드백)도 함께 쓴다.
 // 과거 평가피드백(eval_reports)은 쓰지 않는다.
+//
+// 과목을 고른 별빛보드 프로젝트의 교사 평가도 같은 과목에 함께 넣는다(lib/starboard/learning-link.ts).
+// 별빛보드 기준은 배움성찰과 같은 3단계라 등급을 그대로 옮긴다. 학생 답변 칸은 없다.
 
 /** AI로 보내는 요소 평가 한 줄 */
 export type AiCriterionItem = {
@@ -55,6 +60,8 @@ export type ViewQuestion = {
 
 export type ViewActivity = {
   id: string;
+  /** 어디서 온 기록인지 — 별빛보드 평가는 학생 답변이 없어 화면에서 답변 줄을 숨긴다 */
+  source: 'learning' | 'starboard';
   unit: string;
   title: string;
   createdAt: string;
@@ -77,21 +84,31 @@ type GradeRow = {
 const asGrade = (value: string | null | undefined): Grade | null => (isGrade(value) ? value : null);
 
 export async function gatherLearningSubjectRecords(studentId: string, classId: string) {
-  const { data: activities } = await supabaseAdmin
-    .from('learning_activities')
-    .select(`id,subject,unit,title,created_at,learning_activity_questions(${QUESTION_COLUMNS})`)
-    .eq('class_id', classId)
-    .order('created_at', { ascending: true });
+  const [{ data: activities }, starboard] = await Promise.all([
+    supabaseAdmin
+      .from('learning_activities')
+      .select(`id,subject,unit,title,created_at,learning_activity_questions(${QUESTION_COLUMNS})`)
+      .eq('class_id', classId)
+      .order('created_at', { ascending: true }),
+    // 별빛보드 조회가 실패해도 배움성찰 기록은 보여준다(위 조회들처럼 실패를 빈 목록으로 둔다).
+    loadStarboardRecords(studentId, classId).catch((e) => {
+      console.error('[learningSubjectReportData] 별빛보드 평가 조회 실패:', (e as Error).message);
+      return [] as StarboardRecord[];
+    }),
+  ]);
 
   const activityRows = activities ?? [];
-  if (activityRows.length === 0) return { view: [] as ViewSubject[], ai: [] as AiSubjectRecords[] };
+  if (activityRows.length === 0 && starboard.length === 0) return { view: [] as ViewSubject[], ai: [] as AiSubjectRecords[] };
 
   // 다른 학생의 제출물은 조회하지 않는다(student_id로 먼저 좁힌다).
-  const { data: submissions } = await supabaseAdmin
-    .from('learning_submissions')
-    .select('id,activity_id,status,feedback_text')
-    .eq('student_id', studentId)
-    .in('activity_id', activityRows.map((a) => a.id));
+  // 별빛보드 기록만 있는 학급이면 배움성찰 제출물은 조회하지 않는다.
+  const { data: submissions } = activityRows.length === 0
+    ? { data: [] }
+    : await supabaseAdmin
+      .from('learning_submissions')
+      .select('id,activity_id,status,feedback_text')
+      .eq('student_id', studentId)
+      .in('activity_id', activityRows.map((a) => a.id));
 
   const submissionRows = submissions ?? [];
   const submissionIds = submissionRows.map((s) => s.id);
@@ -143,6 +160,7 @@ export async function gatherLearningSubjectRecords(studentId: string, classId: s
 
     const view: ViewActivity = {
       id: activity.id,
+      source: 'learning',
       unit: activity.unit,
       title: activity.title,
       createdAt: activity.created_at,
@@ -182,6 +200,20 @@ export async function gatherLearningSubjectRecords(studentId: string, classId: s
     }
   });
 
+  starboard.forEach((record) => {
+    const viewBucket = viewBySubject.get(record.subject) ?? [];
+    viewBucket.push(starboardView(record));
+    viewBySubject.set(record.subject, viewBucket);
+
+    const aiBucket = aiBySubject.get(record.subject) ?? [];
+    aiBucket.push({
+      title: `별빛보드 · ${starboardRecordTitle(record)}`,
+      items: record.items.map((item) => ({ ...item, comment: null })),
+      feedback: record.feedback,
+    });
+    aiBySubject.set(record.subject, aiBucket);
+  });
+
   const view: ViewSubject[] = [...viewBySubject.entries()].map(([subject, list]) => ({
     subject,
     activities: list,
@@ -190,4 +222,34 @@ export async function gatherLearningSubjectRecords(studentId: string, classId: s
   const ai: AiSubjectRecords[] = [...aiBySubject.entries()].map(([subject, list]) => ({ subject, activities: list }));
 
   return { view, ai };
+}
+
+/** 별빛보드 평가 한 건을 교사 화면 기록 모양으로. 공개 전이면 평가 대기, 공개했으면 피드백 완료로 보인다. */
+function starboardView(record: StarboardRecord): ViewActivity {
+  return {
+    id: `starboard:${record.boardId}`,
+    source: 'starboard',
+    unit: '별빛보드',
+    title: starboardRecordTitle(record),
+    createdAt: record.updatedAt,
+    status: record.published ? 'reviewed' : 'grading',
+    feedback: record.feedback,
+    // 등급이나 피드백이 없는 평가는 loadStarboardRecords가 이미 뺐다.
+    sendable: true,
+    questions: record.criteria.map((c) => {
+      const texts = levelTexts(c.levels);
+      return {
+        question: c.name,
+        answer: '',
+        criterion: {
+          title: c.name,
+          levelHigh: texts.high || null,
+          levelMid: texts.mid || null,
+          levelLow: texts.low || null,
+          teacherGrade: c.grade,
+          teacherComment: null,
+        },
+      };
+    }),
+  };
 }

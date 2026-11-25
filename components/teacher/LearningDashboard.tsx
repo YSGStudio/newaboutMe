@@ -45,6 +45,7 @@ import {
   type Grade,
 } from '@/lib/learning';
 import { GradePicker } from '@/components/learning/GradeParts';
+import { learningItemFromCriterion, type Criterion } from '@/lib/starboard/criteria';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -236,6 +237,27 @@ export default function LearningDashboard({ classId }: { classId: string }) {
     loadActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  // 별빛보드 평가 기준 — "별빛보드 기준에서 불러오기"에 쓴다. 교사 소유라 학급과 상관없이 한 번만 불러온다.
+  // 불러오지 못해도 배움성찰 작업은 그대로 할 수 있으므로 오류를 띄우지 않고 목록만 비운다.
+  const [starboardCriteria, setStarboardCriteria] = useState<Criterion[]>([]);
+  useEffect(() => {
+    api<{ criteria: Criterion[] }>('/api/starboard/criteria', { headers: { 'X-GP-Actor': 'teacher' } })
+      .then((res) => setStarboardCriteria(res.criteria ?? []))
+      .catch(() => setStarboardCriteria([]));
+  }, []);
+
+  /** 별빛보드 기준 하나를 평가요소로 덧붙인다(복사). 비어 있는 첫 칸이면 그 칸을 채운다. */
+  const importStarboardCriterion = (criterionId: string) => {
+    const source = starboardCriteria.find((c) => c.id === criterionId);
+    if (!source) return;
+    const item: FormItem = { ...learningItemFromCriterion(source), legacy: false };
+    setForm((f) => {
+      const blank = (x: FormItem) => !x.text.trim() && !x.levelHigh.trim() && !x.levelMid.trim() && !x.levelLow.trim();
+      const kept = f.items.filter((x) => !blank(x));
+      return { ...f, items: [...kept, item].slice(0, MAX_QUESTIONS_PER_ACTIVITY) };
+    });
+  };
 
   /**
    * 한 활동의 학생 카드를 읽어온다. 실패하면 null.
@@ -763,6 +785,20 @@ export default function LearningDashboard({ classId }: { classId: string }) {
                     <option value="">지난 활동에서 불러오기</option>
                     {importSources.map((a) => (
                       <option key={a.id} value={a.id}>{a.subject} · {a.title}</option>
+                    ))}
+                  </select>
+                )}
+                {starboardCriteria.length > 0 && !questionsLocked && (
+                  <select
+                    value=""
+                    onChange={(e) => importStarboardCriterion(e.target.value)}
+                    aria-label="별빛보드 기준에서 평가요소 불러오기"
+                    disabled={form.items.length >= MAX_QUESTIONS_PER_ACTIVITY && form.items.every((x) => x.text.trim())}
+                    style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }}
+                  >
+                    <option value="">별빛보드 기준에서 불러오기</option>
+                    {starboardCriteria.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 )}

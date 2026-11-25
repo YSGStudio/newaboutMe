@@ -2,19 +2,18 @@
 
 /**
  * CriterionForm — 평가 기준 만들기·수정(원본 criteria/CriterionForm.tsx)
- * 이름(60자)·설명(1000자)·단계 2~5개(이름·점수·설명). 기본 단계는 노력 필요 1 · 보통 2 · 잘함 3.
+ * 이름(60자)·설명(1000자)·단계는 배움성찰과 같은 3단계(노력요함 1 · 보통 2 · 잘함 3)로 고정. 교사는 단계별 기준 문장(200자)만 적습니다.
  * 평가에 쓰인 기준(locked)은 단계를 바꿀 수 없고, attachToBoardId가 있으면 만들고 그 작업장에 바로 붙입니다.
  */
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Criterion, CriterionLevel } from '@/lib/starboard/criteria';
-import { MAX_LEVELS, MIN_LEVELS } from '@/lib/starboard/criteria';
+import { buildLevels, LEVEL_GRADES, MAX_LEVEL_DESCRIPTION } from '@/lib/starboard/criteria';
+import { GRADE_COLOR, GRADE_LABEL } from '@/lib/learning';
 import { json, useSb } from './context';
 
-const DEFAULT_LEVELS: CriterionLevel[] = [
-  { name: '노력 필요', score: 1, description: '' },
-  { name: '보통', score: 2, description: '' },
-  { name: '잘함', score: 3, description: '' },
-];
+const DEFAULT_LEVELS: CriterionLevel[] = buildLevels();
+/** 입력 순서 — 배움성찰 평가요소 폼과 같이 잘함 → 보통 → 노력요함 */
+const INPUT_ORDER = [2, 1, 0] as const;
 
 type Props = { criterion?: Criterion; attachToBoardId?: string; locked?: boolean; onDone?: () => void };
 
@@ -61,29 +60,27 @@ export default function CriterionForm({ criterion, attachToBoardId, locked, onDo
         <textarea id={`cr-desc-${idp}`} value={description} maxLength={1000} onChange={(e) => setDescription(e.target.value)} />
       </div>
       <fieldset disabled={locked} className="sb-fieldset">
-        <legend>
-          단계 ({MIN_LEVELS}~{MAX_LEVELS}개){locked && ' — 평가가 있어 바꿀 수 없음'}
-        </legend>
-        {levels.map((l, i) => (
-          <div key={i} className="sb-level-row" data-testid="level-row">
-            <input aria-label={`${i + 1}단계 이름`} value={l.name} onChange={(e) => setLevel(i, { name: e.target.value })} required />
-            <input
-              type="number"
-              step="any"
-              aria-label={`${i + 1}단계 점수`}
-              value={Number.isFinite(l.score) ? l.score : ''}
-              onChange={(e) => setLevel(i, { score: e.target.valueAsNumber })}
-              required
-            />
-            <input className="sb-level-desc" aria-label={`${i + 1}단계 설명`} placeholder="설명" value={l.description ?? ''} onChange={(e) => setLevel(i, { description: e.target.value })} />
-            <button type="button" className="sb-icon-btn" aria-label={`${i + 1}단계 빼기`} onClick={() => setLevels(levels.filter((_, k) => k !== i))}>
-              −
-            </button>
-          </div>
-        ))}
-        <button type="button" className="sb-btn ghost sb-auto" onClick={() => setLevels([...levels, { name: '', score: levels.length + 1, description: '' }])}>
-          ＋ 단계 추가
-        </button>
+        <legend>단계별 기준{locked && ' — 평가가 있어 바꿀 수 없음'}</legend>
+        {/* 배움성찰 평가요소 폼과 같은 3칸 배치(design.md 6.3.3) */}
+        <div className="learning-criterion-levels">
+        {INPUT_ORDER.map((i) => {
+          const grade = LEVEL_GRADES[i];
+          return (
+            <label
+              key={i}
+              className="learning-criterion-level"
+              style={{ '--grade-color': GRADE_COLOR[grade].text, '--grade-soft': GRADE_COLOR[grade].bg } as CSSProperties}
+            >
+              <span className="learning-criterion-level-badge">{GRADE_LABEL[grade]} 기준</span>
+              <input
+                value={levels[i]?.description ?? ''}
+                maxLength={MAX_LEVEL_DESCRIPTION}
+                onChange={(e) => setLevel(i, { description: e.target.value })}
+              />
+            </label>
+          );
+        })}
+        </div>
       </fieldset>
       {error && (
         <p role="alert" className="sb-error">

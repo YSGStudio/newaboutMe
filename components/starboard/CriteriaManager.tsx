@@ -3,13 +3,14 @@
 /**
  * CriteriaManager — 교사의 평가 기준 목록(원본 criteria/page.tsx + CriteriaClient)
  * 학급·프로젝트와 상관없이 재사용합니다. 평가에 쓰인 기준은 "평가에 사용됨 · 단계 잠김"으로 표시하고 삭제를 막습니다.
- * "복사해서 수정"은 새 기준 행을 만듭니다.
+ * "복사해서 수정"은 새 기준 행을 만듭니다. "배움성찰에서 불러오기"는 배움성찰 평가요소를 기준으로 복사합니다.
  */
 import { useState } from 'react';
 import { useLoad } from '@/components/group-project/ui';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { json, useSb } from './context';
 import CriterionForm from './CriterionForm';
+import LearningCriteriaImport from './LearningCriteriaImport';
 
 export default function CriteriaManager() {
   const { api } = useSb();
@@ -44,6 +45,12 @@ export default function CriteriaManager() {
           <CriterionForm onDone={reload} />
         </div>
       </details>
+      <details className="card sb-create-card">
+        <summary>배움성찰에서 불러오기</summary>
+        <div className="sb-create-body">
+          <LearningCriteriaImport onDone={reload} />
+        </div>
+      </details>
       {error && (
         <p role="alert" className="notice error">
           {error}
@@ -73,7 +80,7 @@ export default function CriteriaManager() {
               <ol className="sb-level-chips">
                 {c.levels.map((l, i) => (
                   <li key={i}>
-                    {l.name} ({l.score})
+                    {l.name}{l.description ? ` — ${l.description}` : ''}
                   </li>
                 ))}
               </ol>
