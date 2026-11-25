@@ -50,3 +50,15 @@ describe("별빛보드 ↔ 배움성찰 기준 연동", () => {
     expect(typeof cleanProject({ title: "t", subject: "코딩" })).toBe("string");
   });
 });
+
+import { checkFile, VIDEO_MAX } from "@/lib/starboard/upload";
+
+describe("카드 첨부 — 영상", () => {
+  it("MP4·WebM·MOV는 50MB까지 영상으로 받는다", () => {
+    expect(checkFile({ type: "video/mp4", size: 1000 })).toEqual({ kind: "video" });
+    expect(checkFile({ type: "video/quicktime", size: VIDEO_MAX })).toEqual({ kind: "video" });
+    expect(checkFile({ type: "video/webm", size: VIDEO_MAX + 1 })).toHaveProperty("error");
+    expect(checkFile({ type: "video/x-msvideo", size: 1000 })).toHaveProperty("error");
+    expect(checkFile({ type: "application/pdf", size: 1000 })).toEqual({ kind: "pdf" });
+  });
+});

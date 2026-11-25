@@ -5691,6 +5691,18 @@ button.sb-card-open:hover:not(:disabled) { opacity: 1; transform: none; box-shad
 .sb-thumbs { display: flex; flex-direction: column; gap: 6px; }
 .sb-thumb { max-width: 7rem; height: 64px; border: 1.5px solid var(--border); border-radius: var(--radius-xs); background: #fff; object-fit: contain; }
 .sb-file-chip { padding: 3px 8px; border-radius: var(--radius-xs); background: var(--bg); font-size: 12px; }
+/* 영상 썸네일 — 가운데 ▶ 표시 */
+.sb-thumb-wrap { position: relative; display: inline-flex; }
+.sb-thumb-wrap.is-video::after { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: rgba(30, 27, 75, .72); color: #fff; font-size: 11px; content: '▶'; transform: translate(-50%, -50%); pointer-events: none; }
+.sb-attachment-video { display: block; width: 100%; max-height: 320px; border-radius: var(--radius-sm); background: #000; }
+/* 새 카드 쓰기의 첨부 — 고른 파일·링크를 올리기 전에 미리 보여 준다 */
+.sb-composer-attach { display: flex; flex-direction: column; gap: 8px; }
+.sb-pending-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.sb-pending-item { position: relative; display: flex; align-items: center; max-width: 100%; }
+.sb-pending-item img,
+.sb-pending-item video { width: 96px; height: 72px; border: 1.5px solid var(--border); border-radius: var(--radius-xs); background: #fff; object-fit: cover; }
+.sb-pending-item.is-link .sb-file-chip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.sb-pending-remove { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 24px; min-height: 24px; height: 24px; padding: 0; border-radius: 999px; background: var(--text); color: #fff; box-shadow: var(--shadow-sm); font-size: 14px; line-height: 1; }
 .sb-attachment-row { display: flex; align-items: flex-start; gap: 8px; }
 .sb-attachment-image { max-height: 160px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: #fff; object-fit: contain; }
 .sb-attachment-pdf { height: 112px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: #fff; object-fit: contain; }

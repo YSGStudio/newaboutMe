@@ -2,7 +2,8 @@
 
 /**
  * AttachmentThumbs / AttachmentDetail — 첨부 보기(원본 attachments/AttachmentList.tsx)
- * 카드 위에는 작은 썸네일과 링크 카드를, 카드 상세에서는 이미지 크게 보기·PDF 뷰어·링크 카드를 보여 줍니다.
+ * 카드 위에는 작은 썸네일과 링크 카드를, 카드 상세에서는 이미지 크게 보기·PDF 뷰어·영상 재생·링크 카드를 보여 줍니다.
+ * 영상 썸네일에는 ▶ 표시를 얹습니다.
  */
 import { useState } from 'react';
 import type { AttachmentView } from '@/lib/starboard/types';
@@ -21,11 +22,13 @@ export function AttachmentThumbs({ boardId, items }: { boardId: string; items: A
           .filter((a) => a.type !== 'link')
           .map((a) =>
             a.thumb_path && urls[a.thumb_path] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={a.id} src={urls[a.thumb_path]} alt={a.name} className="sb-thumb" data-testid={a.type === 'pdf' ? 'pdf-thumb' : 'image-thumb'} />
+              <span key={a.id} className={a.type === 'video' ? 'sb-thumb-wrap is-video' : 'sb-thumb-wrap'}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={urls[a.thumb_path]} alt={a.name} className="sb-thumb" data-testid={`${a.type}-thumb`} />
+              </span>
             ) : (
               <span key={a.id} className="sb-file-chip">
-                <span aria-hidden="true">{a.type === 'pdf' ? '📄' : '🖼'}</span> {a.name}
+                <span aria-hidden="true">{a.type === 'pdf' ? '📄' : a.type === 'video' ? '🎬' : '🖼'}</span> {a.name}
               </span>
             ),
           )}
@@ -72,6 +75,28 @@ export function AttachmentDetail({ boardId, items, canEdit, onDelete }: { boardI
                   {a.page_count ? ` · ${a.page_count}쪽` : ''}
                 </span>
               </button>
+            )}
+            {a.type === 'video' && (
+              <div className="sb-stack is-tight">
+                {a.storage_path && urls[a.storage_path] ? (
+                  <video
+                    className="sb-attachment-video"
+                    src={urls[a.storage_path]}
+                    poster={(a.thumb_path && urls[a.thumb_path]) || undefined}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    data-testid="video-player"
+                  >
+                    <track kind="captions" />
+                  </video>
+                ) : (
+                  <p className="sb-meta">영상을 불러오는 중…</p>
+                )}
+                <span className="sb-meta">
+                  <span aria-hidden="true">🎬</span> {a.name}
+                </span>
+              </div>
             )}
             {a.type === 'link' && <LinkCard a={a} />}
           </div>

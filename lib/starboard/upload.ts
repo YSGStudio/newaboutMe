@@ -5,17 +5,25 @@
 export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 export const IMAGE_MAX = 10 * 1024 * 1024;
 export const PDF_MAX = 20 * 1024 * 1024;
+/** 영상 — MP4·WebM·MOV, 50MB(20261126_starboard_video_attachments.sql과 같은 값) */
+export const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+export const VIDEO_MAX = 50 * 1024 * 1024;
 
-export type FileKind = "image" | "pdf";
+/** 파일 고르기 창에 넘기는 형식 목록 */
+export const ACCEPT_FILES = [...IMAGE_TYPES, "application/pdf", ...VIDEO_TYPES].join(",");
+
+export type FileKind = "image" | "pdf" | "video";
 
 export function checkFile(file: { type: string; size: number }): { kind: FileKind } | { error: string } {
   const isImage = IMAGE_TYPES.includes(file.type);
   const isPdf = file.type === "application/pdf";
-  if (!isImage && !isPdf) return { error: "이미지(JPG·PNG·GIF·WebP)나 PDF만 첨부할 수 있습니다." };
-  if (file.size <= 0) return { error: "빈 파일은 첨부할 수 없습니다." };
-  if (isImage && file.size > IMAGE_MAX) return { error: "이미지는 10MB 이하여야 합니다." };
-  if (isPdf && file.size > PDF_MAX) return { error: "PDF는 20MB 이하여야 합니다." };
-  return { kind: isImage ? "image" : "pdf" };
+  const isVideo = VIDEO_TYPES.includes(file.type);
+  if (!isImage && !isPdf && !isVideo) return { error: "이미지(JPG·PNG·GIF·WebP), PDF, 영상(MP4·WebM·MOV)만 첨부할 수 있어요." };
+  if (file.size <= 0) return { error: "빈 파일은 첨부할 수 없어요." };
+  if (isImage && file.size > IMAGE_MAX) return { error: "이미지는 10MB 이하여야 해요." };
+  if (isPdf && file.size > PDF_MAX) return { error: "PDF는 20MB 이하여야 해요." };
+  if (isVideo && file.size > VIDEO_MAX) return { error: "영상은 50MB 이하여야 해요." };
+  return { kind: isImage ? "image" : isPdf ? "pdf" : "video" };
 }
 
 /** 확장자(원본 ext()): 파일 이름에서, 없으면 MIME에서 */

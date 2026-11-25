@@ -7,7 +7,7 @@
  * 섹션이 없으면 교사에게 "멤버별로 나누기 / 직접 만들기" 안내를, 학생에게 빈 보드 안내를 보여 줍니다.
  * readOnly는 평가 화면에서 대상 보드를 읽기 전용으로 보여 줄 때 씁니다.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -29,6 +29,8 @@ import { avatarPair, initials } from '@/lib/starboard/visual';
 import type { CardField, CardFieldValues } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
 import { AttachmentThumbs } from './attachments/AttachmentList';
+import { addCardLink, uploadCardFile } from './attachments/upload-client';
+import { ACCEPT_FILES, checkFile, normalizeLink } from '@/lib/starboard/upload';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
 import { MyReviewInline, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
@@ -313,6 +315,8 @@ function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardVie
 }
 
 /** 섹션 머리의 ✏️로 여닫는 글쓰기 칸: 제목 + 보드 카드 형식(기본: 내용) */
+type PendingFile = { id: string; file: File; kind: 'image' | 'pdf' | 'video'; url: string };
+
 function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { boardId: string; columnId: string; template: CardField[]; lastPosition: number; onAdded: () => void }) {
   const { api } = useSb();
   const [title, setTitle] = useState('');
@@ -320,6 +324,35 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
   const [values, setValues] = useState<CardFieldValues>({});
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  // 올리기 전에 고른 첨부 — 카드를 만든 뒤 차례로 올린다. 미리보기는 브라우저 안 주소(objectURL)로 바로 그린다.
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const [links, setLinks] = useState<string[]>([]);
+  const [link, setLink] = useState('');
+  const [progress, setProgress] = useState('');
+  // 쓰기 창을 닫을 때 남은 미리보기 주소를 풀어 준다(빼기·올리기에서는 그때그때 푼다).
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.url)), []);
+
+  const pick = (list: FileList | null) => {
+    const next: PendingFile[] = [];
+    const problems: string[] = [];
+    for (const file of Array.from(list ?? [])) {
+      const check = checkFile(file);
+      if ('error' in check) problems.push(`${file.name}: ${check.error}`);
+      else next.push({ id: `${file.name}-${file.size}-${Math.random()}`, file, kind: check.kind, url: URL.createObjectURL(file) });
+    }
+    setFiles((prev) => [...prev, ...next]);
+    setError(problems.join(' '));
+  };
+  const addLink = () => {
+    const url = normalizeLink(link);
+    if (!url) return setError('링크 주소가 올바르지 않아요.');
+    setLinks((prev) => [...prev, url]);
+    setLink('');
+    setError('');
+  };
+
   return (
     <form
       className="sb-composer"
@@ -328,7 +361,7 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
         e.preventDefault();
         setPending(true);
         try {
-          await api(
+          const created = await api<{ id: string }>(
             `/boards/${boardId}/cards`,
             json('POST', {
               columnId,
@@ -341,15 +374,32 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
               checklist: [],
             }),
           );
+          // 첨부는 카드가 생긴 뒤에 올린다. 하나가 실패해도 나머지는 계속 올리고, 실패한 것만 알려 준다.
+          const total = files.length + links.length;
+          const failed: string[] = [];
+          let done = 0;
+          for (const f of files) {
+            setProgress(`첨부 올리는 중 (${++done}/${total})`);
+            await uploadCardFile(api, created.id, f.file).catch((err: Error) => failed.push(`${f.file.name}: ${err.message}`));
+          }
+          for (const url of links) {
+            setProgress(`첨부 올리는 중 (${++done}/${total})`);
+            await addCardLink(api, created.id, url).catch((err: Error) => failed.push(`${url}: ${err.message}`));
+          }
+          setProgress('');
           setTitle('');
           setBody('');
           setValues({});
-          setError('');
+          files.forEach((f) => URL.revokeObjectURL(f.url));
+          setFiles([]);
+          setLinks([]);
+          setError(failed.length ? `카드는 올렸지만 첨부 ${failed.length}개를 올리지 못했어요. ${failed.join(' ')}` : '');
           onAdded();
         } catch (err) {
           setError(err instanceof Error ? err.message : '올리지 못했어요.');
         } finally {
           setPending(false);
+          setProgress('');
         }
       }}
       onKeyDown={(e) => {
@@ -371,9 +421,84 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
         <input id={`new-${columnId}-title`} autoFocus maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} data-testid="card-input-title" />
       </div>
       <CardContentInputs template={template} body={body} onBody={setBody} values={values} onValues={setValues} idPrefix={`new-${columnId}`} compact />
+      <div className="sb-composer-attach">
+        <label className="sb-file-label">
+          📎 사진·PDF·영상 넣기
+          <input
+            type="file"
+            className="sb-sr-only"
+            accept={ACCEPT_FILES}
+            multiple
+            disabled={pending}
+            data-testid="composer-file-input"
+            onChange={(e) => {
+              pick(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <div className="sb-inline-form">
+          <input
+            placeholder="링크 주소"
+            aria-label="넣을 링크 주소"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (link.trim()) addLink();
+              }
+            }}
+          />
+          <button type="button" className="sb-btn ghost is-small" disabled={pending || !link.trim()} onClick={addLink}>
+            링크 넣기
+          </button>
+        </div>
+        {(files.length > 0 || links.length > 0) && (
+          <ul className="sb-pending-list" aria-label="넣은 첨부 미리보기" data-testid="composer-previews">
+            {files.map((f) => (
+              <li key={f.id} className="sb-pending-item">
+                {f.kind === 'image' && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.url} alt={f.file.name} />
+                )}
+                {f.kind === 'video' && <video src={f.url} muted playsInline controls preload="metadata" aria-label={f.file.name} />}
+                {f.kind === 'pdf' && (
+                  <span className="sb-file-chip">
+                    <span aria-hidden="true">📄</span> {f.file.name}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="sb-pending-remove"
+                  aria-label={`${f.file.name} 빼기`}
+                  disabled={pending}
+                  onClick={() => {
+                    URL.revokeObjectURL(f.url);
+                    setFiles((prev) => prev.filter((x) => x.id !== f.id));
+                  }}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+            {links.map((url, i) => (
+              <li key={`${url}-${i}`} className="sb-pending-item is-link">
+                <span className="sb-file-chip">
+                  <span aria-hidden="true">🔗</span> {url}
+                </span>
+                <button type="button" className="sb-pending-remove" aria-label={`${url} 빼기`} disabled={pending} onClick={() => setLinks((prev) => prev.filter((_, k) => k !== i))}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {error && <p className="sb-error">{error}</p>}
       <button className="sb-btn" disabled={pending || !title.trim()}>
-        {pending ? '올리는 중…' : '올리기'}
+        {pending ? progress || '올리는 중…' : '올리기'}
       </button>
     </form>
   );

@@ -52,7 +52,7 @@ export type ColumnView = {
 
 export type AttachmentView = {
   id: string;
-  type: "image" | "pdf" | "link";
+  type: "image" | "pdf" | "video" | "link";
   name: string;
   storage_path: string | null;
   thumb_path: string | null;
