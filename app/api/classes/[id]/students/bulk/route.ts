@@ -1,3 +1,4 @@
+import { createAutoPersonalBoards } from '@/lib/starboard/students';
 import { NextResponse } from 'next/server';
 import { serverError } from '@/lib/api-error';
 import { requireTeacher, requireTeacherClass } from '@/lib/auth';
@@ -91,6 +92,7 @@ export async function POST(req: Request, { params }: Params) {
     .select('id,name,student_number');
 
   if (error) return serverError(error);
+  await createAutoPersonalBoards((data ?? []).map((s) => s.id as string));
 
   return NextResponse.json({ created: data?.length ?? 0, skipped, students: data ?? [] }, { status: 201 });
 }

@@ -35,6 +35,7 @@ import VoyageDashboard from "@/components/teacher/VoyageDashboard";
 import LoginNoticeModal from "@/components/teacher/LoginNoticeModal";
 import LetterThreads from "@/components/teacher/LetterThreads";
 import GroupProjectTeacherPanel from "@/components/group-project/TeacherPanel";
+import StarboardPanel from "@/components/starboard/StarboardPanel";
 import { formatDateInSeoul } from "@/lib/date";
 import { api } from "@/lib/api-client";
 import usePoll from "@/lib/use-poll";
@@ -118,6 +119,7 @@ export default function TeacherPage() {
     | "feed"
     | "learning"
     | "groupProject"
+    | "starBoard"
     | "eval"
     | "stats"
     | "ai"
@@ -1418,6 +1420,12 @@ export default function TeacherPage() {
                   icon: "🧩",
                   disabled: isOverClassLimit,
                 },
+                {
+                  key: "starBoard",
+                  label: "별빛보드",
+                  icon: "🗂️",
+                  disabled: isOverClassLimit,
+                },
                 // 평가피드백은 관리자 계정에만 보입니다(lib/features.ts).
                 ...(evalFeedbackVisible
                   ? [{
@@ -1659,6 +1667,10 @@ export default function TeacherPage() {
 
           {activeTab === "groupProject" && (
             <GroupProjectTeacherPanel classId={selectedClassId} />
+          )}
+
+          {activeTab === "starBoard" && (
+            <StarboardPanel kind="teacher" classId={selectedClassId} />
           )}
 
           {evalFeedbackVisible && activeTab === "eval" && (

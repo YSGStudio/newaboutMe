@@ -25,3 +25,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# 별빛보드 PDF 뷰어 워커(postinstall이 node_modules에서 복사)
+public/pdf.worker.min.mjs

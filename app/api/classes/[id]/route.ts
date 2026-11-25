@@ -1,3 +1,4 @@
+import { prepareStarboardDelete, removeStoragePaths as removeStarboardFiles } from '@/lib/starboard/storage';
 import { NextResponse } from 'next/server';
 import { serverError } from '@/lib/api-error';
 import { requireTeacher } from '@/lib/auth';
@@ -63,8 +64,11 @@ export async function DELETE(_: Request, { params }: Params) {
 
   // 모둠 프로젝트는 cascade에 맡기면 FK 검사에 걸리므로 주제를 먼저 지운다.
   let groupProjectFiles: string[];
+  let starboardFiles: string[];
   try {
     groupProjectFiles = await prepareGroupProjectsDelete({ classIds: [params.id] });
+    // 별빛보드는 cascade로 지워진다. 행이 사라지기 전에 첨부 파일 경로만 모은다.
+    starboardFiles = await prepareStarboardDelete({ classIds: [params.id] });
   } catch (e) {
     console.error('[classes] 모둠 프로젝트 정리 실패:', e);
     return NextResponse.json({ error: '학급을 삭제하지 못했습니다. 잠시 후 다시 시도하십시오.' }, { status: 500 });
@@ -74,5 +78,6 @@ export async function DELETE(_: Request, { params }: Params) {
   if (error) return serverError(error);
 
   await removeStoragePaths(groupProjectFiles);
+  await removeStarboardFiles(starboardFiles);
   return NextResponse.json({ ok: true });
 }

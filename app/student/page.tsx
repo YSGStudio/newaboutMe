@@ -18,6 +18,7 @@ import VoyageContent from '@/components/student/VoyageContent';
 import BookCard from '@/components/student/BookCard';
 import LearningContent from '@/components/student/LearningContent';
 import GroupProjectStudentPanel from '@/components/group-project/StudentPanel';
+import StarboardPanel from '@/components/starboard/StarboardPanel';
 import { formatDateInSeoul } from '@/lib/date';
 import { SUBJECT_COLOR, DEFAULT_SUBJECT_COLOR } from '@/lib/subjects';
 import { EMOTION_CATEGORIES, EMOTION_META, EmotionCategoryType, EmotionType } from '@/types/domain';
@@ -236,7 +237,7 @@ export default function StudentPage() {
   const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'learning' | 'groupProject' | 'eval' | 'relationship' | 'letters'>('voyage');
+  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' | 'learning' | 'groupProject' | 'starBoard' | 'eval' | 'relationship' | 'letters'>('voyage');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [evalReports, setEvalReports] = useState<EvalReportSummary[]>([]);
   const [evalReportsLoaded, setEvalReportsLoaded] = useState(false);
@@ -1227,6 +1228,7 @@ export default function StudentPage() {
                 { key: 'emotion', label: '마음일기', icon: '💜' },
                 { key: 'learning', label: '배움성찰', icon: '📚' },
                 { key: 'groupProject', label: '프로젝트', icon: '🧩' },
+                { key: 'starBoard', label: '별빛보드', icon: '🗂️' },
                 // 평가피드백은 관리자 선생님의 학급에만 보입니다(lib/features.ts).
                 ...(evalFeedbackEnabled ? [{ key: 'eval', label: '포트폴리오', icon: '📝' }] : []),
                 { key: 'relationship', label: `교우관계${activeSurvey && !surveyCompleted ? ' 🔔' : ''}`, icon: '🤝' },
@@ -1238,7 +1240,7 @@ export default function StudentPage() {
               ]}
               value={activeTab}
               onChange={(key) => {
-                setActiveTab(key as 'voyage' | 'emotion' | 'learning' | 'groupProject' | 'eval' | 'relationship' | 'letters');
+                setActiveTab(key as 'voyage' | 'emotion' | 'learning' | 'groupProject' | 'starBoard' | 'eval' | 'relationship' | 'letters');
                 if (key === 'eval' && !evalReportsLoaded) loadEvalReports();
                 if (key === 'relationship' && !relationshipLoaded) loadRelationshipStatus();
                 if (key === 'letters') {
@@ -1643,6 +1645,7 @@ export default function StudentPage() {
           {activeTab === 'learning' && <LearningContent />}
 
           {activeTab === 'groupProject' && <GroupProjectStudentPanel studentName={studentName} />}
+          {activeTab === 'starBoard' && <StarboardPanel kind="student" />}
 
           {evalFeedbackEnabled && activeTab === 'eval' && (
             <section className="card">

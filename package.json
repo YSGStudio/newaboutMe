@@ -8,16 +8,22 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\""
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.8",
     "bcryptjs": "^3.0.3",
     "next": "14.2.18",
     "openai": "^6.45.0",
+    "pdfjs-dist": "^6.5.438",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "undici": "^8.13.1",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2"
   },

@@ -82,6 +82,7 @@
 | 월별 감정 일기장 제목 (`.emotion-journal-title`) | 배경 `#2e1d75 → #5b38ba → #7353cc` (120deg) / 테두리 `#d9d0fb` / 보조 글자 `#dcd4ff` / 강조 금색 `#ffe681` |
 | 월별 감정 일기장 카드 (`.emotion-journal-entry`) | 종이 `#fffdf6` / 테두리 `#e7ddc1`(accent 24% 섞음) / 줄노트 선 `#dbeafe` / 여백선 `rgba(244,114,182,.18)` / 본문 `#46405d` / 날짜 `#3f3471`·`#9185a7` / 감정 보조 `#847a97` / 푸터 `#a197ae` / 별 `#eab308`·`#a78bfa` |
 | 평가 등급 칩 (`GRADE_COLOR`, 잘함·보통·노력요함) | 잘함 `#16a34a`/`#dcfce7` · 보통 `#a16207`/`#fef9c3` · 노력요함 `#dc2626`/`#fee2e2` |
+| 별빛보드 섹션 머리 파스텔 8색 (`COLUMN_PALETTE`, `lib/starboard/columns.ts`) | `#F9D5F0` `#F8D7D7` `#F9E1BE` `#FBF0C0` `#D6F0DC` `#D4E8F8` `#E3DAF7` `#FADBC8` — 새 섹션에 차례로 돌려 쓰고, 교사가 색을 바꿀 수 있다. 진한 색은 `columnTint()`가 흰색과 30% 섞는다. 2026-11-25 사용자 승인 |
 
 > 등급 색은 `lib/learning.ts`의 `GRADE_COLOR`에 한 번만 정의하고, `components/learning/GradeParts.tsx`가 `--grade-color` / `--grade-soft` CSS 변수로 넘깁니다(globals.css "배움성찰 평가요소 · 등급" 섹션). 평가피드백(`EvalDashboard`)에서 쓰던 값을 그대로 옮긴 것입니다.
 
@@ -379,6 +380,32 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 
 - 교사 주제 화면 — 방 화면과 같은 "머리 카드(`.card.gp-overview`: 기간·목표·전체 진행률·바로가기) + `Tabs`(프로젝트 방 / 전체공지 / 주제 설정)" 구조. 방 만들기 폼은 버튼을 누를 때만 `.gp-subpanel`로 펼치고, 삭제는 주제 설정 탭의 별도 카드에 둡니다
 - 전체공지(`.card.gp-topic-notice`) — 방 공지 맨 위에 고정. `--primary` 테두리, `--primary-soft`를 섞은 배경, `.badge` "전체공지" 표시
+
+### 6.3.3 별빛보드 — 계층형 칸반
+
+`components/starboard/*` · CSS는 `globals.css`의 "별빛보드 · 계층형 칸반" 섹션(`.sb-` 접두사). 클래스보드에서 옮겨 왔고, **레이아웃·버튼 배치·문구는 원본 그대로**, 색·글꼴·그림자만 이 문서의 토큰으로 바꿨다.
+
+| 원본 클래스보드 | 별빛보드 |
+|---|---|
+| 남색 `#1E2A5A` 사이드바·배너 | 딥스페이스 그라디언트(§2.4 사이드바·우주여행 히어로) |
+| 금색 `#FFD166` 강조(현재 작업장, 내 카드, 별) | 별빛 금색 `#ffe47b`·`#fbbf24` |
+| 아바타 6색 | §2.5 감정 팔레트 soft/accent 6쌍(`lib/starboard/visual.ts`) |
+| 가리기 표시(호박색) | 배움성찰 "평가 대기" `#fef9c3`/`#fde68a`/`#a16207` |
+| 선생님 평가 패널(초록) | 평가 등급 "잘함" `#16a34a`/`#dcfce7` |
+| Jua 제목 글꼴 | Pretendard 700~800, 자간 `-.02em` |
+
+- **프로젝트 방** — `.sb-room` = 왼쪽 `.sb-sidebar`(280px, 22px 라운드, sticky) + `.sb-room-main`. 900px 이하에서 사이드바가 위로 쌓이고 트리는 `<details>`로 접힌다
+- **작업장 트리** — `.sb-tree-row`. 현재 작업장 `.is-current`는 금색 그라디언트, 접근할 수 없는 상위는 `.sb-tree-dim`(흰색 40%), 하위 추가 `＋`는 줄에 올렸을 때만 보인다
+- **칸반** — `.sb-kanban`은 안쪽만 가로 스크롤(스냅). `.sb-column` 폭 `min(82vw, 290px)`, 머리(`.sb-column-head`) 배경은 섹션 색을 인라인으로 넣는다. 본문은 `--bg`
+  - 카드 `.sb-card`: 내 카드 `.is-mine`은 금색 테두리 + 링, 끌 수 있으면 `.sb-card-inner.is-movable`(grab)
+  - 섹션 머리 원형 버튼 `button.sb-round-btn`(40px): ⭐ 평가하기 / 📊 평가 보기 / ✏️ 글쓰기(누르면 `.is-active`로 반전)
+  - "개수만" 가리기의 숨은 카드는 `.sb-hidden-count`(점선 박스)
+  - 드래그 대상 섹션 `.is-over`: `--primary` 3px 점선
+- **작업장 설정 화면** — 2열(`minmax(300px,380px) / 1fr`). 행 `.sb-ws-row`, 드롭 위치는 `.sb-drop-line`(위·아래 금색 4px 선)과 `.is-drop-inside`(금색 링)로 보여 준다. ⋮ 메뉴 `.sb-menu`
+- **설정 탭** — `button.sb-chip-tab`(라일락 칩, 선택 시 보라 그라디언트). 탭이 7개라 `Tabs`(장식 탭) 대신 칩을 쓴다
+- **별점** — `button.sb-star`(40px 터치, 켜짐 `#fbbf24`), 평균은 `.sb-star-track` 위에 `.sb-star-fill`을 % 폭으로 덮는다
+- **모달·서랍** — `.sb-overlay`(z-index 9000, 인디고 반투명) 위 `.sb-modal`(20px 라운드) / `.sb-drawer`(오른쪽 580px). 640px 이하에서는 꽉 찬 화면
+- `prefers-reduced-motion`에서 트리·섹션·별의 전환과 별 확대를 끈다
 
 ### 6.4 로그인 — 좌 일러스트 / 우 폼
 

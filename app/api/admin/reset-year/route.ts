@@ -1,3 +1,4 @@
+import { prepareStarboardDelete, removeStoragePaths as removeStarboardFiles } from '@/lib/starboard/storage';
 import { NextResponse } from 'next/server';
 import { serverError } from '@/lib/api-error';
 import { z } from 'zod';
@@ -29,8 +30,11 @@ export async function POST(req: Request) {
 
   // 모둠 프로젝트는 cascade에 맡기면 FK 검사에 걸리므로 주제를 먼저 지운다.
   let groupProjectFiles: string[];
+  let starboardFiles: string[];
   try {
     groupProjectFiles = await prepareGroupProjectsDelete('all');
+    // 별빛보드는 학급 cascade로 지워진다(평가 기준은 교사 소유라 남는다). 첨부 파일 경로만 먼저 모은다.
+    starboardFiles = await prepareStarboardDelete('all');
   } catch (e) {
     console.error('[reset-year] 모둠 프로젝트 정리 실패:', e);
     return NextResponse.json({ error: '초기화하지 못했습니다. 잠시 후 다시 시도하십시오.' }, { status: 500 });
@@ -40,6 +44,7 @@ export async function POST(req: Request) {
   if (error) return serverError(error);
 
   await removeStoragePaths(groupProjectFiles);
+  await removeStarboardFiles(starboardFiles);
 
   await logAdminAction(
     { id: auth.teacher.id, name: auth.teacher.name },
