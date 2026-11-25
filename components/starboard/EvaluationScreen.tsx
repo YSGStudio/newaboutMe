@@ -26,6 +26,10 @@ type Data = {
   evaluation: { levels: Record<string, number>; feedback: string; published: boolean; updated_at: string } | null;
   mode: 'personal' | 'cards';
   targets: { title: string; view: BoardView }[];
+  /** 배움성찰과 연결된 작업장이면 그 활동 — 평가가 배움성찰에 함께 저장된다 */
+  linkedActivity?: { id: string; subject: string; unit: string; title: string } | null;
+  /** 서술 피드백 상한(연결된 작업장은 배움성찰과 같은 500자) */
+  feedbackMax?: number;
 };
 
 export default function EvaluationScreen({ projectId, boardId, studentId }: { projectId: string; boardId: string; studentId: string }) {
@@ -45,6 +49,11 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
           {data.index + 1} / {data.total}
         </span>
       </div>
+      {data.linkedActivity && (
+        <p className="notice info" data-testid="eval-linked">
+          배움성찰 &lsquo;{data.linkedActivity.subject} · {[data.linkedActivity.unit, data.linkedActivity.title].filter(Boolean).join(' ')}&rsquo;과 연결된 작업장입니다. 여기서 매긴 등급과 피드백이 배움성찰 평가로 함께 저장됩니다.
+        </p>
+      )}
       <div className="sb-evaluate-grid">
         <section aria-label="평가 대상(읽기 전용)" className="sb-evaluate-targets" data-testid="eval-target" data-mode={data.mode}>
           {data.targets.length === 0 && <p className="card sb-meta">이 학생의 개인 보드가 없습니다.</p>}
@@ -62,6 +71,7 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
           studentId={studentId}
           criteria={data.criteria}
           initial={data.evaluation}
+          feedbackMax={data.feedbackMax ?? 2000}
           onPrev={data.prevId ? () => go({ name: 'evaluate', projectId, boardId, studentId: data.prevId! }) : null}
           onNext={data.nextId ? () => go({ name: 'evaluate', projectId, boardId, studentId: data.nextId! }) : null}
         />
@@ -77,6 +87,7 @@ function EvaluationForm({
   studentId,
   criteria,
   initial,
+  feedbackMax,
   onPrev,
   onNext,
 }: {
@@ -84,6 +95,7 @@ function EvaluationForm({
   studentId: string;
   criteria: Criterion[];
   initial: Initial;
+  feedbackMax: number;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
 }) {
@@ -156,10 +168,10 @@ function EvaluationForm({
       ))}
       <div>
         <label htmlFor="feedback">피드백</label>
-        <textarea id="feedback" className="sb-textarea-lg" maxLength={2000} value={feedback} onChange={(e) => change({ feedback: e.target.value })} onBlur={flush} />
+        <textarea id="feedback" className="sb-textarea-lg" maxLength={feedbackMax} value={feedback} onChange={(e) => change({ feedback: e.target.value })} onBlur={flush} />
         <p className="sb-between sb-meta">
           <span data-testid="save-status">{status}</span>
-          <span>{feedback.length}/2000</span>
+          <span>{feedback.length}/{feedbackMax}</span>
         </p>
       </div>
       <div className="sb-row-wrap">

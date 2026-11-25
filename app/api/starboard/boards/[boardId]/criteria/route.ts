@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireActor } from '@/lib/group-project/actor';
 import { requireBoardTeacher } from '@/lib/starboard/access';
 import { dbFail, isUuid, jsonError, readJson } from '@/lib/starboard/http';
+import { LINKED_CRITERIA_MESSAGE } from '@/lib/starboard/learning-sync';
 
 type Params = { params: { boardId: string } };
 
@@ -11,6 +12,8 @@ async function target(req: Request, params: Params['params']) {
   if ('error' in auth) return auth;
   const ctx = await requireBoardTeacher(auth.actor, params.boardId);
   if ('error' in ctx) return ctx;
+  // 배움성찰과 연결된 작업장은 기준을 활동 평가요소가 정한다(lib/starboard/learning-sync.ts).
+  if (ctx.board.learning_activity_id) return { error: jsonError(LINKED_CRITERIA_MESSAGE, 409) };
   const body = await readJson(req);
   if (typeof body.criterionId !== 'string' || !isUuid(body.criterionId)) return { error: jsonError('기준을 고르세요.', 400) };
   return { ctx, body, criterionId: body.criterionId };

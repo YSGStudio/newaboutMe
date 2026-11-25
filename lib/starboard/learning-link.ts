@@ -63,6 +63,8 @@ export async function loadStarboardRecords(
     .eq('student_id', studentId)
     .eq('sb_boards.sb_projects.class_id', classId)
     .not('sb_boards.sb_projects.subject', 'is', null)
+    // 배움성찰 활동과 연결된 작업장의 평가는 배움성찰 기록으로 이미 들어간다 — 두 번 세지 않는다.
+    .is('sb_boards.learning_activity_id', null)
     .order('updated_at', { ascending: true });
   if (range) query = query.gte('updated_at', range.startIso).lte('updated_at', range.endIso);
 

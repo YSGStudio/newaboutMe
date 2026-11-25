@@ -4,12 +4,13 @@ import { requireActor } from '@/lib/group-project/actor';
 import { requireTeacherActor } from '@/lib/starboard/access';
 import { cleanCriterion } from '@/lib/starboard/inputs';
 import { dbFail, isUuid, jsonError, notFoundResponse, readJson } from '@/lib/starboard/http';
+import { LINKED_CRITERION_MESSAGE } from '@/lib/starboard/learning-sync';
 
 type Params = { params: { criterionId: string } };
 
 async function ownCriterion(teacherId: string, id: string) {
   if (!isUuid(id)) return null;
-  const { data } = await supabaseAdmin.from('sb_criteria').select('id').eq('id', id).eq('teacher_id', teacherId).maybeSingle();
+  const { data } = await supabaseAdmin.from('sb_criteria').select('id, learning_activity_id').eq('id', id).eq('teacher_id', teacherId).maybeSingle();
   return data;
 }
 
@@ -19,7 +20,9 @@ export async function PATCH(req: Request, { params }: Params) {
   if ('error' in auth) return auth.error;
   const denied = requireTeacherActor(auth.actor);
   if (denied) return denied.error;
-  if (!(await ownCriterion(auth.actor.id, params.criterionId))) return notFoundResponse();
+  const own = await ownCriterion(auth.actor.id, params.criterionId);
+  if (!own) return notFoundResponse();
+  if (own.learning_activity_id) return jsonError(LINKED_CRITERION_MESSAGE, 409);
   const v = cleanCriterion(await readJson(req));
   if (typeof v === 'string') return jsonError(v, 400);
   const { error } = await supabaseAdmin.from('sb_criteria').update(v).eq('id', params.criterionId);
@@ -33,7 +36,9 @@ export async function DELETE(req: Request, { params }: Params) {
   if ('error' in auth) return auth.error;
   const denied = requireTeacherActor(auth.actor);
   if (denied) return denied.error;
-  if (!(await ownCriterion(auth.actor.id, params.criterionId))) return notFoundResponse();
+  const own = await ownCriterion(auth.actor.id, params.criterionId);
+  if (!own) return notFoundResponse();
+  if (own.learning_activity_id) return jsonError(LINKED_CRITERION_MESSAGE, 409);
   const { error } = await supabaseAdmin.from('sb_criteria').delete().eq('id', params.criterionId);
   if (error) return dbFail(error);
   return NextResponse.json({ ok: true });

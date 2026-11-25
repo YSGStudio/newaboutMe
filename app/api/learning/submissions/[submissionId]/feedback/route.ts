@@ -3,6 +3,7 @@ import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ensureProxySubmission, requireTeacherSubmission, SUBMISSION_COLUMNS } from '@/lib/learning-access';
 import { learningFeedbackSchema } from '@/lib/validators';
+import { mirrorQuietly } from '@/lib/starboard/learning-sync';
 
 // 교사 피드백 저장·수정·삭제
 // 피드백은 선택 사항이다. 쓰지 않은 학생에게 미완료 표시를 하지 않으며,
@@ -33,6 +34,8 @@ export async function POST(req: Request, { params }: Params) {
     .single();
 
   if (error) return serverError(error);
+  // 별빛보드 작업장과 연결된 활동이면 별빛보드 평가 화면에도 같은 피드백이 보이게 한다.
+  await mirrorQuietly(access.activity.id, [access.submission.student_id]);
   return NextResponse.json({ submission: data });
 }
 
@@ -49,5 +52,7 @@ export async function DELETE(_: Request, { params }: Params) {
     .single();
 
   if (error) return serverError(error);
+  // 별빛보드 작업장과 연결된 활동이면 별빛보드 평가 화면에도 같은 피드백이 보이게 한다.
+  await mirrorQuietly(access.activity.id, [access.submission.student_id]);
   return NextResponse.json({ submission: data });
 }

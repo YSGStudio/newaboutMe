@@ -5,6 +5,7 @@ import { requireBoardTeacher, who } from '@/lib/starboard/access';
 import { cleanEvaluationLevels } from '@/lib/starboard/inputs';
 import { dbFail, isUuid, jsonError, notFoundResponse, readJson } from '@/lib/starboard/http';
 import type { BoardView } from '@/lib/starboard/types';
+import { LINKED_FEEDBACK_MAX, saveLinkedEvaluation } from '@/lib/starboard/learning-sync';
 
 type Params = { params: { boardId: string; studentId: string } };
 
@@ -65,6 +66,11 @@ export async function GET(req: Request, { params }: Params) {
     targets = [{ title: view.board.title, view: { ...view, cards: view.cards.filter((x) => x.author_id === student.id) } }];
   }
 
+  // 배움성찰과 연결된 작업장이면 평가가 그 활동에 함께 저장된다는 것을 화면에 알린다.
+  const { data: linkedActivity } = ctx.board.learning_activity_id
+    ? await supabaseAdmin.from('learning_activities').select('id, subject, unit, title').eq('id', ctx.board.learning_activity_id).maybeSingle()
+    : { data: null };
+
   const list = students ?? [];
   const idx = list.findIndex((s) => s.id === student.id);
   return NextResponse.json({
@@ -78,15 +84,34 @@ export async function GET(req: Request, { params }: Params) {
     evaluation: evaluation ?? null,
     mode: personal ? 'personal' : 'cards',
     targets,
+    linkedActivity: linkedActivity ?? null,
+    feedbackMax: linkedActivity ? LINKED_FEEDBACK_MAX : 2000,
   });
 }
 
-/** 교사: 자동 저장(원본 saveEvaluation). (보드, 학생)당 1행 upsert */
+/** 교사: 자동 저장(원본 saveEvaluation). (보드, 학생)당 1행 upsert. 배움성찰과 연결된 작업장은 배움성찰에 저장한다. */
 export async function PUT(req: Request, { params }: Params) {
   const c = await context(req, params);
   if ('error' in c) return c.error;
   const body = await readJson(req);
   const feedback = typeof body.feedback === 'string' ? body.feedback : '';
+  const activityId = c.ctx.board.learning_activity_id;
+  if (activityId) {
+    // 배움성찰과 연결된 작업장: 원본(배움성찰 등급·피드백)에 쓰고 sb_evaluations 사본을 맞춘다.
+    if (feedback.trim().length > LINKED_FEEDBACK_MAX) return jsonError(`피드백은 ${LINKED_FEEDBACK_MAX}자 이하여야 합니다.`, 400);
+    try {
+      await saveLinkedEvaluation({ activityId, studentId: c.student.id, levels: cleanEvaluationLevels(body.levels), feedback });
+    } catch (e) {
+      return dbFail(e as { message: string });
+    }
+    const { data } = await supabaseAdmin
+      .from('sb_evaluations')
+      .select('updated_at')
+      .eq('board_id', c.ctx.board.id)
+      .eq('student_id', c.student.id)
+      .maybeSingle();
+    return NextResponse.json({ updated_at: data?.updated_at ?? new Date().toISOString() });
+  }
   if (feedback.length > 2000) return jsonError('피드백은 2000자 이하여야 합니다.', 400);
   const { data, error } = await supabaseAdmin
     .from('sb_evaluations')

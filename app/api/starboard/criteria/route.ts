@@ -4,6 +4,7 @@ import { requireActor } from '@/lib/group-project/actor';
 import { requireBoardTeacher, requireTeacherActor } from '@/lib/starboard/access';
 import { cleanCriterion } from '@/lib/starboard/inputs';
 import { dbFail, isUuid, jsonError, readJson } from '@/lib/starboard/http';
+import { LINKED_CRITERIA_MESSAGE } from '@/lib/starboard/learning-sync';
 
 /** 교사: 내 평가 기준 목록(최신순)과 평가에 쓰인(잠긴) 기준 id (원본 criteria/page.tsx) */
 export async function GET(req: Request) {
@@ -16,6 +17,8 @@ export async function GET(req: Request) {
       .from('sb_criteria')
       .select('id, name, description, levels, source_criterion_id, created_at')
       .eq('teacher_id', auth.actor.id)
+      // 배움성찰 활동을 따라 만든 미러 기준은 내 기준 목록에 올리지 않는다(작업장 연결로만 쓰인다).
+      .is('learning_activity_id', null)
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('sb_evaluations')
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
   if (typeof body.attachToBoardId === 'string' && isUuid(body.attachToBoardId)) {
     const ctx = await requireBoardTeacher(auth.actor, body.attachToBoardId);
     if ('error' in ctx) return ctx.error;
+    if (ctx.board.learning_activity_id) return jsonError(LINKED_CRITERIA_MESSAGE, 409);
     attachTo = ctx.board.id;
   }
   const { data, error } = await supabaseAdmin.from('sb_criteria').insert({ ...v, teacher_id: auth.actor.id }).select('id').single();

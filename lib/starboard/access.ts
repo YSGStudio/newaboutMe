@@ -71,6 +71,8 @@ export type BoardRow = {
   auto_personal: boolean;
   card_fields: unknown;
   peer_review: boolean;
+  /** 연결된 배움성찰 활동(lib/starboard/learning-sync.ts). 있으면 평가 기준·평가가 그 활동을 따른다 */
+  learning_activity_id: string | null;
 };
 
 export type BoardContext = {

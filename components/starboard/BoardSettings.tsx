@@ -16,6 +16,7 @@ import { FIELD_TYPE_LABEL, MAX_CARD_FIELDS, MAX_FIELD_LABEL, newFieldId, type Ca
 import { json, useSb } from './context';
 import CriterionForm from './CriterionForm';
 import LearningCriteriaImport from './LearningCriteriaImport';
+import { useLoad } from '@/components/group-project/ui';
 
 const ACCESS_LABEL: Record<Access, string> = { none: '없음', read: '읽기', edit: '수정' };
 const TABS = ['일반', '열', '카드 형식', '가리기', '권한', '개인 보드', '평가 기준'] as const;
@@ -585,6 +586,8 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
   const attached = new Set(view.criteria.map((c) => c.id));
   const [pick, setPick] = useState('');
   const [creating, setCreating] = useState(false);
+  // 배움성찰과 연결된 작업장은 기준을 붙이고 떼고 순서를 바꾸는 조작을 숨긴다(서버도 막는다).
+  const [linked, setLinked] = useState(false);
   const crit = (method: string, body: Record<string, unknown>, msg?: string) => run(() => api(`/boards/${b.id}/criteria`, json(method, body)), msg);
   return (
     <>
@@ -607,12 +610,14 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
           </span>
         </span>
       </label>
+      <LearningLinkPanel boardId={b.id} pending={pending} run={run} onLinkedChange={setLinked} onChanged={onChanged} />
       <ol className="sb-stack is-tight">
         {view.criteria.map((c, i) => (
           <li key={c.id} className="sb-criterion-row">
             <span className="sb-flex-1">
               {i + 1}. {c.name}
             </span>
+            {!linked && (<>
             <button type="button" className="sb-icon-btn" disabled={i === 0} onClick={() => crit('PATCH', { criterionId: c.id, direction: 'up' })} aria-label="위로">
               ▲
             </button>
@@ -622,10 +627,13 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
             <button type="button" className="sb-btn is-danger is-small" onClick={() => crit('DELETE', { criterionId: c.id })}>
               떼기
             </button>
+            </>)}
           </li>
         ))}
         {!view.criteria.length && <li className="sb-meta">붙은 기준이 없습니다.</li>}
       </ol>
+      {!linked && (
+        <>
       <form
         className="sb-inline-form"
         onSubmit={(e) => {
@@ -667,6 +675,97 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
         <summary>배움성찰 평가요소 불러와서 붙이기</summary>
         <LearningCriteriaImport attachToBoardId={b.id} onDone={onChanged} />
       </details>
+        </>
+      )}
     </>
+  );
+}
+
+type LinkActivity = { id: string; subject: string; unit: string; title: string; criteriaCount: number };
+
+/**
+ * LearningLinkPanel — 작업장 ↔ 배움성찰 활동 연결
+ * 연결하면 활동의 평가요소가 이 작업장의 평가 기준이 되고, 평가는 여기와 배움성찰 어디서 해도 한 곳(배움성찰)에 저장됩니다.
+ * 기준은 배움성찰 활동에서 고칩니다. 이미 평가한 작업장은 연결할 수 없습니다(서버가 막음).
+ */
+function LearningLinkPanel({
+  boardId,
+  pending,
+  run,
+  onLinkedChange,
+  onChanged,
+}: {
+  boardId: string;
+  pending: boolean;
+  run: Run;
+  onLinkedChange: (linked: boolean) => void;
+  onChanged: () => void;
+}) {
+  const { api, confirm } = useSb();
+  const { data, reload } = useLoad(
+    () => api<{ linked: LinkActivity | null; candidates: LinkActivity[] }>(`/boards/${boardId}/learning-link`),
+    [api, boardId],
+  );
+  const [pick, setPick] = useState('');
+  const linked = data?.linked ?? null;
+  useEffect(() => onLinkedChange(Boolean(linked)), [linked, onLinkedChange]);
+  const label = (a: LinkActivity) => `${a.subject} · ${[a.unit, a.title].filter(Boolean).join(' ')}`;
+  const after = () => {
+    reload();
+    onChanged();
+  };
+
+  if (!data) return null;
+  if (linked) {
+    return (
+      <div className="notice info sb-stack is-tight" data-testid="learning-link">
+        <p className="sb-strong">배움성찰 활동과 연결됨 — {label(linked)}</p>
+        <p className="hint">
+          평가요소 {linked.criteriaCount}개가 이 작업장의 평가 기준입니다. 평가는 여기와 배움성찰 어디서 해도 같은 곳에 저장됩니다. 기준은 배움성찰 활동에서 고칩니다.
+        </p>
+        <button
+          type="button"
+          className="sb-btn ghost is-small sb-auto"
+          disabled={pending}
+          onClick={async () => {
+            if (!(await confirm('연결을 끊으면 지금까지의 평가는 양쪽에 남고, 이후로는 따로 평가합니다. 끊을까요?', '연결 끊기'))) return;
+            run(() => api(`/boards/${boardId}/learning-link`, json('DELETE')).then(after), '연결을 끊었습니다.');
+          }}
+        >
+          연결 끊기
+        </button>
+      </div>
+    );
+  }
+  return (
+    <details className="sb-subpanel">
+      <summary>배움성찰 활동과 연결하기</summary>
+      <p className="hint">연결하면 활동의 평가요소가 이 작업장의 평가 기준이 되고, 한 번 평가하면 배움성찰에도 함께 저장됩니다.</p>
+      {data.candidates.length === 0 ? (
+        <p className="sb-meta">연결할 수 있는 배움성찰 활동이 없습니다(같은 학급 · 평가요소 있음 · 다른 작업장에 연결되지 않은 활동).</p>
+      ) : (
+        <form
+          className="sb-inline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!pick) return;
+            run(() => api(`/boards/${boardId}/learning-link`, json('PUT', { activityId: pick })).then(after), '배움성찰 활동과 연결했습니다.');
+            setPick('');
+          }}
+        >
+          <select aria-label="연결할 배움성찰 활동" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">배움성찰 활동 고르기</option>
+            {data.candidates.map((a) => (
+              <option key={a.id} value={a.id}>
+                {label(a)} (평가요소 {a.criteriaCount}개)
+              </option>
+            ))}
+          </select>
+          <button className="sb-btn ghost" disabled={!pick || pending}>
+            연결
+          </button>
+        </form>
+      )}
+    </details>
   );
 }

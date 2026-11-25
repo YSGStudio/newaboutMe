@@ -4,6 +4,7 @@ import { requireActor } from '@/lib/group-project/actor';
 import { requireBoardTeacher, requireTeacherActor } from '@/lib/starboard/access';
 import { criterionFromLearning } from '@/lib/starboard/criteria';
 import { dbFail, isUuid, jsonError, notFoundResponse, readJson } from '@/lib/starboard/http';
+import { LINKED_CRITERIA_MESSAGE } from '@/lib/starboard/learning-sync';
 
 // 배움성찰 평가요소 → 별빛보드 기준 불러오기(복사). 교사 전용.
 // 복사한 기준은 원래 활동과 이어지지 않는다 — 한쪽을 고쳐도 다른 쪽은 그대로다.
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
   if (typeof body.attachToBoardId === 'string' && isUuid(body.attachToBoardId)) {
     const ctx = await requireBoardTeacher(auth.actor, body.attachToBoardId);
     if ('error' in ctx) return ctx.error;
+    if (ctx.board.learning_activity_id) return jsonError(LINKED_CRITERIA_MESSAGE, 409);
     attachTo = ctx.board.id;
   }
 

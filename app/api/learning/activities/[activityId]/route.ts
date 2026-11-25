@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { serverError } from '@/lib/api-error';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { hasAnyGrade, requireTeacherActivity, sameQuestions, toQuestionRows } from '@/lib/learning-access';
+import { linkedBoardId, syncLinkedCriteria } from '@/lib/starboard/learning-sync';
 import { ACTIVITY_LOCKED_MESSAGE, isCriterionQuestion, QUESTION_COLUMNS, type LearningQuestionRow } from '@/lib/learning';
 import { learningActivityUpdateSchema } from '@/lib/validators';
 import { LEARNING_BUCKET } from '@/lib/learning-storage';
@@ -61,6 +62,17 @@ export async function PATCH(req: Request, { params }: Params) {
     .select(QUESTION_COLUMNS);
 
   if (questionError) return serverError(questionError);
+
+  // 별빛보드 작업장과 연결된 활동이면 작업장의 평가 기준도 새 평가요소에 맞춘다.
+  // 실패해도 배움성찰 저장은 끝났으므로 응답은 막지 않는다(다음 저장이나 다시 연결할 때 맞춰진다).
+  const boardId = await linkedBoardId(params.activityId);
+  if (boardId) {
+    try {
+      await syncLinkedCriteria(boardId, params.activityId);
+    } catch (e) {
+      console.error('[learning/activities] 별빛보드 기준 맞추기 실패:', (e as Error).message);
+    }
+  }
 
   return NextResponse.json({ activity: { ...data, learning_activity_questions: questions ?? [] } });
 }

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { ensureProxySubmission, requireTeacherSubmission } from '@/lib/learning-access';
 import { learningGradesSchema } from '@/lib/validators';
 import { isCriterionQuestion } from '@/lib/learning';
+import { mirrorQuietly } from '@/lib/starboard/learning-sync';
 
 // 교사 요소별 등급·코멘트 저장 (평가요소 질문마다)
 // 등급을 null로 보내면 그 요소의 교사 등급을 지운다. 등급과 서술 피드백이 모두 없어지면
@@ -48,6 +49,9 @@ export async function PUT(req: Request, { params }: Params) {
     );
 
   if (error) return serverError(error);
+
+  // 별빛보드 작업장과 연결된 활동이면 별빛보드 평가 화면에도 같은 등급이 보이게 한다.
+  await mirrorQuietly(access.activity.id, [access.submission.student_id]);
 
   const { data: grades } = await supabaseAdmin
     .from('learning_submission_grades')

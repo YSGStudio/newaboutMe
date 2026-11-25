@@ -408,6 +408,7 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - `prefers-reduced-motion`에서 트리·섹션·별의 전환과 별 확대를 끈다
 - **평가 기준** — 배움성찰 평가요소와 같은 3단계(노력요함·보통·잘함) 고정. 기준 폼의 단계 입력은 배움성찰 폼의 `.learning-criterion-levels` + `.learning-criterion-level`(등급색 `--grade-color`/`--grade-soft`)을 그대로 쓰고, 입력 순서도 잘함 → 보통 → 노력요함으로 맞춘다
 - **배움성찰 연동** — 기준 목록·작업장 설정의 "배움성찰에서 불러오기"는 `<details>` + `.sb-inline-form`(select + 버튼), 배움성찰 활동 폼의 "별빛보드 기준에서 불러오기"는 옆의 "지난 활동에서 불러오기"와 같은 작은 select. 프로젝트 과목은 폼의 select, 목록 카드에는 `.badge`
+- **배움성찰 활동 연결** — 작업장 설정 "평가 기준" 탭 맨 위. 연결 전에는 `<details className="sb-subpanel">` + `.sb-inline-form`, 연결 후에는 `.notice.info` 안내 + "연결 끊기"(`.sb-btn.ghost.is-small`)를 보여 주고 기준 붙이기·떼기·순서 조작은 숨긴다. 평가 화면에도 같은 `.notice.info`로 "배움성찰에 함께 저장" 안내
 - **상단 헤더 없음** — 별빛보드 탭에서는 교사·학생 화면 모두 `PageHeader`를 그리지 않는다(작업 화면을 넓게 쓰려고). 학생 로그아웃은 다른 탭으로 옮겨 가서 한다
 
 ### 6.4 로그인 — 좌 일러스트 / 우 폼
