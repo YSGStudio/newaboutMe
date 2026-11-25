@@ -45,13 +45,22 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
   const cards = optimistic && optimistic.base === view.cards ? optimistic.cards : view.cards;
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const columns = useMemo(() => [...view.columns].sort((a, b) => a.position - b.position), [view.columns]);
+  // 학생에게는 자기 멤버 섹션을 맨 앞에, 각 섹션 안에서는 자기 카드를 맨 앞에 보여 준다(교사는 저장된 순서 그대로).
+  // 자기 카드끼리·남의 카드끼리의 순서는 저장된 순서를 지킨다.
+  const viewerId = view.board.viewer_id;
+  const columns = useMemo(() => {
+    const sorted = [...view.columns].sort((a, b) => a.position - b.position);
+    if (isTeacher) return sorted;
+    return [...sorted.filter((c) => c.member_id && c.member_id === viewerId), ...sorted.filter((c) => !(c.member_id && c.member_id === viewerId))];
+  }, [view.columns, isTeacher, viewerId]);
   const byColumn = useMemo(() => {
     const m = new Map<string, CardView[]>();
     for (const c of columns) m.set(c.id, []);
-    for (const card of sortCards(cards)) m.get(card.column_id)?.push(card);
+    const ordered = sortCards(cards);
+    const list = isTeacher ? ordered : [...ordered.filter((c) => c.is_mine), ...ordered.filter((c) => !c.is_mine)];
+    for (const card of list) m.get(card.column_id)?.push(card);
     return m;
-  }, [cards, columns]);
+  }, [cards, columns, isTeacher]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -60,9 +69,13 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
   );
 
   const doMove = (card: CardView, columnId: string, index: number) => {
-    const target = (byColumn.get(columnId) ?? []).filter((c) => c.id !== card.id);
-    const prev = target[index - 1]?.position ?? null;
-    const next = target[index]?.position ?? null;
+    const shown = (byColumn.get(columnId) ?? []).filter((c) => c.id !== card.id);
+    // 학생 화면은 자기 카드를 앞에 모아 보여 주므로, 저장 순서는 자기 카드끼리 사이에서만 정한다.
+    // (화면 순서 그대로 이웃을 잡으면 남의 카드 위치와 섞여 엉뚱한 자리로 저장된다.)
+    const target = isTeacher ? shown : shown.filter((c) => c.is_mine);
+    const at = isTeacher ? index : Math.min(index, target.length);
+    const prev = target[at - 1]?.position ?? null;
+    const next = target[at]?.position ?? null;
     const position = positionBetween(prev, next);
     if (card.column_id === columnId && card.position === position) return;
     const updated = cards.map((c) => (c.id === card.id ? { ...c, column_id: columnId, position } : c));
@@ -124,7 +137,7 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
           </div>
         ))}
       <DndContext id={`kanban-${view.board.id}`} sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
-        <div className="sb-kanban" data-testid="kanban">
+        <div className={isTeacher ? 'sb-kanban' : 'sb-kanban is-student'} data-testid="kanban">
           {columns.map((col) => (
             <Column
               key={col.id}

@@ -401,14 +401,17 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
   - 섹션 머리 원형 버튼 `button.sb-round-btn`(40px): ⭐ 평가하기 / 📊 평가 보기 / ✏️ 글쓰기(누르면 `.is-active`로 반전)
   - "개수만" 가리기의 숨은 카드는 `.sb-hidden-count`(점선 박스)
   - 드래그 대상 섹션 `.is-over`: `--primary` 3px 점선
-- **작업장 설정 화면** — 2열(`minmax(300px,380px) / 1fr`). 행 `.sb-ws-row`, 드롭 위치는 `.sb-drop-line`(위·아래 금색 4px 선)과 `.is-drop-inside`(금색 링)로 보여 준다. ⋮ 메뉴 `.sb-menu`
-- **설정 탭** — `button.sb-chip-tab`(라일락 칩, 선택 시 보라 그라디언트). 탭이 7개라 `Tabs`(장식 탭) 대신 칩을 쓴다
+- **작업장 설정 화면** — `.dev/starboard-port/workspace-settings.html` 시안의 배치를 별빛로그 토큰으로 옮겼다(2026-11-26 승인). 머리는 `button.sb-back-link`(‹ 프로젝트) + 24px 제목 + 설명. 왼쪽 카드(340px): "작업장 N" + "＋ 추가", 테두리 없는 행(고른 행 `--primary-soft`, 하위는 `.is-child` 연결선, 아이콘 상자 `.sb-ws-icon` 📦/📄/👤, ⠿·⋮는 올렸을 때만 — 터치 기기는 늘 보임), 맨 아래 `.sb-tip`. 오른쪽 카드: `.sb-detail-head`(40px 아이콘 · 상위 이름/최상위 · 제목 + `.sb-tag` · 보드 열기 ↗) → 밑줄 탭 → 일반 탭은 `.sb-setting-row`(200px 이름·설명 / 입력), 순서는 `.sb-seg`, 삭제는 `.sb-danger-zone`(빨강 연한 상자, 두 번 눌러 삭제), 끝에 `.sb-setting-foot` 프로젝트 ID
+- **작업장 설정 화면(옛 설명)** — 2열(`minmax(300px,380px) / 1fr`). 행 `.sb-ws-row`, 드롭 위치는 `.sb-drop-line`(위·아래 금색 4px 선)과 `.is-drop-inside`(금색 링)로 보여 준다. ⋮ 메뉴 `.sb-menu`
+- **설정 탭** — `button.sb-line-tab`(글자 탭 + 선택한 탭 아래 `--primary` 2px 밑줄, 탭 줄은 가로 스크롤). 작업장 설정 페이지·보드 설정 서랍 공용. 탭이 7개라 `Tabs`(장식 탭)는 쓰지 않는다. 2026-11-26 사용자 승인(이전의 `sb-chip-tab` 칩을 대체)
 - **별점** — `button.sb-star`(40px 터치, 켜짐 `#fbbf24`), 평균은 `.sb-star-track` 위에 `.sb-star-fill`을 % 폭으로 덮는다
 - **모달·서랍** — `.sb-overlay`(z-index 9000, 인디고 반투명) 위 `.sb-modal`(20px 라운드) / `.sb-drawer`(오른쪽 580px). 640px 이하에서는 꽉 찬 화면
 - `prefers-reduced-motion`에서 트리·섹션·별의 전환과 별 확대를 끈다
 - **평가 기준** — 배움성찰 평가요소와 같은 3단계(노력요함·보통·잘함) 고정. 기준 폼의 단계 입력은 배움성찰 폼의 `.learning-criterion-levels` + `.learning-criterion-level`(등급색 `--grade-color`/`--grade-soft`)을 그대로 쓰고, 입력 순서도 잘함 → 보통 → 노력요함으로 맞춘다
 - **배움성찰 연동** — 기준 목록·작업장 설정의 "배움성찰에서 불러오기"는 `<details>` + `.sb-inline-form`(select + 버튼), 배움성찰 활동 폼의 "별빛보드 기준에서 불러오기"는 옆의 "지난 활동에서 불러오기"와 같은 작은 select. 프로젝트 과목은 폼의 select, 목록 카드에는 `.badge`
 - **배움성찰 활동 연결** — 작업장 설정 "평가 기준" 탭 맨 위. 연결 전에는 `<details className="sb-subpanel">` + `.sb-inline-form`, 연결 후에는 `.notice.info` 안내 + "연결 끊기"(`.sb-btn.ghost.is-small`)를 보여 주고 기준 붙이기·떼기·순서 조작은 숨긴다. 평가 화면에도 같은 `.notice.info`로 "배움성찰에 함께 저장" 안내
+- **작업장 화면 시작선** — 경로·제목 줄을 그리지 않아 칸반이 왼쪽 사이드바와 같은 높이에서 시작한다(제목은 `.sb-sr-only`로만). 교사 버튼(모두 공개·학생별 보기·설정)과 가리기 상태는 사이드바 맨 아래 `.sb-sidebar-actions`(포털)에 `sb-btn-dark`/`sb-btn-gold`로. 내 평가·평가 기준 패널은 칸반 아래
+- **학생의 내 카드** — 학생 화면에서는 자기 멤버 섹션이 맨 앞, 섹션 안에서도 자기 카드가 맨 앞. `.sb-kanban.is-student .sb-card.is-mine`은 금빛 맥동(`sb-mine-glow`, 3초, `#ffe47b` 링 + `rgba(251,191,36,.55)` 18px 번짐) — 2026-11-26 승인, `prefers-reduced-motion`에서 멈춤
 - **상단 헤더 없음** — 별빛보드 탭에서는 교사·학생 화면 모두 `PageHeader`를 그리지 않는다(작업 화면을 넓게 쓰려고). 학생 로그아웃은 다른 탭으로 옮겨 가서 한다
 
 ### 6.4 로그인 — 좌 일러스트 / 우 폼

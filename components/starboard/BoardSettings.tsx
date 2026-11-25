@@ -80,7 +80,7 @@ export function BoardSettingsPanel({ view, projectId, tree, onChanged, onDeleted
     <div className="sb-settings">
       <div className="sb-settings-tabs" role="tablist" aria-label="설정 항목">
         {tabs.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={current === t} className={current === t ? 'sb-chip-tab is-active' : 'sb-chip-tab'} onClick={() => setTab(t)}>
+          <button key={t} type="button" role="tab" aria-selected={current === t} className={current === t ? 'sb-line-tab is-active' : 'sb-line-tab'} onClick={() => setTab(t)}>
             {t}
           </button>
         ))}
@@ -160,77 +160,105 @@ function GeneralTab({
   blocked.add(b.id);
   return (
     <>
-      <form
-        className="sb-inline-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(() => api(`/boards/${b.id}`, json('PATCH', { title })), '이름을 바꿨습니다.');
-        }}
-      >
-        <input aria-label="보드 이름" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} />
-        <button className="sb-btn ghost" disabled={pending}>
-          이름 저장
-        </button>
-      </form>
-      <div className="sb-row-wrap">
-        <span>순서</span>
-        <button type="button" className="sb-btn ghost" onClick={() => run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'reorder', direction: 'up' })))} disabled={pending}>
-          ▲ 위로
-        </button>
-        <button type="button" className="sb-btn ghost" onClick={() => run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'reorder', direction: 'down' })))} disabled={pending}>
-          ▼ 아래로
-        </button>
-      </div>
-      {b.kind === 'shared' && (
+      <div className="sb-setting-row">
+        <div>
+          <p className="sb-setting-label">이름</p>
+          <p className="sb-setting-desc">학생들에게 보이는 작업장 이름이에요.</p>
+        </div>
         <form
-          className="sb-stack"
+          className="sb-inline-form"
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'parent', parentId: target || null })), '보드를 옮겼습니다.');
+            run(() => api(`/boards/${b.id}`, json('PATCH', { title })), '이름을 바꿨습니다.');
           }}
         >
-          <label htmlFor="move-target">다른 보드 아래로 옮기기</label>
-          <div className="sb-inline-form">
-            <select id="move-target" value={target} onChange={(e) => setTarget(e.target.value)}>
-              <option value="">(최상위)</option>
-              {tree
-                .filter((n) => n.kind === 'shared')
-                .map((n) => (
-                  <option key={n.id} value={n.id} disabled={blocked.has(n.id)}>
-                    {n.title}
-                    {blocked.has(n.id) ? ' (불가)' : ''}
-                  </option>
-                ))}
-            </select>
-            <button className="sb-btn ghost" disabled={pending}>
-              옮기기
+          <input aria-label="보드 이름" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} />
+          <button className="sb-btn ghost" disabled={pending || !title.trim() || title === b.title}>
+            저장
+          </button>
+        </form>
+      </div>
+      <div className="sb-setting-row">
+        <div>
+          <p className="sb-setting-label">위치</p>
+          <p className="sb-setting-desc">순서{b.kind === 'shared' ? '와 상위 작업장' : ''}을 정해요.</p>
+        </div>
+        <div className="sb-stack">
+          <div>
+            <p className="sb-setting-sub">순서</p>
+            <div className="sb-seg" role="group" aria-label="순서">
+              <button type="button" onClick={() => run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'reorder', direction: 'up' })))} disabled={pending}>
+                ↑ 위로
+              </button>
+              <button type="button" onClick={() => run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'reorder', direction: 'down' })))} disabled={pending}>
+                ↓ 아래로
+              </button>
+            </div>
+          </div>
+          {b.kind === 'shared' && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                run(() => api(`/boards/${b.id}/place`, json('POST', { mode: 'parent', parentId: target || null })), '보드를 옮겼습니다.');
+              }}
+            >
+              <label htmlFor="move-target" className="sb-setting-sub">
+                상위 작업장
+              </label>
+              <div className="sb-inline-form">
+                <select id="move-target" value={target} onChange={(e) => setTarget(e.target.value)}>
+                  <option value="">최상위 (상위 없음)</option>
+                  {tree
+                    .filter((n) => n.kind === 'shared')
+                    .map((n) => (
+                      <option key={n.id} value={n.id} disabled={blocked.has(n.id)}>
+                        {n.title}
+                        {blocked.has(n.id) ? ' (불가)' : ''}
+                      </option>
+                    ))}
+                </select>
+                <button className="sb-btn ghost" disabled={pending || target === (b.parent_id ?? '')}>
+                  옮기기
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+      <div className="sb-danger-zone">
+        <div>
+          <p className="sb-setting-label">작업장 삭제</p>
+          <p className="sb-setting-desc">하위 작업장과 모든 카드가 함께 지워지고 되돌릴 수 없어요.</p>
+        </div>
+        {confirm ? (
+          <div className="sb-row-wrap">
+            <button type="button" className="sb-btn ghost is-small" onClick={() => setConfirm(false)}>
+              취소
+            </button>
+            <button
+              type="button"
+              className="sb-btn is-danger is-small"
+              onClick={async () => {
+                try {
+                  const r = await api<{ parentId: string | null }>(`/boards/${b.id}`, json('DELETE'));
+                  onDeleted(r.parentId ?? null);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : '삭제하지 못했습니다.');
+                }
+              }}
+            >
+              정말 삭제
             </button>
           </div>
-        </form>
-      )}
-      <div className="sb-divider">
-        {confirm ? (
-          <button
-            type="button"
-            className="sb-btn is-danger"
-            onClick={async () => {
-              try {
-                const r = await api<{ parentId: string | null }>(`/boards/${b.id}`, json('DELETE'));
-                onDeleted(r.parentId ?? null);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : '삭제하지 못했습니다.');
-              }
-            }}
-          >
-            정말 삭제(하위 보드·카드 모두 삭제)
-          </button>
         ) : (
-          <button type="button" className="sb-btn is-danger" onClick={() => setConfirm(true)}>
-            보드 삭제
+          <button type="button" className="sb-btn is-danger is-small" onClick={() => setConfirm(true)}>
+            삭제
           </button>
         )}
       </div>
-      <p className="sb-meta">프로젝트: {projectId.slice(0, 8)}</p>
+      <p className="sb-setting-foot">
+        프로젝트 ID <code>{projectId.slice(0, 8)}</code>
+      </p>
     </>
   );
 }

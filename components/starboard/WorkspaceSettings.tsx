@@ -6,6 +6,7 @@
  * ⋮ 메뉴로 이름 바꾸기·복제·하위 추가·학생별 보드·평가 기준·위/아래·삭제를 합니다.
  * 학생 개인 보드는 부모마다 "학생별 보드 N개" 묶음으로 접혀 있습니다.
  * 오른쪽: 고른 작업장의 상세 설정(BoardSettingsPanel).
+ * 배치는 .dev/starboard-port/workspace-settings.html 시안(왼쪽 트리 카드 + 오른쪽 상세 카드, 밑줄 탭), 색은 별빛로그 토큰.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -141,13 +142,11 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
   return (
     <main className="sb-workspace">
       <header className="sb-workspace-head">
-        <h2>
-          <span aria-hidden="true">⚙</span> 프로젝트 작업장 <span className="sb-underline">설정하기</span>
-        </h2>
-        <p className="hint">작업장을 추가·수정·복제·삭제하거나 끌어서 순서와 위치를 바꾸고, 작업장마다 상세 설정을 할 수 있어요.</p>
-        <button type="button" className="sb-btn ghost sb-push-right" onClick={() => go({ name: 'home', projectId: project.id })}>
-          ← {project.title}
+        <button type="button" className="sb-back-link" onClick={() => go({ name: 'home', projectId: project.id })}>
+          <span aria-hidden="true">‹</span> {project.title}
         </button>
+        <h2>작업장 설정</h2>
+        <p className="hint">작업장을 추가·정리하고, 작업장마다 세부 설정을 바꿀 수 있어요.</p>
       </header>
 
       {message && (
@@ -163,7 +162,7 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
         <section className="card sb-workspace-list" aria-labelledby="ws-list-h">
           <div className="sb-workspace-list-head">
             <h3 id="ws-list-h">
-              <span aria-hidden="true">📦</span> 작업장 리스트 <span className="sb-meta">{sharedCount}</span>
+              작업장 <span className="sb-count-pill">{sharedCount}</span>
             </h3>
             <AddWorkspace
               onAdd={(title) =>
@@ -175,7 +174,6 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
               }
             />
           </div>
-          <p className="hint">⠿ 손잡이를 끌어 작업장의 위·아래에 놓으면 순서가, 가운데에 놓으면 그 안(하위)으로 들어가요.</p>
           <DndContext id="workspace-tree" sensors={sensors} onDragMove={(e) => setDrop(placeFrom(e))} onDragCancel={() => setDrop(null)} onDragEnd={onDragEnd}>
             <ul className="sb-workspace-rows" data-testid="workspace-list">
               {rows.map((row) =>
@@ -231,6 +229,10 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
               {nodes.length === 0 && <li className="sb-empty-row">아직 작업장이 없어요. ＋ 작업장 추가로 시작해 보세요.</li>}
             </ul>
           </DndContext>
+          <p className="sb-tip">
+            <span aria-hidden="true">ⓘ</span>
+            <span>⠿ 손잡이를 끌어 위·아래에 놓으면 순서가 바뀌고, 다른 작업장 가운데에 놓으면 그 안으로 들어가요.</span>
+          </p>
         </section>
 
         <section className="card sb-workspace-detail" aria-labelledby="ws-detail-h">
@@ -263,8 +265,8 @@ function AddWorkspace({ onAdd }: { onAdd: (title: string) => void }) {
   const [title, setTitle] = useState('');
   if (!open)
     return (
-      <button type="button" className="sb-btn sb-push-right" onClick={() => setOpen(true)}>
-        ＋ 작업장 추가
+      <button type="button" className="sb-btn is-small sb-push-right" onClick={() => setOpen(true)}>
+        ＋ 추가
       </button>
     );
   return (
@@ -336,7 +338,9 @@ function WorkspaceRow({ node, depth, count, selected, drop, onSelect, onRename, 
     setMenu(false);
     fn();
   };
-  const cls = ['sb-ws-row', selected && 'is-selected', isDragging && 'is-dragging', drop === 'inside' && 'is-drop-inside'].filter(Boolean).join(' ');
+  const cls = ['sb-ws-row', depth > 0 && 'is-child', selected && 'is-selected', isDragging && 'is-dragging', drop === 'inside' && 'is-drop-inside']
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <li style={{ paddingLeft: depth * 22 }} data-testid="workspace-row" data-title={node.title}>
@@ -352,17 +356,12 @@ function WorkspaceRow({ node, depth, count, selected, drop, onSelect, onRename, 
         <button type="button" className="sb-drag-handle" aria-label={`${node.title} 끌어서 옮기기`} title="끌어서 옮기기" {...listeners} {...attributes}>
           ⠿
         </button>
-        {depth > 0 && (
-          <span className="sb-meta" aria-hidden="true">
-            ↳
-          </span>
-        )}
+        <span className="sb-ws-icon" aria-hidden="true">
+          {!shared ? '👤' : depth === 0 ? '📦' : '📄'}
+        </span>
         {mode === 'view' ? (
           <button type="button" className="sb-ws-title" onClick={onSelect} aria-current={selected ? 'true' : undefined}>
-            <span className="sb-truncate">
-              {!shared && <span aria-hidden="true">👤 </span>}
-              {node.title}
-            </span>
+            <span className="sb-truncate">{node.title}</span>
           </button>
         ) : (
           <form
@@ -459,6 +458,7 @@ function DetailPanel({
 }) {
   const { api, go } = useSb();
   const [view, setView] = useState<BoardView | null>(null);
+  const parent = node.parent_id ? nodes.find((n) => n.id === node.parent_id) : null;
   const load = useCallback(async () => {
     try {
       const r = await api<{ view: BoardView }>(`/boards/${node.id}`);
@@ -472,14 +472,20 @@ function DetailPanel({
   }, [load]);
 
   return (
-    <div className="sb-stack">
-      <div className="sb-row-wrap">
-        <h3 id="ws-detail-h" className="sb-detail-title">
-          <span aria-hidden="true">📦</span> <span className="sb-primary-text">[{node.title}]</span> 상세설정
-        </h3>
-        <span className="badge">{node.kind === 'personal' ? '학생 개인 보드' : '작업장'}</span>
-        <button type="button" className="sb-btn ghost sb-push-right" onClick={() => go({ name: 'board', projectId: project.id, boardId: node.id })}>
-          보드 열기 →
+    <div className="sb-detail">
+      <div className="sb-detail-head">
+        <span className="sb-detail-icon" aria-hidden="true">
+          {node.kind === 'personal' ? '👤' : parent ? '📄' : '📦'}
+        </span>
+        <div className="sb-flex-1">
+          <p className="sb-detail-crumb">{parent ? parent.title : '최상위'}</p>
+          <h3 id="ws-detail-h" className="sb-detail-title">
+            <span className="sb-truncate">{node.title}</span>
+            <span className="sb-tag">{node.kind === 'personal' ? '학생 개인 보드' : '작업장'}</span>
+          </h3>
+        </div>
+        <button type="button" className="sb-btn ghost is-small" onClick={() => go({ name: 'board', projectId: project.id, boardId: node.id })}>
+          보드 열기 <span aria-hidden="true">↗</span>
         </button>
       </div>
       {view ? (

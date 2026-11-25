@@ -39,6 +39,8 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
   const [tree, setTree] = useState<Tree | null>(null);
   const [error, setError] = useState('');
   const [signals, setSignals] = useState<RoomSignals>({ structure: 0, content: {} });
+  // 사이드바 아래 교사 버튼 자리 — 작업장 화면(BoardScreen)이 포털로 채운다.
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   const last = useRef<Map<string, Ev> | null>(null);
 
   const loadTree = useCallback(async () => {
@@ -109,12 +111,21 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
           currentId={screen.name === 'board' ? screen.boardId : undefined}
           onHome={screen.name === 'home'}
           onChanged={refresh}
+          actionsRef={setActionsSlot}
         />
       )}
       <div className="sb-room-main">
         {screen.name === 'home' && <ProjectHome projectId={projectId} signals={signals} />}
         {screen.name === 'board' && (
-          <BoardScreen key={screen.boardId} project={tree.project} boardId={screen.boardId} tree={tree.nodes} signals={signals} onTreeChanged={refresh} />
+          <BoardScreen
+            key={screen.boardId}
+            project={tree.project}
+            boardId={screen.boardId}
+            tree={tree.nodes}
+            signals={signals}
+            onTreeChanged={refresh}
+            actionsSlot={actionsSlot}
+          />
         )}
         {screen.name === 'settings' && (
           <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={tree.counts} initialSelected={screen.boardId ?? null} onTreeChanged={refresh} />

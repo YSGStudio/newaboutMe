@@ -2,10 +2,12 @@
 
 /**
  * BoardScreen — 작업장 화면(원본 boards/[boardId]/page.tsx + BoardClient)
- * 경로(프로젝트 › … › 현재), 제목·배지, 교사 버튼(모두 공개/다시 가리기, 학생별 보기, 설정),
- * 내 평가, 평가 기준, 칸반을 차례로 그립니다. 다른 사람이 바꾸면 ProjectRoom 신호로 다시 불러옵니다.
+ * 칸반을 맨 위에 그려 왼쪽 작업장 사이드바와 시작선을 맞춥니다(경로·제목 줄은 그리지 않음 — 현재 작업장은 사이드바 트리가 보여 줌).
+ * 교사 버튼(모두 공개/다시 가리기, 학생별 보기, 설정)과 가리기 상태는 사이드바 아래 자리에 포털로 그립니다.
+ * 내 평가·평가 기준은 칸반 아래에 둡니다. 다른 사람이 바꾸면 ProjectRoom 신호로 다시 불러옵니다.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Notice from '@/components/ui/Notice';
 import { HIDE_MODE_LABEL } from '@/lib/starboard/hiding';
 import { pathTo } from '@/lib/starboard/tree';
@@ -16,9 +18,17 @@ import Kanban from './Kanban';
 import { CriteriaPanel, MyEvaluationPanel } from './CriteriaPanel';
 import { BoardSettingsDrawer } from './BoardSettings';
 
-type Props = { project: Project; boardId: string; tree: TreeNode[]; signals: RoomSignals; onTreeChanged: () => void };
+type Props = {
+  project: Project;
+  boardId: string;
+  tree: TreeNode[];
+  signals: RoomSignals;
+  onTreeChanged: () => void;
+  /** 사이드바 아래 교사 버튼 자리(ProjectSidebar의 .sb-sidebar-actions) */
+  actionsSlot: HTMLDivElement | null;
+};
 
-export default function BoardScreen({ project, boardId, tree, signals, onTreeChanged }: Props) {
+export default function BoardScreen({ project, boardId, tree, signals, onTreeChanged, actionsSlot }: Props) {
   const { api, go, isTeacher } = useSb();
   const [view, setView] = useState<BoardView | null | undefined>(undefined);
   const [error, setError] = useState('');
@@ -41,34 +51,12 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
     refetchView();
   }, [refetchView, signals.structure, mine]);
 
-  const path = pathTo(tree, boardId);
   const b = view?.board;
+  // 경로 줄을 없앴으므로 현재 작업장 이름은 화면 읽기 프로그램용 제목으로만 남긴다.
+  const title = useMemo(() => pathTo(tree, boardId).at(-1)?.title ?? '', [tree, boardId]);
 
   return (
     <div className="sb-board-screen">
-      <nav aria-label="경로" className="sb-breadcrumb" data-testid="breadcrumb">
-        <ol>
-          <li>
-            <button type="button" className="sb-link" onClick={() => go({ name: 'home', projectId: project.id })}>
-              {project.title}
-            </button>
-          </li>
-          {path.map((n) => (
-            <li key={n.id} data-testid="crumb">
-              <span aria-hidden="true">›</span>
-              {n.id === boardId ? (
-                <b>{n.title}</b>
-              ) : n.accessible ? (
-                <button type="button" className="sb-link" onClick={() => go({ name: 'board', projectId: project.id, boardId: n.id })}>
-                  {n.title}
-                </button>
-              ) : (
-                <span className="sb-dim">{n.title}</span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
 
       {view === undefined ? (
         <p className="hint">불러오는 중...</p>
@@ -78,22 +66,19 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
         </div>
       ) : (
         <>
-          <div className="sb-board-head">
-            <h1 data-testid="board-title">{b.title}</h1>
-            {b.kind === 'personal' && <span className="badge">개인 보드{b.owner_name ? ` · ${b.owner_name}` : ''}</span>}
-            {b.access === 'read' && <span className="badge sb-badge-muted">읽기 전용</span>}
-            {isTeacher && b.hide_mode !== 'off' && (
-              <span className="badge sb-badge-hide">
-                가리기 {HIDE_MODE_LABEL[b.hide_mode]}
-                {b.revealed ? ' · 공개 중' : ''}
-              </span>
-            )}
-            {isTeacher && (
+          <h1 className="sb-sr-only" data-testid="board-title">{b.title || title}</h1>
+          {isTeacher && actionsSlot && createPortal(
               <div className="sb-board-actions">
+                {b.hide_mode !== 'off' && (
+                  <span className="badge sb-badge-hide">
+                    가리기 {HIDE_MODE_LABEL[b.hide_mode]}
+                    {b.revealed ? ' · 공개 중' : ''}
+                  </span>
+                )}
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (
                   <button
                     type="button"
-                    className={b.revealed ? 'sb-btn ghost' : 'sb-btn-gold'}
+                    className={b.revealed ? 'sb-btn-dark' : 'sb-btn-gold'}
                     disabled={pending}
                     onClick={async () => {
                       setPending(true);
@@ -111,20 +96,20 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
                   </button>
                 )}
                 {b.kind === 'shared' && (
-                  <button type="button" className="sb-btn ghost" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
+                  <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
                     학생별 보기
                   </button>
                 )}
-                <button type="button" className="sb-btn ghost" onClick={() => setSettings(true)}>
+                <button type="button" className="sb-btn-dark" onClick={() => setSettings(true)}>
                   설정
                 </button>
-              </div>
-            )}
-          </div>
+              </div>,
+            actionsSlot,
+          )}
           <Notice type="error" message={error} />
+          <Kanban view={view} onChanged={refetchView} />
           <MyEvaluationPanel view={view} />
           <CriteriaPanel view={view} />
-          <Kanban view={view} onChanged={refetchView} />
         </>
       )}
       {settings && view && (
