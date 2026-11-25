@@ -3,6 +3,7 @@
 /**
  * ProjectRoom — 프로젝트 = 하나의 방(원본 projects/[id]/layout.tsx + ProjectSidebar)
  * 왼쪽 작업장 사이드바는 방 안 모든 화면에서 유지되고(작업장 설정 화면에서만 숨김), 오른쪽에 현재 화면을 그립니다.
+ * 프로젝트를 열면(home) 소개·최신 카드·멤버 화면 대신 첫 작업장의 카드 화면으로 바로 갑니다(교사·학생 모두).
  *
  * 실시간 반영: 원본은 Supabase Realtime(board_events)을 구독했다. 별빛로그 학생은 Auth 사용자가 아니라
  * 같은 방식을 쓸 수 없어, 3초마다 변경 시각(versions)만 가볍게 읽고 바뀐 것만 다시 부른다.
@@ -14,9 +15,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Notice from '@/components/ui/Notice';
 import usePoll from '@/lib/use-poll';
 import type { Project, TreeNode } from '@/lib/starboard/types';
+import { firstAccessible } from '@/lib/starboard/tree';
 import { useSb, type Screen } from './context';
 import ProjectSidebar from './ProjectSidebar';
-import ProjectHome from './ProjectHome';
 import BoardScreen from './BoardScreen';
 import WorkspaceSettings from './WorkspaceSettings';
 import StudentSummary from './StudentSummary';
@@ -82,6 +83,12 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
 
   usePoll(poll, { enabled: Boolean(tree), intervalMs: 3000 });
 
+  // 프로젝트 첫 화면(home)은 첫 작업장의 카드 화면으로 바로 넘긴다. 볼 수 있는 작업장이 없을 때만 빈 안내를 그린다.
+  const firstId = tree && screen.name === 'home' ? (firstAccessible(tree.nodes)?.id ?? null) : null;
+  useEffect(() => {
+    if (firstId) go({ name: 'board', projectId, boardId: firstId });
+  }, [firstId, go, projectId]);
+
   if (error && !tree) {
     return (
       <div className="sb-room">
@@ -93,6 +100,7 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
     );
   }
   if (!tree) return <p className="hint">불러오는 중...</p>;
+  if (firstId) return <p className="hint">불러오는 중...</p>;
 
   const refresh = () => {
     loadTree().catch(() => {});
@@ -115,7 +123,12 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
         />
       )}
       <div className="sb-room-main">
-        {screen.name === 'home' && <ProjectHome projectId={projectId} signals={signals} />}
+        {screen.name === 'home' && (
+          <div className="card sb-empty-board" data-testid="empty-project">
+            <p className="sb-empty-title">아직 작업장이 없어요</p>
+            <p className="hint">{tree.isTeacher ? '왼쪽의 ＋ 작업장 추가로 첫 작업장을 만들어 보세요.' : '선생님이 작업장을 열면 여기에서 카드를 볼 수 있어요.'}</p>
+          </div>
+        )}
         {screen.name === 'board' && (
           <BoardScreen
             key={screen.boardId}

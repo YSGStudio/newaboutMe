@@ -80,3 +80,18 @@ export function computeDrop(nodes: TreeNode[], movingId: string, place: DropPlac
   siblings.splice(index, 0, movingId);
   return { ok: true, parentId, order: siblings };
 }
+
+/**
+ * 프로젝트를 열었을 때 바로 보여 줄 작업장 — 트리 순서(위 → 아래, 부모 → 자식)에서 처음 만나는, 볼 수 있는 작업장.
+ * 볼 수 있는 작업장이 없으면 null.
+ */
+export function firstAccessible(nodes: TreeNode[]): TreeNode | null {
+  const kids = childrenMap(nodes);
+  const stack = [...roots(nodes)].reverse();
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.accessible) return n;
+    stack.push(...[...(kids.get(n.id) ?? [])].reverse());
+  }
+  return null;
+}

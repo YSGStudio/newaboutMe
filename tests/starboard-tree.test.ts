@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDrop } from "@/lib/starboard/tree";
+import { computeDrop, firstAccessible } from "@/lib/starboard/tree";
 import type { TreeNode } from "@/lib/starboard/types";
 
 const n = (id: string, parent_id: string | null, position: number, kind: "shared" | "personal" = "shared"): TreeNode =>
@@ -25,5 +25,15 @@ describe("작업장 드래그 앤 드롭 위치 계산", () => {
   it("학생 개인 보드는 순서만 바꿀 수 있다", () => {
     expect(computeDrop(nodes, "A2", { overId: "A1", where: "before" })).toEqual({ ok: true, parentId: "A", order: ["A2", "A1"] });
     expect(computeDrop(nodes, "A2", { overId: "B", where: "inside" })).toEqual({ ok: false, reason: "personal" });
+  });
+});
+
+describe("프로젝트를 열면 보여 줄 첫 작업장", () => {
+  it("트리 순서에서 처음 만나는 볼 수 있는 작업장", () => {
+    expect(firstAccessible(nodes)?.id).toBe("A");
+    const hidden = nodes.map((x) => (x.id === "A" ? { ...x, accessible: false } : x));
+    expect(firstAccessible(hidden)?.id).toBe("A1");
+    expect(firstAccessible(nodes.map((x) => ({ ...x, accessible: false })))).toBeNull();
+    expect(firstAccessible([])).toBeNull();
   });
 });
