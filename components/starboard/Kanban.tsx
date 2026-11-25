@@ -31,7 +31,7 @@ import { json, useSb } from './context';
 import { AttachmentThumbs } from './attachments/AttachmentList';
 import { addCardLink, uploadCardFile } from './attachments/upload-client';
 import { ACCEPT_FILES, checkFile, normalizeLink } from '@/lib/starboard/upload';
-import { STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
+import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
 import { MyReviewInline, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
@@ -288,7 +288,7 @@ function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardVie
     >
       <div {...attributes} {...listeners} className={movable ? 'sb-card-inner is-movable' : 'sb-card-inner'}>
         <button type="button" className="sb-card-open" onClick={onOpen}>
-          {card.labels.length > 0 && (
+          {STARBOARD_CARD_LABELS_DUE_ENABLED && card.labels.length > 0 && (
             <span className="sb-labels">
               {card.labels.map((l) => (
                 <span key={l} className="sb-label">
@@ -300,7 +300,7 @@ function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardVie
           <span className="sb-card-title">{card.title}</span>
           <CardContentView card={card} template={template} preview />
           <span className="sb-card-meta">
-            {card.due_date && <span>마감 {card.due_date}</span>}
+            {STARBOARD_CARD_LABELS_DUE_ENABLED && card.due_date && <span>마감 {card.due_date}</span>}
             {STARBOARD_CHECKLIST_ENABLED && card.checklist.length > 0 && (
               <span className={done === card.checklist.length ? 'is-complete' : undefined}>
                 · ☑ {done}/{card.checklist.length}

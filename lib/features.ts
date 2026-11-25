@@ -58,3 +58,19 @@ export function canSeeEvalFeedback(role: string | null | undefined): boolean {
  * 되돌리려면 — 이 값을 true로 바꿉니다.
  */
 export const STARBOARD_CHECKLIST_ENABLED = false;
+
+/**
+ * 별빛보드 카드 라벨·마감일 — 화면에서만 내림 (2026-11-26)
+ *
+ * 왜 내렸나: 원본 클래스보드에서 옮겨 온 칸인데 수업에서 쓰지 않아, 카드 수정 화면을 단순하게 하려고
+ * 사용자 요청으로 감췄습니다.
+ *
+ * 감춘 곳: 카드 수정 화면의 "라벨(쉼표로 구분)"·"마감일" 칸, 카드 읽기 화면과 칸반 카드의 라벨 칩·"마감 날짜" 표시
+ * (components/starboard/CardModal.tsx, Kanban.tsx).
+ *
+ * **자료는 지우지 않았습니다.** sb_cards.labels · due_date 컬럼과 저장된 값은 그대로이고,
+ * 카드를 저장할 때도 기존 값을 그대로 다시 보냅니다(지워지지 않음).
+ *
+ * 되돌리려면 — 이 값을 true로 바꿉니다.
+ */
+export const STARBOARD_CARD_LABELS_DUE_ENABLED = false;

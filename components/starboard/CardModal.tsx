@@ -3,8 +3,9 @@
 /**
  * CardModal — 카드 상세(원본 kanban/CardModal.tsx)
  * 머리: 섹션 배지·작성자·(수정하기)·닫기(Esc).
- * 학생은 자기 카드도 먼저 넓은 읽기 화면으로 열고, 닫기 옆 ✏️ 수정하기를 눌러야 편집 화면(제목·내용·라벨·마감일·첨부 올리기·카드 삭제)이 됩니다.
- * 저장하거나 취소하면 다시 읽기 화면으로 돌아갑니다. 교사는 예전처럼 쓸 수 있는 카드를 바로 편집 화면으로 엽니다.
+ * 교사·학생 모두 카드를 먼저 넓은 읽기 화면으로 열고, 닫기 옆 ✏️ 수정하기를 눌러야 편집 화면(제목·내용·첨부 올리기·카드 삭제)이 됩니다.
+ * 저장하거나 취소하면 다시 읽기 화면으로 돌아갑니다.
+ * 라벨·마감일은 lib/features.ts STARBOARD_CARD_LABELS_DUE_ENABLED로 화면에서 내렸습니다(저장된 값은 그대로 다시 보냄).
  * 아래에 첨부(목록 — 읽기 화면에서는 첨부가 있을 때만), 활동 기록을 보여 줍니다.
  * 체크리스트는 lib/features.ts STARBOARD_CHECKLIST_ENABLED로 화면에서 내렸습니다(저장된 항목은 그대로 유지).
  */
@@ -17,14 +18,14 @@ import { json, useSb } from './context';
 import { AttachmentDetail } from './attachments/AttachmentList';
 import AttachmentUploader from './attachments/AttachmentUploader';
 import { CardContentInputs, CardContentView } from './CardContent';
-import { STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
+import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 
 const ACTION_LABEL: Record<Activity['action'], string> = { create: '만듦', update: '수정함', move: '옮김', delete: '삭제함' };
 
 type Props = { card: CardView; boardId: string; template: CardField[]; columns: ColumnView[]; onClose: () => void; onChanged: () => void };
 
 export default function CardModal({ card, boardId, template, columns, onClose, onChanged }: Props) {
-  const { api, isTeacher } = useSb();
+  const { api } = useSb();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [title, setTitle] = useState(card.title);
@@ -37,7 +38,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
   const [activities, setActivities] = useState<Activity[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const editable = card.can_edit;
-  const [editing, setEditing] = useState(editable && isTeacher);
+  const [editing, setEditing] = useState(false);
   const col = columns.find((c) => c.id === card.column_id);
 
   useEffect(() => {
@@ -86,8 +87,9 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
           title,
           body,
           fields: template.length ? values : (card.fields ?? {}),
-          labels: labels.split(',').map((s) => s.trim()).filter(Boolean),
-          due_date: due || null,
+          // 칸을 감춘 동안에는 저장된 값을 그대로 보낸다 — 지워지지 않게.
+          labels: STARBOARD_CARD_LABELS_DUE_ENABLED ? labels.split(',').map((s) => s.trim()).filter(Boolean) : card.labels,
+          due_date: STARBOARD_CARD_LABELS_DUE_ENABLED ? due || null : card.due_date,
           checklist: patch?.checklist ?? checklist,
         }),
       ),
@@ -119,8 +121,8 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
             className="sb-stack"
             onSubmit={(e) => {
               e.preventDefault();
-              // 학생은 저장하면 읽기 화면으로 돌아간다.
-              save(undefined, isTeacher ? undefined : () => setEditing(false));
+              // 저장하면 읽기 화면으로 돌아간다.
+              save(undefined, () => setEditing(false));
             }}
           >
             <div>
@@ -128,6 +130,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
               <input id="card-title" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} required />
             </div>
             <CardContentInputs template={template} body={body} onBody={setBody} values={values} onValues={setValues} idPrefix="card" />
+            {STARBOARD_CARD_LABELS_DUE_ENABLED && (
             <div className="sb-form-grid">
               <div>
                 <label htmlFor="card-labels">라벨 (쉼표로 구분)</label>
@@ -138,6 +141,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
                 <input id="card-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
               </div>
             </div>
+            )}
             {error && <p className="sb-error">{error}</p>}
             <div className="sb-modal-actions">
               {confirmDelete ? (
@@ -150,11 +154,9 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
                 </button>
               )}
               <span className="sb-flex-1" />
-              {!isTeacher && (
-                <button type="button" className="sb-btn ghost" onClick={stopEditing} disabled={pending}>
-                  취소
-                </button>
-              )}
+              <button type="button" className="sb-btn ghost" onClick={stopEditing} disabled={pending}>
+                취소
+              </button>
               <button className="sb-btn" disabled={pending}>
                 저장
               </button>
@@ -164,7 +166,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
           <div className="sb-stack">
             <h2 className="sb-modal-title">{card.title}</h2>
             <CardContentView card={card} template={template} />
-            {card.labels.length > 0 && (
+            {STARBOARD_CARD_LABELS_DUE_ENABLED && card.labels.length > 0 && (
               <div className="sb-labels">
                 {card.labels.map((l) => (
                   <span key={l} className="sb-label">
@@ -173,7 +175,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
                 ))}
               </div>
             )}
-            {card.due_date && <p className="sb-meta">마감 {card.due_date}</p>}
+            {STARBOARD_CARD_LABELS_DUE_ENABLED && card.due_date && <p className="sb-meta">마감 {card.due_date}</p>}
             {error && <p className="sb-error">{error}</p>}
           </div>
         )}
