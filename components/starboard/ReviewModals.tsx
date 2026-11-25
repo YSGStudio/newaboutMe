@@ -246,3 +246,69 @@ export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: str
     </Modal>
   );
 }
+
+/**
+ * MyReviewInline — 학생 본인 섹션 안에 펼치는 "내 평가 보기"
+ * 섹션 머리의 📊를 누르면 칸 폭에 맞춰 세로로 쌓아 보여 줍니다: 평가 기준(단계별 기준 문장),
+ * 공개된 선생님 평가(고른 단계 강조 · 별점)와 친구들 평균, 선생님 한마디.
+ * 학생 화면에서는 작업장 위의 평가 기준 칸 대신 이 안에서 기준을 봅니다.
+ */
+export function MyReviewInline({ boardId, studentId }: { boardId: string; studentId: string }) {
+  const { api } = useSb();
+  const [data, setData] = useState<ReviewSummary | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    api<{ summary: ReviewSummary | null }>(`/boards/${boardId}/review/${studentId}`)
+      .then((r) => alive && setData(r.summary))
+      .catch(() => alive && setData(null));
+    return () => {
+      alive = false;
+    };
+  }, [api, boardId, studentId]);
+
+  if (data === undefined) return <p className="sb-column-review sb-meta">불러오는 중…</p>;
+  if (data === null) return <p className="sb-column-review sb-meta">평가를 볼 수 없어요.</p>;
+  const criteria = data.criteria ?? [];
+  if (criteria.length === 0) return <p className="sb-column-review sb-meta">아직 평가 기준이 없어요.</p>;
+  const tStars = data.teacher ? teacherStars(criteria, data.teacher.levels) : null;
+
+  return (
+    <div className="sb-column-review" data-testid="my-review-inline">
+      {criteria.map((c) => {
+        const picked = data.teacher?.levels?.[c.id];
+        // 잘함 → 보통 → 노력요함 순서로 보여 준다(저장 순서는 노력요함부터).
+        const levels = c.levels.map((l, i) => ({ ...l, i })).reverse();
+        return (
+          <section key={c.id} className="sb-review-item" data-testid="review-row">
+            <p className="sb-strong">{c.name}</p>
+            {c.description && <p className="hint">{c.description}</p>}
+            <ul className="sb-review-levels">
+              {levels.map((l) => (
+                <li key={l.i} className={picked === l.i ? 'is-selected' : undefined}>
+                  <b>{l.name}</b>
+                  {l.description ? <span>{l.description}</span> : null}
+                </li>
+              ))}
+            </ul>
+            <div className="sb-review-stars">
+              <span className="sb-meta">선생님</span>
+              <StarMeter value={tStars?.[c.id] ?? null} max={maxStars(c)} />
+            </div>
+            <div className="sb-review-stars">
+              <span className="sb-meta">친구들 평균</span>
+              <StarMeter value={data.peer_count > 0 ? (data.peer_avg[c.id] ?? null) : null} max={maxStars(c)} />
+            </div>
+          </section>
+        );
+      })}
+      <p className="sb-meta">{data.peer_count}명의 친구가 평가했어요</p>
+      {!data.teacher && <p className="sb-meta">선생님 평가는 아직 공개되지 않았어요.</p>}
+      {data.teacher?.feedback && (
+        <div className="sb-teacher-note">
+          <p className="sb-meta sb-strong">선생님 한마디</p>
+          <p className="sb-prewrap">{data.teacher.feedback}</p>
+        </div>
+      )}
+    </div>
+  );
+}

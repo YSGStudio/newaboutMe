@@ -108,8 +108,13 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
           )}
           <Notice type="error" message={error} />
           <Kanban view={view} onChanged={refetchView} />
-          <MyEvaluationPanel view={view} />
-          <CriteriaPanel view={view} />
+          {/* 학생은 자기 섹션의 📊에서 평가 기준·내 평가를 펼쳐 본다 — 자기 섹션이 없는 보드에서만 따로 보여 준다. */}
+          {(isTeacher || !view.columns.some((c) => c.member_id && c.member_id === b.viewer_id)) && (
+            <>
+              <MyEvaluationPanel view={view} />
+              <CriteriaPanel view={view} />
+            </>
+          )}
         </>
       )}
       {settings && view && (

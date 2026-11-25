@@ -1035,8 +1035,8 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* 별빛 캐릭터 & 뱃지 프로필 배너 */}
-      {isLoggedIn && (
+      {/* 별빛 캐릭터 & 뱃지 프로필 배너 — 별빛보드 탭에서는 보드를 넓게 쓰려고 그리지 않는다 */}
+      {isLoggedIn && activeTab !== 'starBoard' && (
         <section style={{
           background: 'linear-gradient(135deg, #eef2ff, #ede9fe)',
           borderRadius: 14, padding: '12px 16px',

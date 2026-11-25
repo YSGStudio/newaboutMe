@@ -5739,6 +5739,16 @@ button.sb-star:hover:not(:disabled) { opacity: 1; transform: scale(1.1); box-sha
 .sb-review-total small { color: var(--muted); font-size: 15px; }
 .sb-review-total.is-teacher small { color: #c9c4ee; }
 .sb-teacher-note { padding: 14px; border: 1.5px solid var(--border-soft); border-radius: var(--radius); }
+/* 학생 본인 섹션 안에 펼친 "내 평가 보기" — 칸 폭에 맞춰 세로로 쌓는다 */
+.sb-column-review { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 12px; border: 1.5px solid #ffe47b; border-radius: 16px; background: #fffdf5; font-size: 13px; }
+.sb-review-item { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); }
+.sb-review-item p { margin: 0; }
+.sb-review-levels { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.sb-review-levels li { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-xs); background: var(--surface); color: var(--muted); word-break: keep-all; }
+.sb-review-levels li b { color: var(--text); font-size: 12px; }
+.sb-review-levels li.is-selected { box-shadow: 0 0 0 2px var(--primary); color: var(--text); }
+.sb-review-stars { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sb-column-review .sb-star-track { font-size: 15px; }
 .sb-teacher-note p { margin: 0 0 4px; }
 .sb-level-row { display: grid; grid-template-columns: 10rem 5rem minmax(0, 1fr) auto; gap: 8px; }
 .sb-criterion-row { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; list-style: none; }

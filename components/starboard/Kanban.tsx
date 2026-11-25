@@ -31,7 +31,7 @@ import { json, useSb } from './context';
 import { AttachmentThumbs } from './attachments/AttachmentList';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
-import { PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
+import { MyReviewInline, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
 
 function sortCards(cards: CardView[]) {
   return [...cards].sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
@@ -150,6 +150,7 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
               reviewAction={reviewAction(col)}
               isMine={!!col.member_id && col.member_id === view.board.viewer_id}
               onReview={(mode) => setReview({ mode, id: col.member_id!, name: memberName(col.name) })}
+              evaluationBoardId={view.board.evaluation_board_id}
               onOpen={setOpenId}
               onChanged={onChanged}
             />
@@ -189,14 +190,19 @@ type ColumnProps = {
   reviewAction: 'summary' | 'peer' | null;
   isMine: boolean;
   onReview: (mode: 'summary' | 'peer') => void;
+  /** 평가가 걸린 작업장(개인 보드면 부모 작업장) — 학생 본인 섹션의 펼침 평가가 쓴다 */
+  evaluationBoardId: string;
   onOpen: (id: string) => void;
   onChanged: () => void;
 };
 
-function Column({ col, cards, canWrite, boardId, template, readOnly, reviewAction, isMine, onReview, onOpen, onChanged }: ColumnProps) {
+function Column({ col, cards, canWrite, boardId, template, readOnly, reviewAction, isMine, onReview, evaluationBoardId, onOpen, onChanged }: ColumnProps) {
   const { isTeacher } = useSb();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` });
   const [adding, setAdding] = useState(false);
+  // 학생 본인 섹션의 📊는 창을 띄우지 않고 섹션 안에 평가 기준·내 평가를 펼친다.
+  const inlineReview = !isTeacher && isMine && reviewAction === 'summary';
+  const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <section
       ref={setNodeRef}
@@ -215,8 +221,9 @@ function Column({ col, cards, canWrite, boardId, template, readOnly, reviewActio
         {reviewAction && (
           <button
             type="button"
-            className="sb-round-btn"
-            onClick={() => onReview(reviewAction)}
+            className={inlineReview && reviewOpen ? 'sb-round-btn is-active' : 'sb-round-btn'}
+            onClick={() => (inlineReview ? setReviewOpen((v) => !v) : onReview(reviewAction))}
+            aria-pressed={inlineReview ? reviewOpen : undefined}
             aria-label={reviewAction === 'peer' ? `${col.name} 평가하기` : isMine ? '내 평가 보기' : `${col.name} 평가 보기`}
             title={reviewAction === 'peer' ? '평가하기' : isMine ? '내 평가 보기' : '평가 보기'}
             data-testid={reviewAction === 'peer' ? 'peer-review-btn' : 'review-summary-btn'}
@@ -240,6 +247,7 @@ function Column({ col, cards, canWrite, boardId, template, readOnly, reviewActio
       </header>
       {isTeacher && col.effective_hide !== 'off' && <p className="sb-column-hide">가리기: {HIDE_MODE_LABEL[col.effective_hide]}</p>}
       <div className="sb-column-body">
+        {inlineReview && reviewOpen && col.member_id && <MyReviewInline boardId={evaluationBoardId} studentId={col.member_id} />}
         {canWrite && adding && (
           <AddCard boardId={boardId} columnId={col.id} template={template} lastPosition={cards.at(-1)?.position ?? 0} onAdded={onChanged} />
         )}
