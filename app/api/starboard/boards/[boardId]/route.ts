@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireActor } from '@/lib/group-project/actor';
 import { loadBoard, requireBoardTeacher, who } from '@/lib/starboard/access';
 import { cleanTemplate } from '@/lib/starboard/card-fields';
+import type { BoardView } from '@/lib/starboard/types';
+import type { Criterion } from '@/lib/starboard/criteria';
 import { cleanBoardTitle } from '@/lib/starboard/inputs';
 import { dbFail, jsonError, notFoundResponse, readJson } from '@/lib/starboard/http';
 import { boardFilePaths, descendantBoardIds, removeStoragePaths } from '@/lib/starboard/storage';
@@ -18,7 +20,18 @@ export async function GET(req: Request, { params }: Params) {
   const { data, error } = await supabaseAdmin.rpc('sb_get_board_view', { p_board: ctx.board.id, ...who(auth.actor) });
   if (error) return dbFail(error);
   if (!data) return notFoundResponse();
-  return NextResponse.json({ view: data });
+  const view = data as BoardView;
+  if (!ctx.isTeacher && !view.criteria.length && new URL(req.url).searchParams.get('rubric') === '1') {
+    // 작업장에서 학생은 등록된 기준을 볼 수 있다. 점수와 피드백은 기존 공개 규칙을 따른다.
+    const { data: rows, error: criteriaError } = await supabaseAdmin
+      .from('sb_board_criteria')
+      .select('criterion:sb_criteria(id, name, description, levels)')
+      .eq('board_id', view.board.evaluation_board_id)
+      .order('position');
+    if (criteriaError) return dbFail(criteriaError);
+    view.criteria = (rows ?? []).map((row) => row.criterion as unknown as Criterion);
+  }
+  return NextResponse.json({ view });
 }
 
 const HIDE = ['off', 'hidden', 'count', 'anonymous'];

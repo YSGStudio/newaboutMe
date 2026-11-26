@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Notice from '@/components/ui/Notice';
 import { useLoad } from '@/components/group-project/ui';
 import { json, useSb } from './context';
+import StudentIdentity from './StudentIdentity';
 
 type Summary = {
   columns: { id: string; name: string; color: string }[];
@@ -34,7 +35,7 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
   const s = data.summary;
   const hasPersonal = s.students.some((x) => x.personal_board_id);
   const published = s.students.filter((student) => student.evaluation_status === 'published').length;
-  const students = s.students.filter((student) => !s.has_criteria || filter === 'all' || (student.evaluation_status === 'published') === (filter === 'published'));
+  const students = s.students.filter((student) => !s.has_criteria || filter === 'all' || (student.evaluation_status === 'published') === (filter === 'published')).sort((a, b) => a.student_number - b.student_number || a.name.localeCompare(b.name, 'ko'));
   return (
     <main className="sb-summary">
       <header className="sb-space-header sb-summary-head">
@@ -72,7 +73,7 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
             {students.map((st) => (
               <tr key={st.id} data-testid={`summary-${st.student_number}`}>
                 <td>
-                  {st.name} <span className="sb-meta">{st.student_number}번</span>
+                  <StudentIdentity name={st.name} number={st.student_number} />
                 </td>
                 {s.columns.map((c) => (
                   <td key={c.id} className="sb-num" data-testid="count-cell">

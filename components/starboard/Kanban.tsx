@@ -34,7 +34,7 @@ import { ACCEPT_FILES, checkFile, normalizeLink } from '@/lib/starboard/upload';
 import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
-import { MyReviewInline, ReviewModal, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
+import { PeerReviewModal, ReviewSummaryModal, RubricModal, memberName } from './ReviewModals';
 
 function sortCards(cards: CardView[]) {
   return [...cards].sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
@@ -57,7 +57,7 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [composeId, setComposeId] = useState<string | null>(null);
-  const [showMyReview, setShowMyReview] = useState(false);
+  const [showRubric, setShowRubric] = useState(false);
   // 공지사항 섹션은 누구에게나 맨 앞. 학생에게는 그다음 자기 멤버 섹션을, 각 섹션 안에서는 자기 카드를 맨 앞에 보여 준다.
   // 자기 카드끼리·남의 카드끼리의 순서는 저장된 순서를 지킨다.
   const viewerId = view.board.viewer_id;
@@ -131,6 +131,19 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
   const writeChoices = myColumn ? [myColumn] : columns;
   const composeColumn = canWrite ? columns.find((col) => col.id === composeId) : undefined;
   const [review, setReview] = useState<{ mode: 'peer' | 'summary'; id: string; name: string } | null>(null);
+  const hasCriteria = appearance === 'workspace' && !readOnly && view.criteria.length > 0;
+  const myReviewId = !isTeacher && viewerId && (myColumn || hasCriteria || view.my_evaluation) ? viewerId : null;
+
+  const openCardReview = (card: CardView) => {
+    const id = card.is_mine && !isTeacher ? viewerId : card.author_id;
+    if (id && (isTeacher || card.is_mine)) {
+      setReview({ mode: 'summary', id, name: card.author_name ?? '나' });
+    } else if (id && view.board.kind === 'shared' && view.board.peer_review) {
+      setReview({ mode: 'peer', id, name: card.author_name ?? '친구' });
+    } else {
+      setShowRubric(true);
+    }
+  };
   // 섹션 주인에 따라: 내 섹션 → 내 평가 보기, 친구 섹션 → 평가하기(동료평가가 켜져 있고 기준이 있을 때), 교사 → 그 학생 평가 보기
   const reviewAction = (col: ColumnView): 'summary' | 'peer' | null => {
     if (readOnly || !col.member_id) return null;
@@ -146,7 +159,9 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
           {heading}
           <div className="sb-board-actions">
             {actions}
-            {myColumn && <button type="button" className="sb-btn-dark" onClick={() => setShowMyReview(true)}>내 평가</button>}
+            {myReviewId && (
+              <button type="button" className="sb-btn-dark" onClick={() => setReview({ mode: 'summary', id: myReviewId, name: '나' })}>내 평가</button>
+            )}
             {canWrite && writeChoices.length === 1 && (
               <button type="button" className="sb-btn-gold" onClick={() => setComposeId(writeChoices[0].id)}>
                 ＋ {myColumn ? '내 카드 쓰기' : '카드 쓰기'}
@@ -198,9 +213,10 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
               template={template}
               readOnly={!!readOnly}
               reviewAction={reviewAction(col)}
+              hasCriteria={hasCriteria}
+              onCardReview={openCardReview}
               isMine={!!col.member_id && col.member_id === view.board.viewer_id}
               onReview={(mode) => setReview({ mode, id: col.member_id!, name: memberName(col.name) })}
-              evaluationBoardId={view.board.evaluation_board_id}
               onOpen={setOpenId}
             />
           ))}
@@ -221,16 +237,12 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
           onClose={() => setComposeId(null)}
         />
       )}
-      {showMyReview && myColumn?.member_id && (
-        <ReviewModal label="내 평가" onClose={() => setShowMyReview(false)}>
-          <MyReviewInline boardId={view.board.evaluation_board_id} studentId={myColumn.member_id} />
-        </ReviewModal>
-      )}
+      {showRubric && <RubricModal criteria={view.criteria} onClose={() => setShowRubric(false)} />}
       {review?.mode === 'peer' && (
         <PeerReviewModal boardId={view.board.evaluation_board_id} target={{ id: review.id, name: review.name }} criteria={view.criteria} onClose={() => setReview(null)} />
       )}
       {review?.mode === 'summary' && (
-        <ReviewSummaryModal boardId={view.board.evaluation_board_id} student={{ id: review.id, name: review.name }} onClose={() => setReview(null)} />
+        <ReviewSummaryModal boardId={view.board.evaluation_board_id} student={{ id: review.id, name: review.name }} criteria={view.criteria} onClose={() => setReview(null)} />
       )}
       {openCard && (
         <CardModal
@@ -258,17 +270,14 @@ type ColumnProps = {
   reviewAction: 'summary' | 'peer' | null;
   isMine: boolean;
   onReview: (mode: 'summary' | 'peer') => void;
-  /** 평가가 걸린 작업장(개인 보드면 부모 작업장) — 학생 본인 섹션의 펼침 평가가 쓴다 */
-  evaluationBoardId: string;
+  hasCriteria: boolean;
+  onCardReview: (card: CardView) => void;
   onOpen: (id: string) => void;
 };
 
-function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, reviewAction, isMine, onReview, evaluationBoardId, onOpen }: ColumnProps) {
+function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, reviewAction, isMine, onReview, hasCriteria, onCardReview, onOpen }: ColumnProps) {
   const { isTeacher } = useSb();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` });
-  // 학생 본인 섹션의 📊는 창을 띄우지 않고 섹션 안에 평가 기준·내 평가를 펼친다.
-  const inlineReview = !isTeacher && isMine && reviewAction === 'summary';
-  const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <section
       ref={setNodeRef}
@@ -288,9 +297,8 @@ function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, r
         {reviewAction && (
           <button
             type="button"
-            className={inlineReview && reviewOpen ? 'sb-round-btn is-active' : 'sb-round-btn'}
-            onClick={() => (inlineReview ? setReviewOpen((v) => !v) : onReview(reviewAction))}
-            aria-pressed={inlineReview ? reviewOpen : undefined}
+            className={hasCriteria ? 'sb-round-btn sb-review-glow' : 'sb-round-btn'}
+            onClick={() => onReview(reviewAction)}
             aria-label={reviewAction === 'peer' ? `${col.name} 평가하기` : isMine ? '내 평가 보기' : `${col.name} 평가 보기`}
             title={reviewAction === 'peer' ? '평가하기' : isMine ? '내 평가 보기' : '평가 보기'}
             data-testid={reviewAction === 'peer' ? 'peer-review-btn' : 'review-summary-btn'}
@@ -313,14 +321,21 @@ function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, r
       </header>
       {isTeacher && col.effective_hide !== 'off' && <p className="sb-column-hide">가리기: {HIDE_MODE_LABEL[col.effective_hide]}</p>}
       <div className="sb-column-body">
-        {inlineReview && reviewOpen && col.member_id && <MyReviewInline boardId={evaluationBoardId} studentId={col.member_id} />}
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           <ul className="sb-card-list">
             {cards.length === 0 && col.hidden_count === 0 && (
               <li className="sb-empty-row">{onWrite ? '✏️를 눌러 글을 써 보세요' : '아직 카드가 없어요'}</li>
             )}
             {cards.map((card) => (
-              <CardItem key={card.id} card={card} template={template} boardId={boardId} readOnly={readOnly} onOpen={() => onOpen(card.id)} />
+              <CardItem
+                key={card.id}
+                card={card}
+                template={template}
+                boardId={boardId}
+                readOnly={readOnly}
+                onOpen={() => onOpen(card.id)}
+                onReview={hasCriteria && card.author_role !== 'teacher' ? () => onCardReview(card) : undefined}
+              />
             ))}
             {col.hidden_count > 0 && (
               <li className="sb-hidden-count" data-testid="hidden-count">
@@ -334,7 +349,7 @@ function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, r
   );
 }
 
-function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardView; template: CardField[]; boardId: string; readOnly: boolean; onOpen: () => void }) {
+function CardItem({ card, template, boardId, readOnly, onOpen, onReview }: { card: CardView; template: CardField[]; boardId: string; readOnly: boolean; onOpen: () => void; onReview?: () => void }) {
   const movable = card.can_edit && !readOnly;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id, disabled: !movable });
   const done = card.checklist.filter((c) => c.done).length;
@@ -369,8 +384,16 @@ function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardVie
           </span>
         </button>
         <AttachmentThumbs boardId={boardId} items={card.attachments} />
-        <AuthorLine card={card} />
+        {!onReview && <AuthorLine card={card} />}
       </div>
+      {onReview && (
+        <div className="sb-card-review-footer">
+          <AuthorLine card={card} />
+          <button type="button" className="sb-round-btn sb-review-glow" aria-label={`${card.title} 평가 기준 보기`} title="평가 기준 보기" onClick={onReview} data-testid="card-review-btn">
+            <span aria-hidden="true">⭐</span>
+          </button>
+        </div>
+      )}
     </li>
   );
 }

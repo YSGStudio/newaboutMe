@@ -6,7 +6,7 @@
  * 작업장 화면의 오른쪽 서랍과 작업장 설정 화면이 같은 패널을 씁니다.
  * 학급 학생·학생별 권한·내 기준 목록은 패널이 직접 불러옵니다.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import type { Access, BoardView, PermissionRow, StudentLite, TreeNode } from '@/lib/starboard/types';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { HIDE_MODE_LABEL, type HideMode } from '@/lib/starboard/hiding';
@@ -14,12 +14,14 @@ import { COLUMN_PALETTE, MAX_COLUMNS, MIN_COLUMNS, orderColumns } from '@/lib/st
 import { descendants } from '@/lib/starboard/tree';
 import { FIELD_TYPE_LABEL, MAX_CARD_FIELDS, MAX_FIELD_LABEL, newFieldId, type CardField, type CardFieldType } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
+import StudentIdentity from './StudentIdentity';
 import CriterionForm from './CriterionForm';
 import LearningCriteriaImport from './LearningCriteriaImport';
 import { useLoad } from '@/components/group-project/ui';
 
 const ACCESS_LABEL: Record<Access, string> = { none: '없음', read: '읽기', edit: '수정' };
 const TABS = ['일반', '열', '카드 형식', '가리기', '권한', '개인 보드', '평가 기준'] as const;
+const TAB_COLORS = ['lavender', 'blue', 'pink', 'gold', 'green', 'blue', 'lavender'] as const;
 export type Tab = (typeof TABS)[number];
 
 type SettingsData = { students: StudentLite[]; permissions: PermissionRow[]; myCriteria: Criterion[] };
@@ -38,6 +40,7 @@ type Run = (fn: () => Promise<unknown>, success?: string) => void;
 
 export function BoardSettingsPanel({ view, projectId, tree, onChanged, onDeleted, initialTab = '일반' }: PanelProps) {
   const { api } = useSb();
+  const tabsId = useId();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -79,13 +82,32 @@ export function BoardSettingsPanel({ view, projectId, tree, onChanged, onDeleted
   return (
     <div className="sb-settings">
       <div className="sb-settings-tabs" role="tablist" aria-label="설정 항목">
-        {tabs.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={current === t} className={current === t ? 'sb-line-tab is-active' : 'sb-line-tab'} onClick={() => setTab(t)}>
+        {tabs.map((t, index) => (
+          <button
+            key={t}
+            id={`${tabsId}-${t}`}
+            type="button"
+            role="tab"
+            aria-selected={current === t}
+            aria-controls={`${tabsId}-panel`}
+            tabIndex={current === t ? 0 : -1}
+            className="sb-line-tab"
+            data-tone={TAB_COLORS[TABS.indexOf(t)]}
+            onClick={() => setTab(t)}
+            onKeyDown={(event) => {
+              const nextIndex = { ArrowLeft: (index + tabs.length - 1) % tabs.length, ArrowRight: (index + 1) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key];
+              if (nextIndex === undefined) return;
+              event.preventDefault();
+              const next = tabs[nextIndex];
+              setTab(next);
+              document.getElementById(`${tabsId}-${next}`)?.focus();
+            }}
+          >
             {t}
           </button>
         ))}
       </div>
-      <div className="sb-settings-body" role="tabpanel">
+      <div className="sb-settings-body" id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${current}`}>
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -463,14 +485,42 @@ function HidingTab({ view, pending, run }: { view: BoardView; pending: boolean; 
   );
 }
 
+function filterStudents(students: StudentLite[], query: string) {
+  const term = query.trim().replace(/\s+/g, '');
+  return students
+    .filter((student) => student.name.replace(/\s+/g, '').includes(term) || `${student.student_number}번`.includes(term))
+    .sort((a, b) => a.student_number - b.student_number || a.name.localeCompare(b.name, 'ko'));
+}
+
+function StudentSearch({ query, onChange, count }: { query: string; onChange: (value: string) => void; count: number }) {
+  return (
+    <div className="sb-student-search">
+      <input type="search" aria-label="이름 또는 번호로 학생 찾기" placeholder="이름 또는 번호로 학생 찾기" value={query} onChange={(e) => onChange(e.target.value)} />
+      <span className="sb-meta" aria-live="polite">{count}명</span>
+    </div>
+  );
+}
+
 function PermissionsTab({ view, students, permissions, pending, run }: { view: BoardView; students: StudentLite[]; permissions: PermissionRow[]; pending: boolean; run: Run }) {
   const { api } = useSb();
   const b = view.board;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const perm = new Map(permissions.map((p) => [p.student_id, p.access]));
+  const [query, setQuery] = useState('');
+  const visible = filterStudents(students, query);
   const def = (b.default_access ?? 'none') as Access;
   const effective = (id: string): Access => perm.get(id) ?? (b.kind === 'personal' && b.owner_id === id ? 'edit' : def);
-  const all = students.length > 0 && selected.size === students.length;
+  const all = visible.length > 0 && visible.every((student) => selected.has(student.id));
+  const toggleVisible = () => {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const student of visible) {
+        if (all) next.delete(student.id);
+        else next.add(student.id);
+      }
+      return next;
+    });
+  };
   const apply = (a: Access | 'default') => {
     const ids = [...selected];
     run(() => api(`/boards/${b.id}/permissions`, json('PUT', { studentIds: ids, access: a })), `${ids.length}명의 권한을 바꿨습니다.`);
@@ -504,22 +554,25 @@ function PermissionsTab({ view, students, permissions, pending, run }: { view: B
           기본값 따르기
         </button>
       </div>
-      <div className="sb-table-scroll">
-        <table className="table">
+      <StudentSearch query={query} onChange={setQuery} count={visible.length} />
+      <div className="sb-table-scroll sb-roster-table-wrap">
+        <table className="table sb-roster-table">
           <thead>
             <tr>
               <th>
-                <input type="checkbox" aria-label="전체 선택" checked={all} onChange={() => setSelected(all ? new Set() : new Set(students.map((s) => s.id)))} />
+                <input type="checkbox" aria-label={query.trim() ? '검색 결과 전체 선택' : '전체 선택'} checked={all} disabled={!visible.length} onChange={toggleVisible} />
               </th>
               <th>학생</th>
               <th>권한</th>
             </tr>
           </thead>
           <tbody>
-            {students.map((s) => {
+            {!visible.length && <tr><td colSpan={3}>표시할 학생이 없습니다.</td></tr>}
+            {visible.map((s) => {
               const explicit = perm.get(s.id);
+              const access = effective(s.id);
               return (
-                <tr key={s.id} data-testid={`perm-${s.student_number}`}>
+                <tr key={s.id} className={selected.has(s.id) ? 'is-selected' : undefined} data-testid={`perm-${s.student_number}`}>
                   <td>
                     <input
                       type="checkbox"
@@ -536,11 +589,11 @@ function PermissionsTab({ view, students, permissions, pending, run }: { view: B
                     />
                   </td>
                   <td>
-                    {s.name} <span className="sb-meta">{s.student_number}번</span>
+                    <StudentIdentity name={s.name} number={s.student_number} />
                   </td>
                   <td>
-                    {ACCESS_LABEL[effective(s.id)]}
-                    {explicit ? <span className="sb-meta sb-strong"> (학생별)</span> : <span className="sb-meta"> (기본)</span>}
+                    <span className="sb-roster-access" data-access={access}>{ACCESS_LABEL[access]}</span>
+                    <span className="sb-meta">{explicit ? '학생별' : '기본'}</span>
                   </td>
                 </tr>
               );
@@ -557,6 +610,8 @@ function PersonalTab({ view, students, pending, run }: { view: BoardView; studen
   const b = view.board;
   const [mode, setMode] = useState<'all' | 'some'>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+  const visible = filterStudents(students, query);
   return (
     <>
       <p className="hint">
@@ -572,24 +627,29 @@ function PersonalTab({ view, students, pending, run }: { view: BoardView; studen
         </label>
       </fieldset>
       {mode === 'some' && (
-        <div className="sb-check-grid">
-          {students.map((s) => (
-            <label key={s.id} className="sb-choice">
-              <input
-                type="checkbox"
-                checked={selected.has(s.id)}
-                onChange={() =>
-                  setSelected((cur) => {
-                    const n = new Set(cur);
-                    if (n.has(s.id)) n.delete(s.id);
-                    else n.add(s.id);
-                    return n;
-                  })
-                }
-              />
-              {s.name}
-            </label>
-          ))}
+        <div className="sb-student-picker">
+          <StudentSearch query={query} onChange={setQuery} count={visible.length} />
+          <p className="sb-meta">{selected.size}명 선택</p>
+          <div className="sb-check-grid sb-student-choices">
+            {!visible.length && <p className="sb-meta">표시할 학생이 없습니다.</p>}
+            {visible.map((s) => (
+              <label key={s.id} className={selected.has(s.id) ? 'sb-choice is-selected' : 'sb-choice'}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(s.id)}
+                  onChange={() =>
+                    setSelected((cur) => {
+                      const n = new Set(cur);
+                      if (n.has(s.id)) n.delete(s.id);
+                      else n.add(s.id);
+                      return n;
+                    })
+                  }
+                />
+                <StudentIdentity name={s.name} number={s.student_number} />
+              </label>
+            ))}
+          </div>
         </div>
       )}
       <button
@@ -620,10 +680,6 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
   const crit = (method: string, body: Record<string, unknown>, msg?: string) => run(() => api(`/boards/${b.id}/criteria`, json(method, body)), msg);
   return (
     <>
-      <label className="sb-choice">
-        <input type="checkbox" checked={b.show_criteria} disabled={pending} onChange={(e) => run(() => api(`/boards/${b.id}`, json('PATCH', { show_criteria: e.target.checked })))} />
-        학생에게 기준 미리 보여주기
-      </label>
       <label className="sb-choice is-top">
         <input
           type="checkbox"
@@ -635,7 +691,7 @@ function CriteriaTab({ view, myCriteria, pending, run, onChanged }: { view: Boar
         <span>
           학생끼리 평가하기(동료평가)
           <span className="hint sb-block">
-            멤버별 섹션 머리의 ⭐로 친구를 이 기준에 따라 별점으로 평가해요(자기 자신은 안 돼요). 각자 자기 섹션의 📊에서 선생님 평가와 친구 평가 총평균을 봐요. 켜 두면 학생도 기준을 봐요.
+            친구 카드나 섹션의 ⭐에서 기준을 확인하고 별점을 줄 수 있어요. 내 평가에는 교사가 공개한 평가와 친구 평가 평균이 표시돼요.
           </span>
         </span>
       </label>

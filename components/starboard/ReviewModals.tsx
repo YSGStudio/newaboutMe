@@ -5,7 +5,7 @@
  * 평가하기: 교사가 붙인 기준마다 별(1~단계 수)을 고릅니다. 같은 별을 다시 누르면 지웁니다. 누가 줬는지는 보이지 않아요.
  * 평가 보기: 선생님 평가 총평균 + 친구 평가 총평균(5점 만점 환산), 기준별 별 막대, 선생님 한마디.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { fmt1, maxStars, overallOutOf5, starLabel, teacherStars, type ReviewSummary, type Stars } from '@/lib/starboard/peer';
 import { json, useSb } from './context';
@@ -13,7 +13,15 @@ import { json, useSb } from './context';
 /** 섹션 이름 '01. 이름' → '이름' */
 export const memberName = (columnName: string) => columnName.replace(/^\d+\.\s*/, '');
 
-export function ReviewModal({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+function ReviewModal({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const trigger = document.activeElement;
+    closeButton.current?.focus();
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -21,10 +29,10 @@ export function ReviewModal({ label, onClose, children }: { label: string; onClo
   }, [onClose]);
   return (
     <div className="sb-overlay" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={label} className="sb-modal is-narrow sb-review-dialog" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={label} className="sb-modal sb-review-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="sb-modal-head">
           <h2 className="sb-modal-title">{label}</h2>
-          <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
+          <button ref={closeButton} type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
             ×
           </button>
         </div>
@@ -124,6 +132,7 @@ export function PeerReviewModal({ boardId, target, criteria, onClose }: { boardI
               <legend className="sb-sr-only">{c.name}</legend>
               <p className="sb-strong">{c.name}</p>
               {c.description && <p className="hint">{c.description}</p>}
+              <CriterionLevels criterion={c} />
               <StarInput
                 c={c}
                 value={stars[c.id]}
@@ -162,7 +171,12 @@ export function PeerReviewModal({ boardId, target, criteria, onClose }: { boardI
 }
 
 /** 내 평가 보기(학생 본인) / 학생 평가 보기(교사): 선생님 평가 + 친구들 평가 평균 */
-export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: string; student: { id: string; name: string }; onClose: () => void }) {
+export function ReviewSummaryModal({ boardId, student, criteria: boardCriteria, onClose }: {
+  boardId: string;
+  student: { id: string; name: string };
+  criteria: Criterion[];
+  onClose: () => void;
+}) {
   const { api, isTeacher } = useSb();
   const [data, setData] = useState<ReviewSummary | null | undefined>(undefined);
   useEffect(() => {
@@ -175,67 +189,53 @@ export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: str
     };
   }, [api, boardId, student.id]);
 
-  const criteria = data?.criteria ?? [];
+  const criteria = data?.criteria ?? boardCriteria;
   const tStars = data?.teacher ? teacherStars(criteria, data.teacher.levels) : null;
   const tOverall = tStars ? overallOutOf5(criteria, tStars) : null;
   const pOverall = data && data.peer_count > 0 ? overallOutOf5(criteria, data.peer_avg) : null;
 
   return (
     <ReviewModal label={isTeacher ? `📊 ${student.name} 평가 보기` : '📊 내 평가 보기'} onClose={onClose}>
-      {data === undefined ? (
-        <p className="sb-empty-row">불러오는 중…</p>
-      ) : data === null ? (
-        <p className="sb-empty-row">평가를 볼 수 없어요.</p>
-      ) : criteria.length === 0 ? (
-        <p className="sb-empty-row">아직 이 작업장에 평가 기준이 없어요.</p>
-      ) : (
+      {data === undefined && <p className="sb-empty-row" role="status">평가 결과를 불러오는 중…</p>}
+      {data === null && <p className="notice info">평가 결과를 불러올 수 없어요.</p>}
+      {criteria.length === 0 && data && <p className="sb-empty-row">아직 이 작업장에 평가 기준이 없어요.</p>}
+      {criteria.length > 0 && (
         <div className="sb-stack" data-testid="review-summary">
-          <div className="sb-review-totals">
-            <div className="sb-review-total is-teacher">
-              <span>선생님 평가 총평균</span>
-              <strong data-testid="teacher-overall">
-                {tOverall === null ? '—' : fmt1(tOverall)}
-                <small> / 5</small>
-              </strong>
-              {isTeacher && data.teacher && !data.teacher.published && <span className="sb-gold">학생에게 아직 비공개</span>}
+          {data && (
+            <div className="sb-review-totals">
+              <div className="sb-review-total is-teacher">
+                <span>선생님 평가 총평균</span>
+                <strong data-testid="teacher-overall">
+                  {tOverall === null ? '—' : fmt1(tOverall)}
+                  <small> / 5</small>
+                </strong>
+                {isTeacher && data.teacher && !data.teacher.published && <span className="sb-gold">학생에게 아직 비공개</span>}
+              </div>
+              <div className="sb-review-total">
+                <span>친구 평가 총평균</span>
+                <strong data-testid="peer-overall">
+                  {pOverall === null ? '—' : fmt1(pOverall)}
+                  <small> / 5</small>
+                </strong>
+                <span className="sb-meta" data-testid="peer-count">
+                  {data.peer_count}명이 평가했어요
+                </span>
+              </div>
             </div>
-            <div className="sb-review-total">
-              <span>친구 평가 총평균</span>
-              <strong data-testid="peer-overall">
-                {pOverall === null ? '—' : fmt1(pOverall)}
-                <small> / 5</small>
-              </strong>
-              <span className="sb-meta" data-testid="peer-count">
-                {data.peer_count}명이 평가했어요
-              </span>
-            </div>
-          </div>
-          <div className="sb-table-scroll">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>평가 기준</th>
-                  <th>선생님</th>
-                  <th>친구들 평균</th>
-                </tr>
-              </thead>
-              <tbody>
-                {criteria.map((c) => (
-                  <tr key={c.id} data-testid="review-row">
-                    <td className="sb-strong">{c.name}</td>
-                    <td>
-                      <StarMeter value={tStars?.[c.id] ?? null} max={maxStars(c)} />
-                    </td>
-                    <td>
-                      <StarMeter value={data.peer_avg[c.id] ?? null} max={maxStars(c)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!data.teacher && <p className="notice info">{isTeacher ? '아직 이 학생을 평가하지 않았어요.' : '선생님 평가는 아직 공개되지 않았어요.'}</p>}
-          {data.teacher?.feedback && (
+          )}
+          {criteria.map((c) => (
+            <section className="sb-review-criterion" key={c.id} data-testid="review-row">
+              <h3>{c.name}</h3>
+              {c.description && <p className="hint">{c.description}</p>}
+              <CriterionLevels criterion={c} selected={data?.teacher?.levels[c.id]} />
+              {data && <div className="sb-row-wrap sb-review-scores">
+                <div className="sb-review-stars"><span className="sb-meta">선생님</span><StarMeter value={tStars?.[c.id] ?? null} max={maxStars(c)} /></div>
+                <div className="sb-review-stars"><span className="sb-meta">친구들 평균</span><StarMeter value={data.peer_avg[c.id] ?? null} max={maxStars(c)} /></div>
+              </div>}
+            </section>
+          ))}
+          {data && !data.teacher && <p className="notice info">{isTeacher ? '아직 이 학생을 평가하지 않았어요.' : '선생님 평가는 아직 공개되지 않았어요.'}</p>}
+          {data?.teacher?.feedback && (
             <div className="sb-teacher-note">
               <p className="sb-meta sb-strong">선생님 한마디</p>
               <p className="sb-prewrap">{data.teacher.feedback}</p>
@@ -247,68 +247,31 @@ export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: str
   );
 }
 
-/**
- * MyReviewInline — 학생 본인 섹션 안에 펼치는 "내 평가 보기"
- * 섹션 머리의 📊를 누르면 칸 폭에 맞춰 세로로 쌓아 보여 줍니다: 평가 기준(단계별 기준 문장),
- * 공개된 선생님 평가(고른 단계 강조 · 별점)와 친구들 평균, 선생님 한마디.
- * 학생 화면에서는 작업장 위의 평가 기준 칸 대신 이 안에서 기준을 봅니다.
- */
-export function MyReviewInline({ boardId, studentId }: { boardId: string; studentId: string }) {
-  const { api } = useSb();
-  const [data, setData] = useState<ReviewSummary | null | undefined>(undefined);
-  useEffect(() => {
-    let alive = true;
-    api<{ summary: ReviewSummary | null }>(`/boards/${boardId}/review/${studentId}`)
-      .then((r) => alive && setData(r.summary))
-      .catch(() => alive && setData(null));
-    return () => {
-      alive = false;
-    };
-  }, [api, boardId, studentId]);
-
-  if (data === undefined) return <p className="sb-column-review sb-meta">불러오는 중…</p>;
-  if (data === null) return <p className="sb-column-review sb-meta">평가를 볼 수 없어요.</p>;
-  const criteria = data.criteria ?? [];
-  if (criteria.length === 0) return <p className="sb-column-review sb-meta">아직 평가 기준이 없어요.</p>;
-  const tStars = data.teacher ? teacherStars(criteria, data.teacher.levels) : null;
-
+export function CriterionLevels({ criterion, selected }: { criterion: Criterion; selected?: number }) {
+  const levels = criterion.levels.map((level, index) => ({ ...level, index })).sort((a, b) => b.score - a.score);
   return (
-    <div className="sb-column-review" data-testid="my-review-inline">
-      {criteria.map((c) => {
-        const picked = data.teacher?.levels?.[c.id];
-        // 잘함 → 보통 → 노력요함 순서로 보여 준다(저장 순서는 노력요함부터).
-        const levels = c.levels.map((l, i) => ({ ...l, i })).reverse();
-        return (
-          <section key={c.id} className="sb-review-item" data-testid="review-row">
-            <p className="sb-strong">{c.name}</p>
-            {c.description && <p className="hint">{c.description}</p>}
-            <ul className="sb-review-levels">
-              {levels.map((l) => (
-                <li key={l.i} className={picked === l.i ? 'is-selected' : undefined}>
-                  <b>{l.name}</b>
-                  {l.description ? <span>{l.description}</span> : null}
-                </li>
-              ))}
-            </ul>
-            <div className="sb-review-stars">
-              <span className="sb-meta">선생님</span>
-              <StarMeter value={tStars?.[c.id] ?? null} max={maxStars(c)} />
-            </div>
-            <div className="sb-review-stars">
-              <span className="sb-meta">친구들 평균</span>
-              <StarMeter value={data.peer_count > 0 ? (data.peer_avg[c.id] ?? null) : null} max={maxStars(c)} />
-            </div>
-          </section>
-        );
-      })}
-      <p className="sb-meta">{data.peer_count}명의 친구가 평가했어요</p>
-      {!data.teacher && <p className="sb-meta">선생님 평가는 아직 공개되지 않았어요.</p>}
-      {data.teacher?.feedback && (
-        <div className="sb-teacher-note">
-          <p className="sb-meta sb-strong">선생님 한마디</p>
-          <p className="sb-prewrap">{data.teacher.feedback}</p>
-        </div>
-      )}
-    </div>
+    <ul className="sb-review-levels">
+      {levels.map((level) => (
+        <li key={level.index} className={selected === level.index ? 'is-selected' : undefined}>
+          <b>{level.name} · {level.score}점</b>
+          {level.description && <span>{level.description}</span>}
+          {selected === level.index && <span className="sb-strong">선생님이 선택한 단계</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function RubricModal({ criteria, onClose }: { criteria: Criterion[]; onClose: () => void }) {
+  return (
+    <ReviewModal label="평가 기준" onClose={onClose}>
+      {criteria.map((criterion) => (
+        <section className="sb-review-criterion" key={criterion.id}>
+          <h3>{criterion.name}</h3>
+          {criterion.description && <p className="hint">{criterion.description}</p>}
+          <CriterionLevels criterion={criterion} />
+        </section>
+      ))}
+    </ReviewModal>
   );
 }

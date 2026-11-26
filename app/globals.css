@@ -5600,16 +5600,8 @@ button.sb-recent-card:hover:not(:disabled) { opacity: 1; filter: brightness(.97)
 .sb-board-head h1 { margin: 0; color: var(--text); font-size: clamp(22px, 3vw, 30px); font-weight: 700; word-break: keep-all; letter-spacing: -.02em; }
 .sb-board-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .sb-no-access { color: var(--muted); text-align: center; }
-.sb-criteria-panel summary { font-weight: 700; cursor: pointer; }
-.sb-criteria-panel > ul { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; }
 .sb-level-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; font-size: 13px; list-style: none; }
 .sb-level-chips li { padding: 4px 10px; border-radius: var(--radius-xs); background: var(--primary-soft); }
-.sb-my-eval { padding: 16px; border: 1.5px solid #bbf7d0; border-radius: var(--radius); background: #f0fdf4; }
-.sb-my-eval h2 { margin: 0 0 8px; color: #16a34a; font-size: 17px; }
-.sb-my-eval ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.sb-my-eval li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
-.sb-my-eval-level { padding: 2px 12px; border-radius: 999px; background: #16a34a; color: #fff; font-size: 13px; font-weight: 700; }
-.sb-my-eval-feedback { margin: 12px 0 0; padding: 12px; border-radius: var(--radius-sm); background: var(--surface); white-space: pre-wrap; }
 
 /* 칸반 */
 .sb-kanban { display: flex; overflow-x: auto; align-items: flex-start; gap: 16px; padding: 4px 4px 20px; scroll-snap-type: x proximity; }
@@ -5806,7 +5798,6 @@ button.sb-star:hover:not(:disabled) { opacity: 1; transform: scale(1.1); box-sha
 .sb-review-total.is-teacher small { color: #c9c4ee; }
 .sb-teacher-note { padding: 14px; border: 1.5px solid var(--border-soft); border-radius: var(--radius); }
 /* 학생 본인 섹션 안에 펼친 "내 평가 보기" — 칸 폭에 맞춰 세로로 쌓는다 */
-.sb-column-review { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 12px; border: 1.5px solid #ffe47b; border-radius: 16px; background: #fffdf5; font-size: 13px; }
 .sb-review-item { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); }
 .sb-review-item p { margin: 0; }
 .sb-review-levels { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
@@ -5814,7 +5805,6 @@ button.sb-star:hover:not(:disabled) { opacity: 1; transform: scale(1.1); box-sha
 .sb-review-levels li b { color: var(--text); font-size: 12px; }
 .sb-review-levels li.is-selected { box-shadow: 0 0 0 2px var(--primary); color: var(--text); }
 .sb-review-stars { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sb-column-review .sb-star-track { font-size: 15px; }
 .sb-teacher-note p { margin: 0 0 4px; }
 .sb-level-row { display: grid; grid-template-columns: 10rem 5rem minmax(0, 1fr) auto; gap: 8px; }
 .sb-criterion-row { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; list-style: none; }
@@ -5823,12 +5813,6 @@ button.sb-star:hover:not(:disabled) { opacity: 1; transform: scale(1.1); box-sha
 
 /* 설정 패널 */
 .sb-settings { display: flex; flex-direction: column; }
-.sb-settings-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); }
-/* 설정 탭 — 글자 탭 + 선택한 탭 아래 보라 2px 밑줄(작업장 설정 시안, 2026-11-26 사용자 승인) */
-button.sb-line-tab { position: relative; flex-shrink: 0; width: auto; min-height: 44px; padding: 12px 10px 13px; border-radius: 0; background: transparent; color: var(--muted); box-shadow: none; font-size: 14px; font-weight: 500; white-space: nowrap; }
-button.sb-line-tab:hover:not(:disabled) { color: var(--text); transform: none; box-shadow: none; }
-button.sb-line-tab.is-active { color: var(--text); font-weight: 700; }
-button.sb-line-tab.is-active::after { position: absolute; right: 8px; bottom: -1px; left: 8px; height: 2px; border-radius: 2px; background: var(--primary); content: ''; }
 .sb-settings-body { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
 .sb-format-fixed,
 .sb-format-default { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: var(--radius-sm); font-size: 14px; }
@@ -6126,7 +6110,6 @@ button.sb-group-toggle:hover:not(:disabled) { background: var(--bg); transform: 
 .sb-card-history summary { color: var(--text); font-weight: 700; cursor: pointer; }
 .sb-card-history ol { margin-top: 10px; }
 .sb-panel .sb-review-dialog { background: var(--sb-sheet); }
-.sb-panel .sb-review-dialog:has(.sb-column-review) { background: var(--sb-paper); }
 
 @media (max-width: 640px) {
   .sb-space-header { padding: 15px; }
@@ -6136,3 +6119,94 @@ button.sb-group-toggle:hover:not(:disabled) { background: var(--bg); transform: 
   .sb-write-menu > div { right: auto; left: 0; }
   .sb-compose-dialog[open] { max-width: 100%; max-height: 100dvh; }
 }
+
+/* 카드에서 여는 평가 기준 및 평가 보기 */
+.sb-card-review-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--sb-paper-border);
+}
+.sb-card-review-footer .sb-author { flex: 1; min-width: 0; padding: 0; border: 0; }
+button.sb-round-btn.sb-review-glow {
+  border: 1px solid #b98510;
+  background: #fff0b6;
+  color: #573b03;
+  box-shadow: 0 0 0 2px #ffe47b, 0 0 10px #fbbf2480;
+}
+button.sb-round-btn.sb-review-glow:hover:not(:disabled) { background: #ffe47b; box-shadow: 0 0 0 2px #d69c20, 0 0 14px #fbbf2490; }
+.sb-modal.sb-review-dialog { max-width: 880px; }
+.sb-review-dialog .sb-review-criterion { min-width: 0; padding: 14px; border: 1px solid #c9bdf0; border-radius: var(--radius); background: #f8f5ff; }
+.sb-review-dialog .sb-review-criterion h3 { margin: 0; color: var(--text); font-size: 16px; }
+.sb-review-dialog .sb-review-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-block: 8px; }
+.sb-review-dialog .sb-review-levels li { gap: 5px; padding: 10px; border: 1px solid #e0d7f8; font-size: 14px; overflow-wrap: anywhere; }
+.sb-review-dialog .sb-review-levels li b { font-size: 14px; }
+.sb-review-dialog .sb-review-levels li.is-selected { background: #fff7d8; box-shadow: 0 0 0 2px #b98510; }
+.sb-review-scores { column-gap: 20px; }
+
+@media (max-width: 640px) {
+  .sb-review-dialog .sb-review-levels { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 작업장 설정의 탭과 학생 명단 */
+html:has(.sb-settings) { scrollbar-gutter: stable; }
+.sb-panel .sb-workspace-drawer { flex: 0 0 auto; width: min(100%, 720px); max-width: none; scrollbar-gutter: stable; }
+.sb-settings, .sb-settings-body { width: 100%; min-width: 0; }
+.sb-settings-body > * { min-width: 0; }
+.sb-settings-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px;
+  border: 1px solid #c9bdf0;
+  border-radius: var(--radius);
+  background: #e4dcf8;
+  scroll-padding: 6px;
+}
+.sb-settings-tabs button.sb-line-tab {
+  flex: 1 0 82px;
+  width: auto;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid #5f4d982b;
+  border-radius: 9px;
+  background: var(--sb-tab-color, #f2eaff);
+  color: #332457;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sb-line-tab[data-tone="blue"] { --sb-tab-color: #d4e8f8; }
+.sb-line-tab[data-tone="pink"] { --sb-tab-color: #f9d5f0; }
+.sb-line-tab[data-tone="gold"] { --sb-tab-color: #fbf0c0; }
+.sb-line-tab[data-tone="green"] { --sb-tab-color: #d6f0dc; }
+.sb-settings-tabs button.sb-line-tab:hover:not(:disabled) { opacity: 1; transform: none; border-color: #6e5bb1; }
+.sb-settings-tabs button.sb-line-tab[aria-selected="true"] { border-color: #352478; background: #352478; color: white; box-shadow: inset 0 -3px #ffe47b; }
+.sb-settings-tabs button.sb-line-tab:focus-visible { outline: 2px solid #352478; outline-offset: 2px; }
+.sb-student-identity { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-align: left; }
+.sb-student-identity strong { overflow-wrap: anywhere; }
+.sb-student-number { flex: 0 0 auto; min-width: 36px; padding: 3px 6px; border-radius: 7px; background: #e4dbfb; color: #433378; font-size: 12px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.sb-student-search { display: flex; align-items: center; gap: 10px; }
+.sb-student-search input { min-width: 0; max-width: 340px; }
+.sb-student-search span { white-space: nowrap; }
+.sb-roster-table-wrap { border: 1px solid #c9bdf0; border-radius: var(--radius-sm); background: #f8f5ff; }
+.sb-roster-table { min-width: 280px; }
+.sb-roster-table :is(th, td):first-child { width: 46px; text-align: center; }
+.sb-roster-table input[type="checkbox"], .sb-student-choices input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--primary-dark); }
+.sb-roster-table th { background: #ded5ff; }
+.sb-roster-table tbody tr:nth-child(even) { background: #eee8fc; }
+.sb-roster-table tbody tr.is-selected { background: #e4daff; }
+.sb-roster-access { display: inline-block; margin-right: 6px; padding: 3px 8px; border-radius: 999px; background: #e5e7eb; color: #374151; font-size: 12px; font-weight: 700; }
+.sb-roster-access[data-access="read"] { background: #dbeafe; color: #1e40af; }
+.sb-roster-access[data-access="edit"] { background: #dcfce7; color: #166534; }
+.sb-student-picker { display: grid; gap: 8px; }
+.sb-student-picker > p { margin: 0; }
+.sb-student-choices { grid-template-columns: repeat(auto-fill, minmax(min(154px, 100%), 1fr)); border-color: #c9bdf0; background: #e6defa; }
+.sb-student-choices .sb-choice { gap: 8px; min-height: 42px; padding: 7px 9px; border: 1px solid #d5c8f2; border-radius: 8px; background: #f8f5ff; cursor: pointer; }
+.sb-student-choices .sb-choice.is-selected { border-color: #8872c5; background: #e4daff; }
+.sb-summary-table tr > :first-child { position: sticky; left: 0; z-index: 1; min-width: 125px; background: #ede9fe; box-shadow: 1px 0 #d6cef0; text-align: left; }
+.sb-summary-table thead tr > :first-child { background: #ded5ff; }
+.sb-summary-table tbody tr:nth-child(even) > :first-child { background: #f5f3ff; }
