@@ -6157,7 +6157,12 @@ button.sb-round-btn.sb-review-glow:hover:not(:disabled) { background: #ffe47b; b
 
 /* 작업장 설정의 탭과 학생 명단 */
 html:has(.sb-settings) { scrollbar-gutter: stable; }
-.sb-panel:has(> .sb-feature-bar) { grid-template-columns: minmax(0, 1fr); }
+/* 프로젝트 방(작업장 화면·작업장 설정)은 대시보드 최대 폭(1180px) 없이 화면 너비를 다 쓴다.
+   격자 칸은 화면 폭을 넘지 않게 묶어, 섹션이 많으면 페이지가 아니라 칸반(.sb-kanban) 안에서만 옆으로 넘긴다.
+   작업장 설정 서랍의 폭 고정(--sb-settings-width)은 아래 .sb-workspace-drawer 규칙이 따로 맡는다. */
+.dashboard-layout > .sb-panel:has(.sb-room) { width: 100%; }
+.sb-panel:has(.sb-room),
+.sb-panel:has(.sb-workspace-drawer) { grid-template-columns: minmax(0, 1fr); }
 .sb-panel .sb-room.is-wide,
 .sb-panel .sb-workspace,
 .sb-panel .sb-workspace-grid { width: 100%; min-width: 0; }
