@@ -15,9 +15,7 @@ export type Screen =
   | { name: 'criteria' }
   | { name: 'home'; projectId: string }
   | { name: 'board'; projectId: string; boardId: string }
-  | { name: 'settings'; projectId: string; boardId?: string | null }
-  | { name: 'students'; projectId: string; boardId: string }
-  | { name: 'evaluate'; projectId: string; boardId: string; studentId: string };
+  | { name: 'settings'; projectId: string; boardId?: string | null };
 
 type Sb = {
   kind: 'teacher' | 'student';

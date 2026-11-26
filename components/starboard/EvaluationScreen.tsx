@@ -32,8 +32,17 @@ type Data = {
   feedbackMax?: number;
 };
 
-export default function EvaluationScreen({ projectId, boardId, studentId }: { projectId: string; boardId: string; studentId: string }) {
-  const { api, go } = useSb();
+type Props = {
+  boardId: string;
+  studentId: string;
+  /** 학생별 현황으로 돌아가기 */
+  onBack: () => void;
+  /** 이전·다음 학생으로 */
+  onStudent: (studentId: string) => void;
+};
+
+export default function EvaluationScreen({ boardId, studentId, onBack, onStudent }: Props) {
+  const { api } = useSb();
   const { data, error } = useLoad(() => api<Data>(`/boards/${boardId}/evaluations/${studentId}`), [api, boardId, studentId]);
   if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
   return (
@@ -43,7 +52,7 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
           <h2 className="sb-page-heading">학생 평가 · <span data-testid="eval-student">{data.student.name}</span></h2>
           <p>{data.board.title} · {data.index + 1} / {data.total}</p>
         </div>
-        <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'students', projectId, boardId })}>← 학생별 현황</button>
+        <button type="button" className="sb-btn-dark" onClick={onBack}>← 학생별 현황</button>
       </header>
       {data.linkedActivity && (
         <p className="notice info" data-testid="eval-linked">
@@ -69,8 +78,8 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
           criteria={data.criteria}
           initial={data.evaluation}
           feedbackMax={data.feedbackMax ?? 2000}
-          onPrev={data.prevId ? () => go({ name: 'evaluate', projectId, boardId, studentId: data.prevId! }) : null}
-          onNext={data.nextId ? () => go({ name: 'evaluate', projectId, boardId, studentId: data.nextId! }) : null}
+          onPrev={data.prevId ? () => onStudent(data.prevId!) : null}
+          onNext={data.nextId ? () => onStudent(data.nextId!) : null}
         />
       </div>
     </main>

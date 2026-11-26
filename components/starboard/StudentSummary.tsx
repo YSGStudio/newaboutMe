@@ -3,6 +3,7 @@
 /**
  * StudentSummary — 교사의 학생별 보기(원본 boards/[boardId]/students/page.tsx + PublishAll)
  * 학생 × 섹션별 자기 카드 수, 개인 보드 카드 수(누르면 그 보드), 평가 상태(누르면 평가 화면)와 보드 전체 평가 공개/취소.
+ * 작업장 화면 위 전체 화면 창(StudentStatusOverlay) 안에서 쓰므로 화면 이동은 부르는 쪽 콜백으로 합니다.
  */
 import { useState } from 'react';
 import Notice from '@/components/ui/Notice';
@@ -27,8 +28,18 @@ type Summary = {
 
 const STATUS: Record<Summary['students'][number]['evaluation_status'], string> = { none: '미평가', draft: '작성 중', published: '공개됨' };
 
-export default function StudentSummary({ projectId, boardId }: { projectId: string; boardId: string }) {
-  const { api, go } = useSb();
+type Props = {
+  boardId: string;
+  /** 닫기(작업장으로 돌아가기) */
+  onClose: () => void;
+  /** 학생 평가 열기 */
+  onEvaluate: (studentId: string) => void;
+  /** 학생 개인 보드로 가기 */
+  onOpenBoard: (boardId: string) => void;
+};
+
+export default function StudentSummary({ boardId, onClose, onEvaluate, onOpenBoard }: Props) {
+  const { api } = useSb();
   const [filter, setFilter] = useState<'all' | 'pending' | 'published'>('all');
   const { data, error, reload } = useLoad(() => api<{ board: { id: string; title: string }; summary: Summary }>(`/boards/${boardId}/students`), [api, boardId]);
   if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
@@ -43,7 +54,7 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
           <h2 className="sb-page-heading">학생별 현황</h2>
           <p>{data.board.title}</p>
         </div>
-        <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'board', projectId, boardId })}>← 작업장</button>
+        <button type="button" className="sb-btn-dark" onClick={onClose}>← 작업장</button>
       </header>
       {s.has_criteria && (
         <div className="sb-row-wrap sb-summary-filters" role="group" aria-label="평가 상태">
@@ -83,7 +94,7 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
                 {hasPersonal && (
                   <td>
                     {st.personal_board_id ? (
-                      <button type="button" className="sb-link" data-testid="personal-count" onClick={() => go({ name: 'board', projectId, boardId: st.personal_board_id! })}>
+                      <button type="button" className="sb-link" data-testid="personal-count" onClick={() => onOpenBoard(st.personal_board_id!)}>
                         {st.personal_count}개
                       </button>
                     ) : (
@@ -96,7 +107,7 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
                 )}
                 {s.has_criteria && (
                   <td>
-                    <button type="button" className="sb-btn ghost is-small" data-testid="eval-status" onClick={() => go({ name: 'evaluate', projectId, boardId, studentId: st.id })}>
+                    <button type="button" className="sb-btn ghost is-small" data-testid="eval-status" onClick={() => onEvaluate(st.id)}>
                       <span className="sb-eval-status" data-state={st.evaluation_status}>{STATUS[st.evaluation_status]}</span>
                       {st.evaluation_status === 'none' ? '평가하기' : '평가 열기'}
                     </button>

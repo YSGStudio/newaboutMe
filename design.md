@@ -187,6 +187,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
 | 콘텐츠 | 0~2 | 히어로 내부 요소 |
 | 스티키 헤더 | 20 | `.sticky-header` |
 | 사이드바 | 40 | `.dashboard-sidebar` |
+| 별빛보드 학생별 현황 전체 화면 창 | 8000 | `.sb-fullscreen` (그 안에서 여는 카드 창보다 아래) |
+| 별빛보드 카드·평가 창 | 9000 | `.sb-overlay` |
 | AI 확인 모달 | 10000 | `.ai-confirm-backdrop` |
 | 로그인 알림장 | 2147483647 | `.login-notice-backdrop` (최상단 고정) |
 
@@ -405,6 +407,7 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - **작업장 설정 화면(옛 설명)** — 2열(`minmax(300px,380px) / 1fr`). 행 `.sb-ws-row`, 드롭 위치는 `.sb-drop-line`(위·아래 금색 4px 선)과 `.is-drop-inside`(금색 링)로 보여 준다. ⋮ 메뉴 `.sb-menu`
 - **설정 탭** — `button.sb-line-tab`(글자 탭 + 선택한 탭 아래 `--primary` 2px 밑줄, 탭 줄은 가로 스크롤). 작업장 설정 페이지·보드 설정 서랍 공용. 탭이 7개라 `Tabs`(장식 탭)는 쓰지 않는다. 2026-11-26 사용자 승인(이전의 `sb-chip-tab` 칩을 대체)
 - **별점** — `button.sb-star`(40px 터치, 켜짐 `#fbbf24`), 평균은 `.sb-star-track` 위에 `.sb-star-fill`을 % 폭으로 덮는다
+- **학생별 현황 전체 화면 창** — `.sb-fullscreen`(`components/starboard/StudentStatusOverlay.tsx`). 교사가 작업장 머리의 "📊 학생별 현황"을 누르면 칸반을 바꾸지 않고 화면 전체를 덮어 띄운다. 창 안에서 현황 표 → 학생 평가 → 이전·다음 학생을 오가고, × · Esc · "← 작업장"으로 닫으면 보던 칸반이 그대로 남는다. 바탕은 `--bg` + 별점 하나, 닫기는 오른쪽 위 고정 원형 버튼. 열려 있는 동안 뒤 페이지 스크롤을 막는다(2026-11-26 사용자 요청: 화면이 통째로 바뀌지 않게)
 - **모달·서랍** — `.sb-overlay`(z-index 9000, 인디고 반투명) 위 `.sb-modal`(20px 라운드) / `.sb-drawer`(오른쪽 580px). 640px 이하에서는 꽉 찬 화면
 - `prefers-reduced-motion`에서 트리·섹션·별의 전환과 별 확대를 끈다
 - **평가 기준** — 배움성찰 평가요소와 같은 3단계(노력요함·보통·잘함) 고정. 기준 폼의 단계 입력은 배움성찰 폼의 `.learning-criterion-levels` + `.learning-criterion-level`(등급색 `--grade-color`/`--grade-soft`)을 그대로 쓰고, 입력 순서도 잘함 → 보통 → 노력요함으로 맞춘다

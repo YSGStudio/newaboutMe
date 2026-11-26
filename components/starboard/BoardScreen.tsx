@@ -13,6 +13,7 @@ import { json, useSb } from './context';
 import type { RoomSignals } from './ProjectRoom';
 import Kanban from './Kanban';
 import { BoardSettingsDrawer } from './BoardSettings';
+import StudentStatusOverlay from './StudentStatusOverlay';
 
 type Props = {
   project: Project;
@@ -26,8 +27,10 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
   const { api, go, isTeacher } = useSb();
   const [view, setView] = useState<BoardView | null | undefined>(undefined);
   const [error, setError] = useState('');
-  const [settings, setSettings] = useState<false | '일반' | '가리기'>(false);
+  const [settings, setSettings] = useState<false | '가리기'>(false);
   const [pending, setPending] = useState(false);
+  /** 학생별 현황 전체 화면 창(교사, 공용 작업장) */
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const refetchView = useCallback(async () => {
     try {
@@ -80,46 +83,35 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             onChanged={refetchView}
             appearance="workspace"
             heading={
-              <div className={isTeacher ? 'sb-board-heading has-tools' : 'sb-board-heading'}>
-                {/* 아이콘 칸(교사만) — 작게 2줄: ✏️ 글쓰기 · ⭐ 동료평가 / ⚙️ 설정 · 👥 학생별 현황. 서버도 담임 교사만 받는다. */}
-                {isTeacher && (
+              <div className={isTeacher && b.kind === 'shared' ? 'sb-board-heading has-tools' : 'sb-board-heading'}>
+                {/* 아이콘 칸(교사, 공용 작업장만) — ✏️ 학생 글쓰기 · ⭐ 동료평가 켜기/끄기. 서버도 담임 교사만 받는다.
+                    설정은 사이드바 "⚙ 작업장 설정"·"공개 범위 확인"으로 연다(2026-11-26 바로가기 아이콘 정리). */}
+                {isTeacher && b.kind === 'shared' && (
                   <div className="sb-board-title-tools" role="group" aria-label="작업장 관리">
-                    {b.kind === 'shared' && (
-                      <button
-                        type="button"
-                        className={b.default_access === 'edit' ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
-                        aria-pressed={b.default_access === 'edit'}
-                        aria-label={b.default_access === 'edit' ? '학생 글쓰기 켜짐 — 눌러서 끄기' : '학생 글쓰기 꺼짐 — 눌러서 켜기'}
-                        title={b.default_access === 'none' ? '학생에게 숨긴 작업장이에요. 설정 › 권한에서 바꿔요.' : b.default_access === 'edit' ? '학생 글쓰기 켜짐' : '학생 글쓰기 꺼짐'}
-                        disabled={pending || b.default_access === 'none'}
-                        data-testid="toggle-writing"
-                        onClick={() => toggle({ default_access: b.default_access === 'edit' ? 'read' : 'edit' })}
-                      >
-                        <span aria-hidden="true">✏️</span>
-                      </button>
-                    )}
-                    {b.kind === 'shared' && (
-                      <button
-                        type="button"
-                        className={b.peer_review ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
-                        aria-pressed={Boolean(b.peer_review)}
-                        aria-label={b.peer_review ? '학생끼리 평가 켜짐 — 눌러서 끄기' : '학생끼리 평가 꺼짐 — 눌러서 켜기'}
-                        title={b.peer_review ? '학생끼리 평가 켜짐' : '학생끼리 평가 꺼짐'}
-                        disabled={pending}
-                        data-testid="toggle-peer-review"
-                        onClick={() => toggle({ peer_review: !b.peer_review })}
-                      >
-                        <span aria-hidden="true">⭐</span>
-                      </button>
-                    )}
-                    <button type="button" className="sb-round-btn" aria-label="작업장 설정" title="작업장 설정" onClick={() => setSettings('일반')}>
-                      <span aria-hidden="true">⚙️</span>
+                    <button
+                      type="button"
+                      className={b.default_access === 'edit' ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                      aria-pressed={b.default_access === 'edit'}
+                      aria-label={b.default_access === 'edit' ? '학생 글쓰기 켜짐 — 눌러서 끄기' : '학생 글쓰기 꺼짐 — 눌러서 켜기'}
+                      title={b.default_access === 'none' ? '학생에게 숨긴 작업장이에요. 설정 › 권한에서 바꿔요.' : b.default_access === 'edit' ? '학생 글쓰기 켜짐' : '학생 글쓰기 꺼짐'}
+                      disabled={pending || b.default_access === 'none'}
+                      data-testid="toggle-writing"
+                      onClick={() => toggle({ default_access: b.default_access === 'edit' ? 'read' : 'edit' })}
+                    >
+                      <span aria-hidden="true">✏️</span>
                     </button>
-                    {b.kind === 'shared' && (
-                      <button type="button" className="sb-round-btn" aria-label="학생별 현황" title="학생별 현황" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
-                        <span aria-hidden="true">👥</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className={b.peer_review ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                      aria-pressed={Boolean(b.peer_review)}
+                      aria-label={b.peer_review ? '학생끼리 평가 켜짐 — 눌러서 끄기' : '학생끼리 평가 꺼짐 — 눌러서 켜기'}
+                      title={b.peer_review ? '학생끼리 평가 켜짐' : '학생끼리 평가 꺼짐'}
+                      disabled={pending}
+                      data-testid="toggle-peer-review"
+                      onClick={() => toggle({ peer_review: !b.peer_review })}
+                    >
+                      <span aria-hidden="true">⭐</span>
+                    </button>
                   </div>
                 )}
                 {/* 글자 칸 — 프로젝트 경로와 작업장 이름 */}
@@ -131,6 +123,11 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             }
             actions={isTeacher && (
               <>
+                {b.kind === 'shared' && (
+                  <button type="button" className="sb-btn-dark" data-testid="open-student-status" onClick={() => setStatusOpen(true)}>
+                    <span aria-hidden="true">📊</span> 학생별 현황
+                  </button>
+                )}
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (
                   <button
                     type="button"
@@ -162,6 +159,20 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             )}
           />
         </>
+      )}
+      {statusOpen && b && (
+        <StudentStatusOverlay
+          boardId={b.id}
+          boardTitle={b.title}
+          onClose={() => {
+            setStatusOpen(false);
+            refetchView();
+          }}
+          onOpenBoard={(id) => {
+            setStatusOpen(false);
+            go({ name: 'board', projectId: project.id, boardId: id });
+          }}
+        />
       )}
       {settings && view && (
         <BoardSettingsDrawer

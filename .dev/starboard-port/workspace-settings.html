@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 작업장 설정 — 리디자인 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --bg:#f6f6f9; --surface:#fff; --line:#ececf2; --line-strong:#dcdce6;
+    --text:#1b1b25; --text-2:#5b5b6b; --text-3:#9a9aab;
+    --brand:#5b5bd6; --brand-weak:#efeffd; --brand-ink:#4343b8;
+    --danger:#d93f3f; --danger-weak:#fdf1f1;
+    --r-lg:16px; --r-md:10px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(20,20,40,.04),0 4px 16px rgba(20,20,40,.04);
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer;border:0;background:none}
+  .page{max-width:1120px;margin:0 auto;padding:40px 32px 64px}
+
+  /* ── Header ── */
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px;font-weight:500;
+    padding:6px 10px 6px 6px;margin-left:-6px;border-radius:var(--r-sm);text-decoration:none}
+  .back:hover{background:#ebebf2;color:var(--text)}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:12px 0 28px}
+  h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .head p{color:var(--text-2);margin-top:6px}
+
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+
+  /* ── Left: tree ── */
+  .tree-head{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 14px}
+  .tree-head h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .count{font-size:12px;font-weight:600;color:var(--text-3);background:#f1f1f6;padding:1px 8px;border-radius:99px}
+  .btn-add{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 12px;border-radius:var(--r-sm);
+    background:var(--brand);color:#fff;font-size:13px;font-weight:600}
+  .btn-add:hover{background:var(--brand-ink)}
+  .tree{list-style:none;padding:0 10px 10px}
+  .node{position:relative;display:flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 8px;
+    border-radius:var(--r-md);cursor:pointer;color:var(--text-2)}
+  .node:hover{background:#f6f6fa}
+  .node.active{background:var(--brand-weak);color:var(--brand-ink)}
+  .node.active .name{font-weight:600}
+  .node.child{margin-left:22px}
+  .node.child::before{content:"";position:absolute;left:-12px;top:-4px;bottom:50%;width:10px;
+    border-left:1.5px solid var(--line-strong);border-bottom:1.5px solid var(--line-strong);border-bottom-left-radius:6px}
+  .handle{width:16px;color:var(--text-3);opacity:0;transition:opacity .15s;cursor:grab;display:grid;place-items:center}
+  .node:hover .handle{opacity:1}
+  .icon{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:#f1f1f6;flex:none}
+  .node.active .icon{background:#fff}
+  .name{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .node.active .name{color:var(--brand-ink)}
+  .num{font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums;min-width:18px;text-align:right}
+  .more{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--text-3);opacity:0}
+  .node:hover .more,.node.active .more{opacity:1}
+  .more:hover{background:rgba(0,0,0,.05);color:var(--text)}
+  .tip{display:flex;gap:8px;margin:0 18px 18px;padding:12px;border-radius:var(--r-md);background:#f8f8fb;
+    color:var(--text-3);font-size:12.5px;line-height:1.55}
+  .tip svg{flex:none;margin-top:2px}
+
+  /* ── Right: detail ── */
+  .detail-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 28px 0}
+  .title-row{display:flex;align-items:center;gap:12px;min-width:0}
+  .big-icon{width:40px;height:40px;border-radius:11px;background:var(--brand-weak);display:grid;place-items:center;font-size:20px}
+  .crumb{font-size:12px;color:var(--text-3);font-weight:500}
+  .detail-head h2{font-size:20px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+  .tag{font-size:11.5px;font-weight:600;color:var(--brand-ink);background:var(--brand-weak);padding:2px 8px;border-radius:6px}
+  .btn-ghost{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:var(--r-sm);
+    border:1px solid var(--line-strong);background:#fff;font-weight:600;font-size:13px;white-space:nowrap}
+  .btn-ghost:hover{border-color:var(--brand);color:var(--brand-ink)}
+
+  .tabs{display:flex;gap:4px;padding:0 24px;margin-top:20px;border-bottom:1px solid var(--line);overflow-x:auto}
+  .tab{position:relative;padding:12px 10px 13px;font-weight:500;color:var(--text-3);white-space:nowrap}
+  .tab:hover{color:var(--text)}
+  .tab.on{color:var(--text);font-weight:600}
+  .tab.on::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--brand);border-radius:2px}
+
+  .body{padding:8px 28px 24px}
+  .row{display:grid;grid-template-columns:200px 1fr;gap:24px;padding:22px 0;border-bottom:1px solid var(--line)}
+  .row:last-of-type{border-bottom:0}
+  .label{font-weight:600;font-size:14px}
+  .desc{color:var(--text-3);font-size:12.5px;margin-top:3px}
+  .field{display:flex;gap:8px;align-items:center}
+  .input,.select{flex:1;height:40px;padding:0 12px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:#fff;outline:none;min-width:0}
+  .input:focus,.select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(91,91,214,.15)}
+  .select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239a9aab' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E") no-repeat right 12px center;padding-right:32px}
+  .btn-sec{height:40px;padding:0 16px;border-radius:var(--r-sm);background:#f1f1f6;font-weight:600;font-size:13px;white-space:nowrap}
+  .btn-sec:hover{background:#e7e7ef}
+  .btn-sec:disabled{opacity:.45;cursor:default}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r-sm);overflow:hidden}
+  .seg button{height:38px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:13px;color:var(--text-2)}
+  .seg button+button{border-left:1px solid var(--line-strong)}
+  .seg button:hover{background:#f6f6fa;color:var(--text)}
+  .stack{display:flex;flex-direction:column;gap:14px}
+  .sub{font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500}
+
+  .danger{margin:8px 28px 0;padding:16px 18px;border:1px solid #f6d6d6;background:var(--danger-weak);border-radius:var(--r-md);
+    display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .danger .label{color:#a52b2b}
+  .danger .desc{color:#c06a6a}
+  .btn-danger{height:36px;padding:0 14px;border-radius:var(--r-sm);background:#fff;border:1px solid #efc3c3;color:var(--danger);font-weight:600;font-size:13px;white-space:nowrap}
+  .btn-danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+
+  .foot{display:flex;align-items:center;gap:8px;padding:18px 28px 22px;color:var(--text-3);font-size:12px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f4f4f8;padding:2px 8px;border-radius:6px;color:var(--text-2)}
+
+  @media (max-width:860px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr;gap:10px}.head{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="page">
+  <a class="back" href="#">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg>
+    사회 작업장
+  </a>
+  <div class="head">
+    <div>
+      <h1>작업장 설정</h1>
+      <p>작업장을 추가·정리하고, 작업장마다 세부 설정을 바꿀 수 있어요.</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Left -->
+    <aside class="card">
+      <div class="tree-head">
+        <h2>작업장 <span class="count">2</span></h2>
+        <button class="btn-add">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 2.5v9M2.5 7h9"/></svg>
+          추가
+        </button>
+      </div>
+      <ul class="tree">
+        <li class="node active">
+          <span class="handle"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/></svg></span>
+          <span class="icon">📦</span>
+          <span class="name">1단원</span>
+          <span class="num">0</span>
+          <button class="more" aria-label="더보기"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></button>
+        </li>
+        <li class="node child">
+          <span class="handle"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/></svg></span>
+          <span class="icon">📄</span>
+          <span class="name">산이 있는 지역</span>
+          <span class="num">0</span>
+          <button class="more" aria-label="더보기"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></button>
+        </li>
+      </ul>
+      <div class="tip">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4M8 4.8v.1" stroke-linecap="round"/></svg>
+        <span>끌어서 위·아래에 놓으면 순서가 바뀌고, 다른 작업장 가운데에 놓으면 그 안으로 들어가요.</span>
+      </div>
+    </aside>
+
+    <!-- Right -->
+    <section class="card">
+      <div class="detail-head">
+        <div class="title-row">
+          <div class="big-icon">📦</div>
+          <div>
+            <div class="crumb">최상위</div>
+            <h2>1단원 <span class="tag">작업장</span></h2>
+          </div>
+        </div>
+        <button class="btn-ghost">보드 열기
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h6.5V9M11.5 2.5 3 11"/></svg>
+        </button>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab on">일반</button>
+        <button class="tab">열</button>
+        <button class="tab">카드 형식</button>
+        <button class="tab">가리기</button>
+        <button class="tab">권한</button>
+        <button class="tab">개인 보드</button>
+        <button class="tab">평가 기준</button>
+      </nav>
+
+      <div class="body">
+        <div class="row">
+          <div><div class="label">이름</div><div class="desc">학생들에게 보이는 작업장 이름이에요.</div></div>
+          <div class="field">
+            <input class="input" value="1단원">
+            <button class="btn-sec" disabled>저장</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div><div class="label">위치</div><div class="desc">순서와 상위 작업장을 정해요.</div></div>
+          <div class="stack">
+            <div>
+              <div class="sub">순서</div>
+              <div class="seg">
+                <button><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5"/></svg>위로</button>
+                <button><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v8M2.5 6.5 6 10l3.5-3.5"/></svg>아래로</button>
+              </div>
+            </div>
+            <div>
+              <div class="sub">상위 작업장</div>
+              <div class="field">
+                <select class="select"><option>최상위 (상위 없음)</option><option>산이 있는 지역</option></select>
+                <button class="btn-sec">옮기기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="danger">
+        <div><div class="label">작업장 삭제</div><div class="desc">하위 작업장과 모든 카드가 함께 지워지고 되돌릴 수 없어요.</div></div>
+        <button class="btn-danger">삭제</button>
+      </div>
+
+      <div class="foot">프로젝트 ID <span class="mono">08f538af</span></div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

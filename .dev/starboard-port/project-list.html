@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 목록 — 리디자인 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --bg:#f6f6f9; --surface:#fff; --line:#ececf2; --line-strong:#dcdce6;
+    --text:#1b1b25; --text-2:#5b5b6b; --text-3:#9a9aab;
+    --brand:#5b5bd6; --brand-weak:#efeffd; --brand-ink:#4343b8;
+    --danger:#d93f3f;
+    --r-lg:16px; --r-md:10px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(20,20,40,.04),0 4px 16px rgba(20,20,40,.05);
+    --shadow-hover:0 2px 4px rgba(20,20,40,.05),0 14px 32px rgba(40,40,90,.12);
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  .page{max-width:1120px;margin:0 auto;padding:28px 32px 64px}
+
+  /* ── Top nav ── */
+  .nav{display:inline-flex;gap:2px;padding:4px;background:#ebebf2;border-radius:12px}
+  .nav button{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 16px;border-radius:9px;
+    font-weight:500;color:var(--text-2)}
+  .nav button:hover{color:var(--text)}
+  .nav button.on{background:#fff;color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(20,20,40,.08)}
+  .nav svg{opacity:.8}
+
+  /* ── Header ── */
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:32px 0 20px}
+  h1{font-size:26px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .count{font-size:13px;font-weight:600;color:var(--brand-ink);background:var(--brand-weak);padding:2px 10px;border-radius:99px}
+  .head p{color:var(--text-2);margin-top:4px}
+  .btn-primary{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border-radius:var(--r-md);
+    background:var(--brand);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(91,91,214,.3)}
+  .btn-primary:hover{background:var(--brand-ink)}
+
+  .filters{display:flex;gap:6px;margin-bottom:20px}
+  .chip{height:30px;padding:0 12px;border-radius:99px;font-size:13px;font-weight:500;color:var(--text-2);border:1px solid var(--line-strong);background:#fff}
+  .chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+
+  /* ── Grid ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+
+  .proj{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:transform .18s, box-shadow .18s}
+  .proj:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}
+
+  .cover{position:relative;height:112px;padding:16px;
+    background:
+      radial-gradient(120px 90px at 85% 20%,rgba(255,255,255,.35),transparent 70%),
+      linear-gradient(135deg,#6d6de8 0%,#8b5cf6 55%,#c084fc 100%)}
+  .cover::after{content:"";position:absolute;right:-24px;bottom:-40px;width:150px;height:150px;border-radius:50%;
+    border:22px solid rgba(255,255,255,.12)}
+  .subject{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:99px;
+    background:rgba(255,255,255,.22);color:#fff;font-size:12px;font-weight:600;backdrop-filter:blur(4px)}
+  .status{position:absolute;top:16px;right:16px;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;
+    border-radius:99px;background:#fff;color:#16825d;font-size:12px;font-weight:600}
+  .status i{width:6px;height:6px;border-radius:50%;background:#22b07d}
+  .emblem{position:absolute;left:20px;bottom:-26px;width:56px;height:56px;border-radius:16px;background:#fff;
+    display:grid;place-items:center;font-size:28px;box-shadow:0 4px 14px rgba(40,40,90,.15);z-index:1}
+
+  .content{padding:38px 20px 0}
+  .proj h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
+  .meta{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--text-3);font-size:13px}
+  .meta .set{color:var(--brand-ink);font-weight:500}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);margin:18px 0 0;border:1px solid var(--line);border-radius:var(--r-md)}
+  .stat{padding:10px 12px}
+  .stat+.stat{border-left:1px solid var(--line)}
+  .stat b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12px;color:var(--text-3)}
+
+  .actions{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 16px;margin-top:16px;border-top:1px solid var(--line)}
+  .open{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--brand-ink)}
+  .proj:hover .open svg{transform:translateX(3px)}
+  .open svg{transition:transform .18s}
+  .icons{display:flex;gap:2px}
+  .ib{width:34px;height:34px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--text-3)}
+  .ib:hover{background:#f1f1f6;color:var(--text)}
+  .ib.del:hover{background:#fdf1f1;color:var(--danger)}
+
+  /* ── New project tile ── */
+  .new{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:318px;
+    border:1.5px dashed #cfcfe6;border-radius:var(--r-lg);background:rgba(255,255,255,.5);color:var(--text-2);transition:all .18s}
+  .new:hover{border-color:var(--brand);background:#fff;color:var(--brand-ink)}
+  .new .plus{width:52px;height:52px;border-radius:16px;background:var(--brand-weak);color:var(--brand);display:grid;place-items:center;transition:transform .18s}
+  .new:hover .plus{transform:scale(1.08) rotate(90deg)}
+  .new b{font-size:15px;font-weight:600}
+  .new span{font-size:12.5px;color:var(--text-3)}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="nav">
+    <button class="on">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg>
+      프로젝트
+    </button>
+    <button>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m8 2 1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13.1l.7-4L2.2 6.3l4-.6z"/></svg>
+      평가 기준
+    </button>
+  </nav>
+
+  <div class="head">
+    <div>
+      <h1>프로젝트 <span class="count">1</span></h1>
+      <p>수업마다 프로젝트를 만들고, 그 안에 작업장을 꾸려 보세요.</p>
+    </div>
+    <button class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 2.5v9M2.5 7h9"/></svg>
+      새 프로젝트
+    </button>
+  </div>
+
+  <div class="filters">
+    <button class="chip on">진행 중</button>
+    <button class="chip">보관됨</button>
+  </div>
+
+  <div class="grid">
+    <article class="proj">
+      <div class="cover">
+        <span class="subject">🌏 사회</span>
+        <span class="status"><i></i>진행 중</span>
+        <div class="emblem">🗺️</div>
+      </div>
+      <div class="content">
+        <h3>사회 작업장</h3>
+        <div class="meta">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke-linecap="round"/></svg>
+          기간 미정 · <span class="set">기간 설정</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>2</b><span>작업장</span></div>
+          <div class="stat"><b>0</b><span>카드</span></div>
+          <div class="stat"><b>0</b><span>참여 학생</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <span class="open">열기
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7.5 3.5 11 7l-3.5 3.5"/></svg>
+        </span>
+        <div class="icons">
+          <button class="ib" title="수정"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M10.5 2.5 13.5 5.5 6 13H3v-3z"/></svg></button>
+          <button class="ib" title="보관"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="3.5" rx="1"/><path d="M3 6v6.5A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6M6.5 9h3" stroke-linecap="round"/></svg></button>
+          <button class="ib del" title="삭제"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.1a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4"/></svg></button>
+        </div>
+      </div>
+    </article>
+
+    <button class="new">
+      <span class="plus"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M11 4v14M4 11h14"/></svg></span>
+      <b>새 프로젝트 만들기</b>
+      <span>과목·단원별로 새 공간을 열어요</span>
+    </button>
+  </div>
+</div>
+</body>
+</html>

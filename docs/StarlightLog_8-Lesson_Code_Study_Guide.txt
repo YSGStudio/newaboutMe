@@ -1,0 +1,1228 @@
+STARLIGHT LOG: PRACTICAL WEB DEVELOPMENT
+An 8-Lesson Code Study Guide for Operations, Debugging, and AI Code Review
+
+Project: /Users/yangseung-geun/ReactProject/aboutMe
+Prepared from the current repository source code
+Date: October 10, 2026
+
+======================================================================
+HOW TO USE THIS GUIDE
+======================================================================
+
+This guide is not designed to make you memorize or rewrite every line of the
+application. Its goal is to help you operate a real service, diagnose failures,
+and verify changes produced by an AI coding assistant.
+
+After completing the eight lessons, you should be able to:
+
+1. Trace a user action from the browser to an API route and the database.
+2. Separate browser, server, authentication, validation, and data failures.
+3. Check whether an AI change fixes the root cause or only hides the symptom.
+4. Review authorization, validation, error handling, and test coverage.
+5. Follow a repeatable production-debugging process.
+
+All examples come from the current project. File paths and line locations are
+included so that you can compare the explanations with the real implementation.
+
+
+======================================================================
+PROJECT MAP
+======================================================================
+
+What the service does
+
+Starlight Log is a school growth-record service for teachers and elementary
+students. Students record emotions, complete learning reflections, view
+evaluations, answer relationship surveys, exchange letters, earn badges, and
+progress through a space-voyage reward system. Teachers manage classes and
+students, review submissions, create evaluations, analyze relationships, and
+generate AI-assisted growth reports. Administrator features manage accounts,
+notices, settings, and AI usage.
+
+Technology stack
+
+- Next.js 14 App Router: pages and server API routes
+- React 18: interactive user interfaces and state
+- TypeScript: compile-time data contracts
+- Supabase: PostgreSQL, teacher authentication, and storage
+- Zod: runtime input and output validation
+- bcryptjs: student PIN verification
+- OpenAI SDK: growth, subject, and Holland reports
+- Vitest: automated business-rule tests
+- xlsx: spreadsheet-based student import
+
+Important directories
+
+app/                 Pages and API route handlers
+components/          React components grouped by feature
+lib/                 Auth, validation, database access, and business rules
+lib/ai/              AI data preparation, prompts, validation, and storage
+types/               Shared TypeScript types and constants
+supabase/             Base schema and database migrations
+tests/                Automated tests
+public/               Static images and other public assets
+
+Typical data flow
+
+Browser UI
+   |
+   | fetch() through the shared API client
+   v
+Next.js API route: app/api/**/route.ts
+   |
+   | authentication -> validation -> business rules
+   v
+Supabase PostgreSQL, Storage, or OpenAI
+   |
+   | JSON response
+   v
+React state update -> screen re-render
+
+When a feature fails, inspect this flow from left to right. Confirm that the
+button handler ran, a request was sent, the API returned the expected status,
+the database operation succeeded, and the returned data updated React state.
+
+
+######################################################################
+LESSON 1. REQUESTS AND RESPONSES: TRACING THE BROWSER TO THE API
+######################################################################
+
+Goals
+
+- Understand how a form submission becomes an HTTP request.
+- Distinguish methods, request bodies, status codes, and JSON responses.
+- Use the browser Network panel to locate a failure.
+
+1. The login event handler
+
+File: app/student/page.tsx, lines 438-448
+
+  const onLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setLoginLoading(true);
+
+    const form = new FormData(event.currentTarget);
+    try {
+      const data = await api<{
+        student: { id: string; name: string; studentNumber: number };
+
+Line-by-line explanation
+
+- onLogin runs when the login form is submitted.
+- async allows the function to wait for server work with await.
+- preventDefault stops the browser's traditional full-page form submission.
+- The previous error and success messages are cleared.
+- loginLoading becomes true, allowing the UI to disable duplicate submissions.
+- FormData reads controls from the submitted form by their name attributes.
+- try begins the section where network or server errors may occur.
+- The generic type describes the response shape expected by this caller.
+
+2. Building the HTTP request
+
+File: app/student/page.tsx, lines 449-456
+
+      }>('/api/auth/student/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          classCode: String(form.get('classCode')).trim(),
+          name: String(form.get('name')),
+          password: String(form.get('password'))
+        })
+      });
+
+- The URL maps to app/api/auth/student/login/route.ts.
+- POST is used because login credentials are sent in the request body.
+- JSON.stringify converts a JavaScript object into a JSON string.
+- trim removes leading and trailing spaces from the class code.
+- name and password are normalized to strings.
+- The route's exported POST function receives this request.
+
+3. The shared API client
+
+File: lib/api-client.ts, lines 29-40
+
+    const res = await fetch(url, {
+      ...init,
+      headers: isFormData
+        ? init?.headers
+        : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    });
+
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+
+- fetch performs the actual request.
+- ...init copies the method, body, and caller-provided options.
+- JSON requests receive the appropriate Content-Type header.
+- FormData must not receive that header manually because the browser adds the
+  multipart boundary.
+- The response is read as text first because gateway and platform errors are
+  not always JSON.
+- JSON parsing is attempted without allowing malformed text to crash the UI.
+
+4. Interpreting status codes
+
+File: lib/api-client.ts, lines 44-55
+
+    const error = (json as { error?: unknown } | null)?.error;
+
+    if (!res.ok) {
+      if (typeof error === 'string') throw new Error(error);
+      if (res.status === 413) throw new Error(tooLargeError);
+      throw new Error(fallbackError);
+    }
+
+    if (json === null && text) throw new Error(fallbackError);
+    return json as T;
+
+- res.ok is true for HTTP status codes from 200 through 299.
+- A string error returned by the route is converted into a JavaScript Error.
+- Status 413 receives a specific file-size message.
+- Unexpected failures receive a safe fallback message.
+- A successful non-JSON response is treated as a contract failure.
+- The final type assertion does not validate the response at runtime.
+
+Status-code reference
+
+- 200: successful read or update
+- 201: successful creation
+- 400: invalid input or business-rule violation
+- 401: authentication is missing or credentials are incorrect
+- 403: authenticated, but not allowed to access this resource
+- 404: resource not found
+- 409: operation conflicts with the current state
+- 413: request body or upload is too large
+- 429: too many attempts or usage limit exceeded
+- 500: server, database, or external-service failure
+
+Debugging sequence
+
+1. Open the browser developer tools and inspect Console errors.
+2. Open Network and confirm that the expected request exists.
+3. Check the request URL, method, headers, and payload.
+4. Check the response status and body.
+5. If no request exists, inspect the React handler. If it exists, follow the
+   matching API route.
+
+AI change review
+
+- Did the change remove or empty a catch block merely to hide an error?
+- Can a failed response accidentally continue through the success path?
+- Are JSON.stringify and Content-Type correct for the request type?
+- Did the change apply application/json to FormData and break uploads?
+
+
+######################################################################
+LESSON 2. REACT STATE AND ASYNCHRONOUS UI FLOW
+######################################################################
+
+Goals
+
+- Understand how useState stores values that affect the screen.
+- Distinguish the roles of try, catch, and finally.
+- Understand required parallel work versus optional background work.
+
+1. State in the student page
+
+File: app/student/page.tsx, lines 228-237
+
+export default function StudentPage() {
+  const [studentName, setStudentName] = useState('');
+  const [sessionChecking, setSessionChecking] = useState(true);
+  const [bootLoading, setBootLoading] = useState(false);
+  const [emotionDate, setEmotionDate] = useState(getTodayInSeoul);
+  const [myFeed, setMyFeed] = useState<MyFeedRow>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'voyage' | 'emotion' |
+    'learning' | 'eval' | 'relationship' | 'letters'>('voyage');
+
+- Each useState call stores a value across renders.
+- An empty studentName can help distinguish the logged-out screen.
+- sessionChecking prevents the login form from flashing before cookie validation
+  finishes.
+- bootLoading represents initial data loading after successful login.
+- myFeed begins as null because no record has been loaded yet.
+- The activeTab union prevents unsupported tab names at compile time.
+
+2. Updating state after login
+
+File: app/student/page.tsx, lines 458-469
+
+      setBootLoading(true);
+      setLettersEnabled(data.class.lettersEnabled ?? true);
+      setEvalFeedbackEnabled(data.class.evalFeedbackEnabled ?? false);
+      const loginToday = getTodayInSeoul();
+      setEmotionDate(loginToday);
+      await Promise.all([
+        loadMyFeed(loginToday), loadBadgeProfile(), loadRelationshipStatus()
+      ]);
+      void loadVoyageSummary();
+      setActiveTab('voyage');
+      setStudentName(data.student.name);
+
+- Feature flags from the server are copied into state.
+- The nullish coalescing operator uses defaults only for null or undefined.
+- Promise.all starts three tasks together and waits until all succeed.
+- If any required task rejects, control moves to catch.
+- loadVoyageSummary starts without blocking completion of login.
+- studentName changes only after required data is ready, reducing empty-screen
+  transitions.
+
+3. Cleanup in finally
+
+File: app/student/page.tsx, lines 471-477
+
+    } catch (err) {
+      setError((err as Error).message);
+      clearNoticeLater();
+    } finally {
+      setLoginLoading(false);
+      setBootLoading(false);
+    }
+  };
+
+- catch converts a thrown error into visible UI state.
+- finally runs after both success and failure.
+- Loading state belongs in finally so a failed request cannot permanently lock
+  the submit button.
+- err as Error is a compile-time assertion, not runtime proof.
+
+Common React failures
+
+- Infinite requests: an effect dependency changes on every render.
+- Stale screen: the server changed, but state was not updated or reloaded.
+- Duplicate writes: a loading state does not disable repeated submissions.
+- Login-screen flash: the UI renders before session checking finishes.
+- Request race: an older slow response overwrites a newer fast response.
+
+Debugging methods
+
+- Inspect state with React Developer Tools.
+- Compare request order and completion time in Network.
+- Add temporary logs at loading start, response, catch, and finally.
+- Remember that state setters affect a future render; logging immediately after
+  a setter may still show the previous value.
+
+AI change review
+
+- Are loading flags cleared after both success and failure?
+- Are required and optional asynchronous tasks correctly separated?
+- Does the UI show success before required server work has finished?
+- Did the change suppress an effect warning by deleting dependencies rather than
+  fixing the underlying lifecycle problem?
+
+
+######################################################################
+LESSON 3. TYPESCRIPT AND ZOD: STATIC CONTRACTS AND RUNTIME VALIDATION
+######################################################################
+
+Goals
+
+- Distinguish TypeScript checking from runtime input validation.
+- Understand union types, as const, and shared domain constants.
+- Trace a Zod failure into an HTTP 400 response.
+
+1. Deriving allowed emotion values
+
+File: types/domain.ts, lines 1-10 and 46-48
+
+export const EMOTION_TYPES = [
+  'moved',
+  'worried',
+  'thankful',
+  'curious',
+  'longing',
+  'joyful',
+  'surprised',
+  'affectionate',
+  // additional values omitted
+] as const;
+export type EmotionType = (typeof EMOTION_TYPES)[number];
+
+- The array is the shared list of allowed application values.
+- as const preserves each literal instead of widening everything to string.
+- Indexing the array type with number creates a union of all item values.
+- EmotionType rejects unknown values during type checking.
+- This list must remain aligned with the PostgreSQL emotion_type enum.
+
+2. Student-login validation
+
+File: lib/validators.ts, lines 47-54
+
+export const studentLoginSchema = z.object({
+  classCode: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,6}$/, 'Class code must contain 1-6 digits.'),
+  name: z.string().min(1).max(30),
+  password: z.string().regex(
+    STUDENT_PASSWORD_REGEX, 'Password must contain exactly four digits.'
+  )
+});
+
+- z.object requires an object with the declared fields.
+- classCode must be a string, is trimmed, and must match the regular expression.
+- ^ and $ require the whole value to match.
+- Student names are limited to 1-30 characters.
+- The PIN rule is shared from lib/password.ts.
+- Zod validates real data while the program is running.
+
+3. safeParse inside the route
+
+File: app/api/auth/student/login/route.ts, lines 12-20
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}));
+  const parsed = studentLoginSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const classCode = parsed.data.classCode.trim();
+
+- Malformed JSON becomes an empty object and follows the validation path.
+- safeParse returns a success/failure result instead of throwing.
+- Invalid input stops before any database query occurs.
+- Successful parsed.data is narrowed to the schema's inferred type.
+
+TypeScript versus Zod
+
+- TypeScript catches developer mistakes during editing and builds.
+- Zod checks untrusted values received at runtime.
+- api<ResponseType>() describes what the caller expects; it does not prove that
+  the server returned that shape.
+- Request bodies, AI output, imported spreadsheets, and JSONB values require
+  runtime validation.
+
+Failure patterns
+
+- Input appears correct but returns 400: inspect whitespace, type conversion,
+  maximum lengths, and regular expressions.
+- Type checking passes but database insertion fails: compare code types with DB
+  enums and column constraints.
+- A shared schema change breaks several routes: search every import and caller.
+- The UI displays [object Object]: the route returned a structured validation
+  object while the API client expects a string error.
+
+AI change review
+
+- Was any introduced only to silence type errors?
+- Is validation present on the server, not only in the browser?
+- Do Zod limits match database column constraints?
+- When an enum changes, were types, UI metadata, tests, and migrations updated?
+
+
+######################################################################
+LESSON 4. AUTHENTICATION, SESSIONS, AND AUTHORIZATION
+######################################################################
+
+Goals
+
+- Understand the difference between teacher and student authentication.
+- Separate authentication from authorization.
+- Understand why tokens, hashes, and cookie flags matter.
+
+Authentication design
+
+- Teachers use Supabase Auth with email and password.
+- Students use class code, name, and a four-digit PIN.
+- Students receive a custom student_sessions token and cookie.
+- Each flow uses different server helpers and cookie formats.
+
+1. Teacher login
+
+File: app/api/auth/teacher/login/route.ts, lines 17-30
+
+  const supabase = await createSupabaseServer();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password
+  });
+
+  if (error) {
+    return NextResponse.json(
+      { error: toKoreanAuthMessage(error, 'Login failed.') },
+      { status: 401 }
+    );
+  }
+  return NextResponse.json({ ok: true });
+
+- The server Supabase client is connected to Next.js cookie storage.
+- Supabase Auth verifies the teacher credentials.
+- Authentication failure produces 401.
+- Successful authentication causes Supabase session cookies to be written.
+
+2. Creating a student session
+
+File: lib/student-session.ts, lines 9-19
+
+export async function createStudentSession(studentId: string) {
+  const token = randomToken();
+  const tokenHash = sha256(token);
+  const expires = new Date();
+  expires.setDate(expires.getDate() + EXPIRE_DAYS);
+
+  const { error } = await supabaseAdmin.from('student_sessions').insert({
+    student_id: studentId,
+    token_hash: tokenHash,
+    expires_at: expires.toISOString()
+  });
+
+- A cryptographically unpredictable token is created after login succeeds.
+- Only the SHA-256 hash is stored in the database.
+- The browser receives the original token.
+- A database leak therefore does not immediately expose usable cookie tokens.
+- The current expiry period is fourteen days.
+
+3. Setting the student cookie
+
+File: lib/student-session.ts, lines 21-30
+
+  if (error) throw error;
+
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_KEY, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    expires
+  });
+
+- A cookie is not created if database insertion fails.
+- httpOnly prevents browser JavaScript from reading the token.
+- secure requires HTTPS in production.
+- sameSite reduces some cross-site request risks.
+- path makes the cookie available throughout the application.
+
+4. Class ownership authorization
+
+File: lib/auth.ts, lines 44-56
+
+export async function requireTeacherClass(
+  teacherId: string, classId: string
+): Promise<NextResponse | null> {
+  const { data } = await supabaseAdmin
+    .from('classes')
+    .select('id')
+    .eq('id', classId)
+    .eq('teacher_id', teacherId)
+    .maybeSingle();
+
+  if (!data) return NextResponse.json(
+    { error: 'You do not have access to this class.' }, { status: 403 }
+  );
+  return null;
+}
+
+- Authentication proves which teacher is making the request.
+- Authorization proves that the requested class belongs to that teacher.
+- A logged-in teacher must not automatically access every class.
+- supabaseAdmin can bypass Row Level Security, so application-level ownership
+  checks are essential.
+
+401 versus 403
+
+- 401: the caller's identity is missing or invalid.
+- 403: the identity is known, but the operation is not permitted.
+
+Security debugging
+
+- Missing cookie: inspect Set-Cookie and the browser Application panel.
+- Production-only session failure: inspect HTTPS, secure, domain, and SameSite.
+- Cross-class data exposure: check every route for ownership validation.
+- Repeated student 401: inspect token hashes and expiry timestamps.
+- Login loop: inspect /me handling and session-reset behavior.
+
+AI change review
+
+- Hiding a button in the UI is not server authorization.
+- Never trust classId or studentId only because the browser supplied it.
+- Never expose the service-role key through client code or NEXT_PUBLIC variables.
+- Do not “fix” login by removing httpOnly or secure protections.
+
+
+######################################################################
+LESSON 5. SUPABASE AND POSTGRESQL: RELATIONSHIPS AND QUERIES
+######################################################################
+
+Goals
+
+- Read primary keys, foreign keys, unique constraints, and cascades.
+- Translate Supabase query-builder code into database operations.
+- Recognize race conditions and partial success.
+
+1. Classes and students
+
+File: supabase/schema.sql, lines 59-76
+
+create table if not exists classes (
+  id uuid primary key default gen_random_uuid(),
+  teacher_id uuid not null references teacher_profiles (id) on delete cascade,
+  class_name text not null,
+  grade int not null check (grade between 1 and 6),
+  section int not null check (section between 1 and 20),
+  class_code text not null unique
+);
+
+create table if not exists students (
+  id uuid primary key default gen_random_uuid(),
+  class_id uuid not null references classes (id) on delete cascade,
+  name text not null,
+  student_number int not null
+);
+
+- UUID primary keys uniquely identify records.
+- classes.teacher_id references teacher_profiles.
+- students.class_id expresses class membership.
+- on delete cascade removes dependent rows when the parent is deleted.
+- NOT NULL and CHECK enforce rules even when application validation is bypassed.
+- The current production structure is the base schema plus all later migrations.
+
+2. Querying one daily emotion record
+
+File: app/api/feeds/route.ts, lines 19-30
+
+  const { data, error } = await supabaseAdmin
+    .from('emotion_feeds')
+    .select('id,emotion_type,content,image_url,created_at')
+    .eq('student_id', auth.student.id)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+- from selects the table and select limits returned columns.
+- eq limits records to the authenticated student.
+- gte and lte define one Seoul-calendar day.
+- Results are sorted newest first and limited to one.
+- maybeSingle returns null for zero rows and an object for one row.
+
+3. Enforcing one feed per day
+
+File: app/api/feeds/route.ts, lines 44-55
+
+  const { count } = await supabaseAdmin
+    .from('emotion_feeds')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', auth.student.id)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
+
+  if ((count ?? 0) >= 1) {
+    return NextResponse.json(
+      { error: 'Only one feed can be created per day.' },
+      { status: 400 }
+    );
+  }
+
+- head: true requests the count without downloading full rows.
+- A null count becomes zero.
+- Existing data prevents another insert.
+- Two simultaneous requests could both observe zero before either insert finishes.
+- A strict guarantee requires a database constraint, transaction, or atomic RPC.
+
+4. Isolating optional reward failures
+
+File: app/api/feeds/route.ts, lines 70-81
+
+  let newBadges: AwardedBadge[] = [];
+  try {
+    newBadges = await checkAndAwardBadge(
+      supabaseAdmin, auth.student.id, 'emotion_save'
+    );
+  } catch (badgeError) {
+    console.error('[badges] badge check failed:', badgeError);
+  }
+  try {
+    await grantFuel(supabaseAdmin, auth.student.id, 'emotion_feed', data.id);
+  } catch (fuelError) {
+    console.error('[voyage] fuel grant failed:', fuelError);
+  }
+
+- The main emotion record has already been saved.
+- Optional badge or fuel failures do not turn that save into a visible failure.
+- This design deliberately allows partial success.
+- Operations should monitor logs and provide a repair path for missing rewards.
+- Work that must succeed together belongs in a database transaction.
+
+Database debugging
+
+- “column does not exist”: check whether the required migration was deployed.
+- “duplicate key”: inspect unique constraints and duplicate requests.
+- Foreign-key violation: inspect the parent row and supplied ID.
+- RLS failure: determine whether the query uses anon auth or service role.
+- Slow query: inspect returned row count, filters, joins, and indexes.
+
+AI change review
+
+- Were student, teacher, or class ownership filters removed?
+- Does select('*') expose unnecessary personal data?
+- Is the partial-failure behavior intentional and observable?
+- Does every schema change include a migration and deployment plan?
+
+
+######################################################################
+LESSON 6. BUSINESS RULES AND MULTI-STEP FEATURES
+######################################################################
+
+Goals
+
+- Understand derived UI state versus stored database state.
+- Review partial failure in multi-table writes.
+- Recognize why shared pure functions reduce inconsistent behavior.
+
+1. Learning status is derived
+
+File: lib/learning.ts, lines 30-35
+
+export function getLearningStatus(
+  submission: SubmissionStatusInput,
+  grading?: GradingInput
+): LearningStatus {
+  if (!submission || submission.status !== 'submitted') return 'none';
+  if (grading && grading.criteriaCount > 0) {
+    return grading.gradedCount >= grading.criteriaCount ? 'reviewed' : 'grading';
+  }
+  return submission.feedback_text ? 'reviewed' : 'submitted';
+}
+
+- The four UI states do not map directly to one database column.
+- No row or a draft produces none.
+- Activities with criteria are reviewed only after every criterion is graded.
+- Activities without criteria use the presence of narrative feedback.
+- Teacher and student screens share this function, reducing disagreement.
+
+2. Submission eligibility
+
+File: lib/learning.ts, lines 114-123
+
+export function isSubmittable(
+  materialCount: number,
+  questionCount: number,
+  answers: (string | null | undefined)[],
+): boolean {
+  if (materialCount <= 0) return false;
+  if (questionCount === 0) return true;
+  if (answers.length < questionCount) return false;
+  return answers.every(
+    (answer) => (answer ?? '').trim().length > 0
+  );
+}
+
+- At least one file or link is required.
+- If there are no questions, the material alone is sufficient.
+- Otherwise an answer must exist for every question.
+- Whitespace-only answers are rejected.
+- A pure function like this can be tested without a UI or database.
+
+3. File validation
+
+File: lib/learning.ts, lines 95-105
+
+export function checkLearningFile(
+  file: FileCheckInput, currentCount: number
+): string | null {
+  if (currentCount >= MAX_FILES_PER_SUBMISSION) {
+    return `A maximum of ${MAX_FILES_PER_SUBMISSION} files is allowed.`;
+  }
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return 'Only JPG, PNG, WEBP, and PDF files are allowed.';
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return `Each file must be at most ${formatMb(MAX_FILE_BYTES)}.`;
+  }
+  return null;
+}
+
+- A valid file returns null; an invalid file returns a user-readable reason.
+- Count, MIME type, and size are checked in order.
+- Browser checks improve feedback, but the API must repeat the validation.
+- The current 4 MB application limit stays below the hosting request limit.
+
+4. Compensating for a failed child insert
+
+File: app/api/learning/activities/route.ts, lines 103-111
+
+  const { data: questions, error: questionError } = await supabaseAdmin
+    .from('learning_activity_questions')
+    .insert(toQuestionRows(data.id, parsed.data.reflectionQuestions))
+    .select(QUESTION_COLUMNS);
+
+  if (questionError) {
+    await supabaseAdmin.from('learning_activities').delete().eq('id', data.id);
+    return NextResponse.json({ error: questionError.message }, { status: 500 });
+  }
+
+- The parent activity was created immediately before this code.
+- Question rows use the new activity ID.
+- If the child insert fails, the parent is deleted as compensation.
+- If that delete also fails, an activity without questions may remain.
+- Strong atomicity is better implemented in a PostgreSQL transaction or RPC.
+
+Debugging complex features
+
+- Do not assume every UI status must be stored as one DB value. Find the
+  derivation function first.
+- For partial records, list every table written by the operation and inspect the
+  first failing step.
+- For uploads, check size, Content-Type, multipart boundaries, and status 413.
+- When a rule changes, search the shared helper, validator, route, labels, and
+  tests together.
+
+AI change review
+
+- Was one business rule duplicated differently in the UI and API?
+- Did state simplification remove an important distinction?
+- Is the result of a mid-operation failure defined and recoverable?
+- Did the change update only wording while leaving the server rule unchanged?
+
+
+######################################################################
+LESSON 7. AI FEATURES: VALIDATION, COST, PRIVACY, AND STORAGE
+######################################################################
+
+Goals
+
+- Separate AI data preparation, model calls, parsing, validation, and storage.
+- Treat model output as untrusted external input.
+- Review privacy, usage limits, caching, and failure behavior.
+
+Important files
+
+- lib/ai/openaiClient.ts: OpenAI client creation
+- lib/ai/*ReportData.ts: database data preparation
+- lib/ai/*ReportPrompt.ts: system and user prompt construction
+- lib/ai/*Report.ts: model calls, validation, persistence, and cache
+- lib/ai/anonymize.ts: reduction of identifying information
+- lib/ai/usage.ts: usage limits
+- components/teacher/AiReportTab.tsx: teacher-facing UI
+
+1. Parsing and validating model output
+
+File: lib/ai/growthReport.ts, lines 105-118
+
+  const rawContent = completion.choices[0]?.message?.content;
+  if (!rawContent) throw new Error('The AI response is empty.');
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawContent);
+  } catch {
+    throw new Error('The AI response could not be parsed as JSON.');
+  }
+
+  const validated = growthReportResponseSchema.safeParse(parsedJson);
+  if (!validated.success) {
+    throw new Error('The AI response has an invalid structure.');
+  }
+
+- Empty content is rejected immediately.
+- Model output is a string and must be parsed.
+- Explanatory prose or Markdown fences can cause JSON parsing failure.
+- Valid JSON can still contain incorrect fields or types.
+- Zod validates the required structure before the result is used.
+- Model output must be treated like any other untrusted external input.
+
+2. Server rules override model claims
+
+File: lib/ai/growthReport.ts, lines 120-128
+
+  const holland: HollandResult | null =
+    hasEnoughDataForHolland(data)
+      ? validated.data.holland ?? null
+      : null;
+  const result: GrowthReportResult = {
+    ...validated.data,
+    holland
+  };
+
+  const { error: saveError } = await supabaseAdmin
+    .from('ai_growth_reports')
+    .upsert({
+
+- Even if the model invents a Holland result, the server removes it when source
+  data is insufficient.
+- Safety rules should not depend only on prompt instructions.
+- The application creates a final approved result before persistence.
+- upsert updates an existing report when its conflict key already exists.
+
+3. Do not report success when persistence fails
+
+File: lib/ai/growthReport.ts, lines 144-158
+
+    }, { onConflict: 'student_id,period,generated_date' });
+
+  if (saveError) {
+    console.error('[ai/growth-report] save failed:', saveError.message);
+    throw new Error(
+      `The analysis result could not be saved: ${saveError.message}`
+    );
+  }
+
+  return {
+    ...result,
+    generatedAt: new Date().toISOString(),
+    cached: false,
+    dataSummary,
+  };
+
+- Returning a generated result after a failed save creates a false success.
+- The report would disappear when reopened.
+- The code therefore converts persistence failure into an explicit error.
+- cached false identifies a newly generated result.
+
+4. Reusing a saved report
+
+File: lib/ai/growthReport.ts, lines 163-174
+
+export async function getSavedGrowthReport(
+  studentId: string, period: Period
+): Promise<GrowthReportApiResult | null> {
+  const { data } = await supabaseAdmin
+    .from('ai_growth_reports')
+    .select(CACHED_COLUMNS)
+    .eq('student_id', studentId)
+    .eq('period', period)
+    .order('generated_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+  return buildApiResultFromCache(data as unknown as CachedRow);
+}
+
+- The application avoids a new model call every time the report is opened.
+- Caching improves cost, speed, and consistency.
+- The cache may become stale if its key does not reflect changed source data.
+- Regeneration and usage charging must have explicit rules.
+
+AI-feature debugging
+
+- 401/403: inspect API credentials and teacher subscription authorization.
+- 429: distinguish OpenAI rate limits from application usage limits.
+- JSON parsing failure: inspect the actual output format and response settings.
+- Save failure: compare code with the latest ai_growth_reports migration.
+- Stale content: inspect cache criteria and generated_date.
+- Poor content: inspect prepared and anonymized input before changing the prompt.
+
+Privacy review
+
+- Include direct identifiers only when truly required.
+- Do not log full prompts or student records.
+- Ensure legal documents describe the actual external AI processing.
+- Treat student free text as data, not as trusted model instructions.
+
+AI change review
+
+- When a prompt changes, were output schemas and persistence fields reviewed?
+- Does a new model support every option used by the current code?
+- Is usage charged on failed calls, and does that match product policy?
+- Is model output ever rendered as raw HTML?
+- Can the UI distinguish saved reports from newly generated reports?
+
+
+######################################################################
+LESSON 8. PRODUCTION DEBUGGING AND REVIEWING AI-GENERATED CHANGES
+######################################################################
+
+Goals
+
+- Use a repeatable path from symptom to root cause.
+- Distinguish tests, type checking, and production builds.
+- Apply a final review checklist to AI-generated changes.
+
+1. Project verification commands
+
+File: package.json
+
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+
+- dev starts a local development server for browser reproduction.
+- typecheck detects TypeScript contract violations without executing APIs.
+- test runs the project's automated business-rule tests.
+- build checks whether Next.js can create a production build.
+- The lint script should be verified against the installed Next.js version and
+  current configuration.
+
+2. A focused validation test
+
+File: tests/validators.test.ts, lines 44-53
+
+describe('studentLoginSchema', () => {
+  it('accepts a four-digit password', () => {
+    const parsed = studentLoginSchema.safeParse({
+      classCode: '1234', name: 'Student', password: '0000'
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a password that is not four digits', () => {
+    const parsed = studentLoginSchema.safeParse({
+      classCode: '1234', name: 'Student', password: '123'
+    });
+
+- describe groups related behavior.
+- Each it block specifies one expected behavior.
+- Both accepted and rejected inputs are tested.
+- Passing this test does not prove that the entire login flow or database works.
+- It proves only the behavior of studentLoginSchema.
+
+3. The page error boundary
+
+File: app/error.tsx, lines 18-29
+
+  useEffect(() => {
+    console.error('[Starlight Log] page render error:', error);
+  }, [error]);
+
+  return (
+    <main style={{ display: 'grid', placeItems: 'center', minHeight: '80vh' }}>
+      <div className="card starlight-error-card">
+        <span className="starlight-error-art" aria-hidden="true">🛸</span>
+        <p className="starlight-error-code">Oops!</p>
+        <h1 className="starlight-error-title">The signal was interrupted</h1>
+
+- Next.js catches rendering failures and shows a safe user-facing screen.
+- The original error is written to the developer console.
+- This boundary does not automatically catch every event-handler or API error.
+- Without centralized production monitoring, user reports may be insufficient.
+
+Seven-step incident process
+
+Step 1: State the symptom precisely.
+
+Weak: “Login does not work.”
+Strong: “In production, student login continues returning 429 more than five
+minutes after five incorrect PIN attempts.”
+
+Step 2: Record the reproduction conditions.
+
+Include role, URL, environment, browser, timing, and input category. Never record
+real passwords, session cookies, or unnecessary student information.
+
+Step 3: Identify the failing layer.
+
+- UI: no request occurs or displayed state is incorrect.
+- API: a 4xx or 5xx originates in route logic.
+- Database: constraints, migration state, permissions, or records are wrong.
+- External service: Supabase, OpenAI, storage, or hosting platform fails.
+
+Step 4: Collect the smallest useful evidence.
+
+- One relevant browser Console error
+- Network URL, method, status, and sanitized response
+- Server error from the same timestamp
+- Existence and state of the relevant database row
+
+Step 5: Read code in request order.
+
+UI handler -> API client -> route -> authentication -> validation -> database or
+external service -> response -> React state.
+
+Step 6: Make the smallest safe change and verify it.
+
+Run npm run typecheck, npm test, and npm run build according to risk. Manually
+test both the success path and important failure paths.
+
+Step 7: Review regression scope.
+
+If a shared helper changed, search every caller. Check teacher and student flows,
+language conventions, mobile layouts, empty data, and slow networks.
+
+First place to inspect by symptom
+
+- No request: React handler and browser Console
+- 400: Zod validators and business rules
+- 401: session cookies and authentication helpers
+- 403: class/student ownership and feature roles
+- 404: URL mapping and target ID
+- 409: conflicting state or duplicate data
+- 413: upload size and hosting limits
+- 429: login lockout or AI usage limits
+- 500: server logs, database errors, migrations, and external APIs
+
+What to provide to an AI coding assistant
+
+- Exact reproduction steps
+- Expected result and actual result
+- Sanitized Network status and response
+- Relevant file paths
+- Explicit out-of-scope areas
+- Completion criteria: typecheck, tests, build, and manual scenarios
+
+Final review checklist
+
+Scope
+
+[ ] Does the change solve the requested issue without a broad rewrite?
+[ ] Does it preserve unrelated user changes?
+
+Security
+
+[ ] Does every write route authenticate on the server?
+[ ] Is teacher ownership of the class or student verified?
+[ ] Are service-role, OpenAI, and session secrets server-only?
+[ ] Are passwords, tokens, and student records absent from logs?
+
+Data
+
+[ ] Is untrusted input validated with Zod or an equivalent check?
+[ ] Is partial failure defined for multi-step writes?
+[ ] Does every database change include a migration?
+[ ] Were cascade-delete effects and recovery considered?
+
+Asynchronous behavior and errors
+
+[ ] Are required await operations present?
+[ ] Are loading states cleared in finally?
+[ ] Can a failed request accidentally look successful?
+[ ] Does any catch block silently discard a critical error?
+
+User experience
+
+[ ] Is the message appropriate for the student or teacher audience?
+[ ] Does an error message suggest a useful next action?
+[ ] Does the screen work with empty data, mobile width, and slow networks?
+
+Verification
+
+[ ] Are normal, boundary, and failure cases covered?
+[ ] Does npm run typecheck pass?
+[ ] Does npm test pass?
+[ ] Does npm run build pass?
+[ ] Was the actual browser request and response inspected?
+
+
+======================================================================
+FEATURE-TO-FILE REFERENCE
+======================================================================
+
+Landing page
+- app/page.tsx
+- components/landing/InteractiveStarfield.tsx
+
+Teacher application
+- app/teacher/page.tsx
+- components/teacher/ClassDashboard.tsx
+- components/teacher/ClassSettings.tsx
+- components/teacher/StatsDashboard.tsx
+
+Student application
+- app/student/page.tsx
+- components/student/VoyageContent.tsx
+- components/student/LearningContent.tsx
+
+Shared API client
+- lib/api-client.ts
+
+Teacher authentication and authorization
+- lib/auth.ts
+- lib/supabase/server.ts
+- app/api/auth/teacher/**/route.ts
+
+Student authentication and sessions
+- lib/student-session.ts
+- lib/password.ts
+- app/api/auth/student/**/route.ts
+
+Validation
+- lib/validators.ts
+- tests/validators.test.ts
+
+Emotion feed
+- app/api/feeds/route.ts
+- app/api/feeds/class/[classId]/route.ts
+- app/api/feeds/[id]/reactions/route.ts
+- types/domain.ts
+
+Learning reflection
+- lib/learning.ts
+- lib/learning-access.ts
+- lib/learning-storage.ts
+- components/teacher/LearningDashboard.tsx
+- components/student/LearningContent.tsx
+- app/api/learning/**/route.ts
+
+Evaluation feedback
+- components/teacher/EvalDashboard.tsx
+- app/api/eval/**/route.ts
+- lib/eval-access.ts
+
+Relationship analysis
+- lib/relationship.ts
+- components/teacher/RelationshipDashboard.tsx
+- app/api/relationship/**/route.ts
+
+Letters
+- lib/letter-threads.ts
+- components/teacher/LetterThreads.tsx
+- app/api/letters/**/route.ts
+
+Voyage and badges
+- lib/voyage.ts
+- lib/badges.ts
+- lib/learning-rewards.ts
+- app/api/voyage/**/route.ts
+- app/api/badges/**/route.ts
+
+AI reports
+- lib/ai/openaiClient.ts
+- lib/ai/anonymize.ts
+- lib/ai/usage.ts
+- lib/ai/*ReportData.ts
+- lib/ai/*ReportPrompt.ts
+- lib/ai/*Report.ts
+- components/teacher/AiReportTab.tsx
+
+Database
+- supabase/schema.sql
+- supabase/migrations/*.sql
+
+Error pages
+- app/error.tsx
+- app/global-error.tsx
+- app/not-found.tsx
+
+
+======================================================================
+FINAL READING METHOD
+======================================================================
+
+Use this order whenever you study or debug a feature:
+
+1. Find the button or form used by the user.
+2. Find its event handler and state changes.
+3. Record the API URL and HTTP method.
+4. Open the matching app/api/**/route.ts file.
+5. Verify authentication and ownership checks.
+6. Inspect Zod validation and business rules.
+7. Inspect Supabase tables, filters, and write order.
+8. Return to the UI and inspect success and failure handling.
+9. Find related tests and migrations.
+10. Confirm that an AI-generated change did not break any connection in the
+    chain.
+
+You do not need to memorize the entire codebase. The essential skill is being
+able to answer four questions: Where did this value come from? Who validates it?
+Where is it stored? What does the user see when the operation fails?
+
+END

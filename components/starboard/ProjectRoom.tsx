@@ -20,8 +20,6 @@ import { useSb, type Screen } from './context';
 import ProjectSidebar from './ProjectSidebar';
 import BoardScreen from './BoardScreen';
 import WorkspaceSettings from './WorkspaceSettings';
-import StudentSummary from './StudentSummary';
-import EvaluationScreen from './EvaluationScreen';
 
 type RoomScreen = Exclude<Screen, { name: 'projects' } | { name: 'criteria' }>;
 type Tree = { project: Project; isTeacher: boolean; nodes: TreeNode[]; counts: Record<string, number> };
@@ -140,10 +138,6 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
         )}
         {screen.name === 'settings' && (
           <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={tree.counts} initialSelected={screen.boardId ?? null} onTreeChanged={refresh} />
-        )}
-        {screen.name === 'students' && <StudentSummary projectId={projectId} boardId={screen.boardId} />}
-        {screen.name === 'evaluate' && (
-          <EvaluationScreen key={screen.studentId} projectId={projectId} boardId={screen.boardId} studentId={screen.studentId} />
         )}
       </div>
     </div>

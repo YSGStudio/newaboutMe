@@ -5911,6 +5911,21 @@ button.sb-group-toggle:hover:not(:disabled) { background: var(--bg); transform: 
 .sb-setting-foot { display: flex; align-items: center; gap: 8px; margin: 18px 0 0; color: var(--muted); font-size: 12px; }
 .sb-setting-foot code { padding: 2px 8px; border-radius: 6px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+/* 학생별 현황 전체 화면 창 — 칸반을 그대로 둔 채 앞에 덮는다(카드 창 .sb-overlay 9000보다 한 층 아래) */
+.sb-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  overflow-y: auto;
+  padding: 72px clamp(12px, 3vw, 40px) 48px;
+  background:
+    radial-gradient(circle at 88% 6%, rgba(250, 204, 21, .16) 0 2px, transparent 3px),
+    var(--bg);
+}
+.sb-fullscreen-body { width: min(1280px, 100%); margin: 0 auto; }
+button.sb-fullscreen-close { position: fixed; top: 16px; right: 16px; z-index: 1; width: 44px; min-width: 44px; min-height: 44px; border-radius: 999px; box-shadow: var(--shadow-md); font-size: 24px; line-height: 1; }
+.sb-fullscreen .sb-evaluate-form { top: 0; }
+
 /* 학생별 보기·평가 */
 .sb-summary,
 .sb-evaluate { display: flex; flex-direction: column; gap: 14px; }
