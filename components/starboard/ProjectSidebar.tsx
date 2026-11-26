@@ -5,7 +5,6 @@
  * 프로젝트 제목(누르면 메인), "작업장 N", 교사에게 "＋ 작업장 추가"·"⚙ 작업장 설정", 작업장 트리.
  * 좁은 화면에서는 트리를 "작업장 목록 펼치기/접기"로 감쌉니다.
  * 맨 위 프로젝트 이름 옆 🏠는 프로젝트 목록으로 돌아갑니다(이름을 누르면 첫 작업장으로).
- * 맨 아래 .sb-sidebar-board-actions는 작업장 화면의 교사 버튼 자리입니다(작업장 화면 위 머리 줄을 없애서 옮겨 옴).
  */
 import { useState } from 'react';
 import type { TreeNode } from '@/lib/starboard/types';
@@ -21,10 +20,9 @@ type Props = {
   onHome: boolean;
   onChanged: () => void;
   /** 작업장 화면의 교사 버튼이 들어올 자리(BoardScreen이 포털로 채운다) */
-  actionsRef?: (el: HTMLDivElement | null) => void;
 };
 
-export default function ProjectSidebar({ projectId, title, nodes, counts, currentId, onHome, onChanged, actionsRef }: Props) {
+export default function ProjectSidebar({ projectId, title, nodes, counts, currentId, onHome, onChanged }: Props) {
   const { isTeacher, go } = useSb();
   const boardCount = nodes.filter((n) => n.accessible).length;
   const tree = <BoardTree projectId={projectId} nodes={nodes} currentId={currentId} counts={counts} onChanged={onChanged} />;
@@ -77,7 +75,6 @@ export default function ProjectSidebar({ projectId, title, nodes, counts, curren
         {tree}
       </details>
       <div className="sb-sidebar-desktop">{tree}</div>
-      {actionsRef && <div ref={actionsRef} className="sb-sidebar-board-actions" />}
     </aside>
   );
 }

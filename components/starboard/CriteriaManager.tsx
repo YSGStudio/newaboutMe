@@ -36,8 +36,8 @@ export default function CriteriaManager() {
 
   return (
     <div className="sb-criteria">
-      <div className="sb-page-title">
-        <h2>평가 기준</h2>
+      <div className="sb-page-title sb-space-header">
+        <h2>평가 기준 관리</h2>
       </div>
       <details className="card sb-create-card">
         <summary>새 기준 만들기</summary>

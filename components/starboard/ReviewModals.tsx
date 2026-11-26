@@ -13,7 +13,7 @@ import { json, useSb } from './context';
 /** 섹션 이름 '01. 이름' → '이름' */
 export const memberName = (columnName: string) => columnName.replace(/^\d+\.\s*/, '');
 
-function Modal({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+export function ReviewModal({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -21,7 +21,7 @@ function Modal({ label, onClose, children }: { label: string; onClose: () => voi
   }, [onClose]);
   return (
     <div className="sb-overlay" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={label} className="sb-modal is-narrow" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={label} className="sb-modal is-narrow sb-review-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="sb-modal-head">
           <h2 className="sb-modal-title">{label}</h2>
           <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
@@ -97,7 +97,7 @@ export function PeerReviewModal({ boardId, target, criteria, onClose }: { boardI
   const done = stars ? criteria.filter((c) => stars[c.id]).length : 0;
 
   return (
-    <Modal label={`⭐ ${target.name} 평가하기`} onClose={onClose}>
+    <ReviewModal label={`⭐ ${target.name} 평가하기`} onClose={onClose}>
       <p className="hint">선생님이 정한 평가 기준마다 별을 골라 주세요. 누가 줬는지는 친구에게 보이지 않고, 평균만 보여요.</p>
       {stars === null ? (
         <p className="sb-empty-row">불러오는 중…</p>
@@ -157,7 +157,7 @@ export function PeerReviewModal({ boardId, target, criteria, onClose }: { boardI
           </div>
         </form>
       )}
-    </Modal>
+    </ReviewModal>
   );
 }
 
@@ -181,7 +181,7 @@ export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: str
   const pOverall = data && data.peer_count > 0 ? overallOutOf5(criteria, data.peer_avg) : null;
 
   return (
-    <Modal label={isTeacher ? `📊 ${student.name} 평가 보기` : '📊 내 평가 보기'} onClose={onClose}>
+    <ReviewModal label={isTeacher ? `📊 ${student.name} 평가 보기` : '📊 내 평가 보기'} onClose={onClose}>
       {data === undefined ? (
         <p className="sb-empty-row">불러오는 중…</p>
       ) : data === null ? (
@@ -243,7 +243,7 @@ export function ReviewSummaryModal({ boardId, student, onClose }: { boardId: str
           )}
         </div>
       )}
-    </Modal>
+    </ReviewModal>
   );
 }
 

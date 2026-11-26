@@ -141,7 +141,7 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
 
   return (
     <main className="sb-workspace">
-      <header className="sb-workspace-head">
+      <header className="sb-workspace-head sb-space-header">
         <button type="button" className="sb-back-link" onClick={() => go({ name: 'home', projectId: project.id })}>
           <span aria-hidden="true">‹</span> {project.title}
         </button>

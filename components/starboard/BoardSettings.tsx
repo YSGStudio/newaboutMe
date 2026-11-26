@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Access, BoardView, PermissionRow, StudentLite, TreeNode } from '@/lib/starboard/types';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { HIDE_MODE_LABEL, type HideMode } from '@/lib/starboard/hiding';
-import { COLUMN_PALETTE, MAX_COLUMNS, MIN_COLUMNS } from '@/lib/starboard/columns';
+import { COLUMN_PALETTE, MAX_COLUMNS, MIN_COLUMNS, orderColumns } from '@/lib/starboard/columns';
 import { descendants } from '@/lib/starboard/tree';
 import { FIELD_TYPE_LABEL, MAX_CARD_FIELDS, MAX_FIELD_LABEL, newFieldId, type CardField, type CardFieldType } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
@@ -118,9 +118,9 @@ export function BoardSettingsDrawer({ onClose, ...props }: PanelProps & { onClos
   }, [onClose]);
   return (
     <div className="sb-overlay is-drawer" onClick={onClose}>
-      <aside className="sb-drawer" onClick={(e) => e.stopPropagation()} aria-label="보드 설정" role="dialog">
+      <aside className="sb-drawer sb-workspace-drawer" onClick={(e) => e.stopPropagation()} aria-label="보드 설정" role="dialog">
         <div className="sb-modal-head">
-          <h2 className="sb-modal-title">보드 설정</h2>
+          <h2 className="sb-modal-title">작업장 설정</h2>
           <button type="button" className="sb-btn ghost is-small" onClick={() => go({ name: 'settings', projectId: props.projectId, boardId: props.view.board.id })}>
             ⚙ 작업장 설정 페이지
           </button>
@@ -356,7 +356,8 @@ function CardFormatTab({ view, pending, run }: { view: BoardView; pending: boole
 function ColumnsTab({ view, pending, run }: { view: BoardView; pending: boolean; run: Run }) {
   const { api } = useSb();
   const [name, setName] = useState('');
-  const cols = [...view.columns].sort((a, b) => a.position - b.position);
+  // 칸반과 같은 순서(공지사항 섹션이 맨 앞)로 보여 준다.
+  const cols = orderColumns(view.columns);
   const [color, setColor] = useState<string>(COLUMN_PALETTE[cols.length % COLUMN_PALETTE.length]);
   return (
     <>

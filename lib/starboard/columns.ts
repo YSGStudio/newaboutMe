@@ -52,3 +52,22 @@ export function columnTint(color: string): string {
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return lum > 0.75 ? color : `color-mix(in srgb, ${color} 30%, white)`;
 }
+
+/**
+ * 공지사항 섹션 — 이름에 "공지"가 들어간 섹션은 교사·학생 화면 모두에서 늘 맨 앞에 둔다(2026-11-26 사용자 요청).
+ * 만들거나 이름을 바꿀 때 저장 순서도 맨 앞으로 옮기고(라우트), 그리는 쪽에서도 한 번 더 앞으로 모은다(orderColumns).
+ */
+export function isNoticeColumn(name: string): boolean {
+  return name.replace(/\s+/g, '').includes('공지');
+}
+
+/** 저장 순서(position)대로 정렬하되 공지사항 섹션을 맨 앞으로 모은다. 공지끼리·나머지끼리의 순서는 그대로. */
+export function orderColumns<T extends { name: string; position: number }>(columns: T[]): T[] {
+  const sorted = [...columns].sort((a, b) => a.position - b.position);
+  return [...sorted.filter((c) => isNoticeColumn(c.name)), ...sorted.filter((c) => !isNoticeColumn(c.name))];
+}
+
+/** 공지사항 섹션을 저장할 자리 — 지금 맨 앞 섹션보다 앞 */
+export function noticePosition(positions: number[]): number {
+  return positions.length ? Math.min(...positions) - 1 : 1;
+}

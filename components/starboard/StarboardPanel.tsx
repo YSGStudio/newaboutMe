@@ -31,6 +31,14 @@ export default function StarboardPanel({ kind, classId }: Props) {
   return (
     <SbProvider kind={kind} go={go}>
       <div className="sb-panel">
+        {screen.name !== 'projects' && (
+          <div className="sb-feature-bar">
+            <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'projects' })}>
+              <span aria-hidden="true">✦</span> 별빛보드
+            </button>
+            <span className="sb-feature-role">{kind === 'teacher' ? '교사' : '학생'}</span>
+          </div>
+        )}
         {kind === 'teacher' && top && (
           <Tabs
             items={[

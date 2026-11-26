@@ -40,8 +40,6 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
   const [tree, setTree] = useState<Tree | null>(null);
   const [error, setError] = useState('');
   const [signals, setSignals] = useState<RoomSignals>({ structure: 0, content: {} });
-  // 사이드바 아래 교사 버튼 자리 — 작업장 화면(BoardScreen)이 포털로 채운다.
-  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   const last = useRef<Map<string, Ev> | null>(null);
 
   const loadTree = useCallback(async () => {
@@ -105,7 +103,6 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
   const refresh = () => {
     loadTree().catch(() => {});
   };
-  const currentBoardId = 'boardId' in screen && screen.name !== 'settings' ? screen.boardId : undefined;
   const onSettings = screen.name === 'settings';
 
   return (
@@ -119,14 +116,16 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
           currentId={screen.name === 'board' ? screen.boardId : undefined}
           onHome={screen.name === 'home'}
           onChanged={refresh}
-          actionsRef={setActionsSlot}
         />
       )}
       <div className="sb-room-main">
         {screen.name === 'home' && (
-          <div className="card sb-empty-board" data-testid="empty-project">
+          <div className="card sb-empty-board sb-empty-project" data-testid="empty-project">
             <p className="sb-empty-title">아직 작업장이 없어요</p>
-            <p className="hint">{tree.isTeacher ? '왼쪽의 ＋ 작업장 추가로 첫 작업장을 만들어 보세요.' : '선생님이 작업장을 열면 여기에서 카드를 볼 수 있어요.'}</p>
+            <p className="hint">{tree.isTeacher ? '첫 작업장을 만들면 수업 자료와 카드를 모을 수 있어요.' : '선생님이 작업장을 열면 여기에서 카드를 볼 수 있어요.'}</p>
+            {tree.isTeacher && (
+              <button type="button" className="sb-btn-gold" onClick={() => go({ name: 'settings', projectId })}>＋ 첫 작업장 만들기</button>
+            )}
           </div>
         )}
         {screen.name === 'board' && (
@@ -137,7 +136,6 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
             tree={tree.nodes}
             signals={signals}
             onTreeChanged={refresh}
-            actionsSlot={actionsSlot}
           />
         )}
         {screen.name === 'settings' && (
@@ -147,7 +145,6 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
         {screen.name === 'evaluate' && (
           <EvaluationScreen key={screen.studentId} projectId={projectId} boardId={screen.boardId} studentId={screen.studentId} />
         )}
-        {currentBoardId === undefined && null}
       </div>
     </div>
   );

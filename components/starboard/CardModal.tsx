@@ -5,6 +5,7 @@
  * 머리: 섹션 배지·작성자·(수정하기)·닫기(Esc).
  * 교사·학생 모두 카드를 먼저 넓은 읽기 화면으로 열고, 닫기 옆 ✏️ 수정하기를 눌러야 편집 화면(제목·내용·첨부 올리기·카드 삭제)이 됩니다.
  * 저장하거나 취소하면 다시 읽기 화면으로 돌아갑니다.
+ * 교사는 그 작업장의 모든 카드(학생 카드 포함)를 지울 수 있어서, 읽기 화면 머리의 🗑로 바로 지웁니다(서버 sb_can_write_card가 담임 교사를 허용).
  * 라벨·마감일은 lib/features.ts STARBOARD_CARD_LABELS_DUE_ENABLED로 화면에서 내렸습니다(저장된 값은 그대로 다시 보냄).
  * 아래에 첨부(목록 — 읽기 화면에서는 첨부가 있을 때만), 활동 기록을 보여 줍니다.
  * 체크리스트는 lib/features.ts STARBOARD_CHECKLIST_ENABLED로 화면에서 내렸습니다(저장된 항목은 그대로 유지).
@@ -22,10 +23,10 @@ import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '
 
 const ACTION_LABEL: Record<Activity['action'], string> = { create: '만듦', update: '수정함', move: '옮김', delete: '삭제함' };
 
-type Props = { card: CardView; boardId: string; template: CardField[]; columns: ColumnView[]; onClose: () => void; onChanged: () => void };
+type Props = { workspace?: boolean; card: CardView; boardId: string; template: CardField[]; columns: ColumnView[]; onClose: () => void; onChanged: () => void };
 
-export default function CardModal({ card, boardId, template, columns, onClose, onChanged }: Props) {
-  const { api } = useSb();
+export default function CardModal({ workspace, card, boardId, template, columns, onClose, onChanged }: Props) {
+  const { api, isTeacher, confirm } = useSb();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [title, setTitle] = useState(card.title);
@@ -98,7 +99,7 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
 
   return (
     <div className="sb-overlay" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="카드 상세" className={editing ? 'sb-modal' : 'sb-modal is-reading'} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="카드 상세" className={`sb-modal${editing ? '' : ' is-reading'}${workspace ? ' sb-workspace-card-dialog' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="sb-modal-head">
           <span className="sb-column-badge" style={{ background: col ? columnTint(col.color) : undefined }}>
             {col?.name}
@@ -108,6 +109,23 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
             {editable && !editing && (
               <button type="button" className="sb-icon-btn" onClick={() => setEditing(true)} aria-label="수정하기" title="수정하기" data-testid="card-edit">
                 <span aria-hidden="true">✏️</span>
+              </button>
+            )}
+            {isTeacher && editable && !editing && (
+              <button
+                type="button"
+                className="sb-icon-btn is-danger"
+                disabled={pending}
+                aria-label="카드 삭제"
+                title="카드 삭제"
+                data-testid="card-delete"
+                onClick={async () => {
+                  const who = card.author_name ?? (card.is_mine ? '내' : '익명');
+                  if (!(await confirm(`'${card.title}' 카드(${who})를 지울까요? 첨부도 함께 지워지고 되돌릴 수 없습니다.`, '삭제'))) return;
+                  run(() => api(`/cards/${card.id}`, json('DELETE')), onClose);
+                }}
+              >
+                <span aria-hidden="true">🗑️</span>
               </button>
             )}
             <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="닫기" title="닫기">
@@ -247,19 +265,32 @@ export default function CardModal({ card, boardId, template, columns, onClose, o
         </section>
         )}
 
-        <section className="sb-modal-section">
-          <h3>활동 기록</h3>
-          <ol className="sb-activities" data-testid="activity-list">
-            {activities.map((a) => (
-              <li key={a.id} data-testid="activity">
-                <time className="sb-meta">{formatKST(a.created_at)}</time> {a.actor_name ?? '누군가'} — {ACTION_LABEL[a.action]}
-                {a.action === 'move' && ` (${a.from_column ?? '?'} → ${a.to_column ?? '?'})`}
-              </li>
-            ))}
-            {activities.length === 0 && <li className="sb-meta">기록이 없습니다.</li>}
-          </ol>
-        </section>
+        {workspace ? (
+          <details className="sb-modal-section sb-card-history">
+            <summary>활동 기록</summary>
+            <CardHistory activities={activities} />
+          </details>
+        ) : (
+          <section className="sb-modal-section">
+            <h3>활동 기록</h3>
+            <CardHistory activities={activities} />
+          </section>
+        )}
       </div>
     </div>
+  );
+}
+
+function CardHistory({ activities }: { activities: Activity[] }) {
+  return (
+    <ol className="sb-activities" data-testid="activity-list">
+      {activities.map((a) => (
+        <li key={a.id} data-testid="activity">
+          <time className="sb-meta">{formatKST(a.created_at)}</time> {a.actor_name ?? '누군가'} — {ACTION_LABEL[a.action]}
+          {a.action === 'move' && ` (${a.from_column ?? '?'} → ${a.to_column ?? '?'})`}
+        </li>
+      ))}
+      {activities.length === 0 && <li className="sb-meta">기록이 없습니다.</li>}
+    </ol>
   );
 }

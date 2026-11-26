@@ -7,7 +7,7 @@
  * 섹션이 없으면 교사에게 "멤버별로 나누기 / 직접 만들기" 안내를, 학생에게 빈 보드 안내를 보여 줍니다.
  * readOnly는 평가 화면에서 대상 보드를 읽기 전용으로 보여 줄 때 씁니다.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -23,7 +23,7 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from '@dnd-kit/utilities';
 import type { BoardView, CardView, ColumnView } from '@/lib/starboard/types';
 import { HIDE_MODE_LABEL } from '@/lib/starboard/hiding';
-import { COLUMN_PALETTE, columnTint, positionBetween } from '@/lib/starboard/columns';
+import { COLUMN_PALETTE, columnTint, isNoticeColumn, orderColumns, positionBetween } from '@/lib/starboard/columns';
 import { formatKST } from '@/lib/starboard/datetime';
 import { avatarPair, initials } from '@/lib/starboard/visual';
 import type { CardField, CardFieldValues } from '@/lib/starboard/card-fields';
@@ -34,27 +34,40 @@ import { ACCEPT_FILES, checkFile, normalizeLink } from '@/lib/starboard/upload';
 import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
-import { MyReviewInline, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
+import { MyReviewInline, ReviewModal, PeerReviewModal, ReviewSummaryModal, memberName } from './ReviewModals';
 
 function sortCards(cards: CardView[]) {
   return [...cards].sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
 }
 
-type Props = { view: BoardView; onChanged: () => void; readOnly?: boolean };
+type Props = {
+  view: BoardView;
+  onChanged: () => void;
+  readOnly?: boolean;
+  heading?: ReactNode;
+  actions?: ReactNode;
+  status?: ReactNode;
+  appearance?: 'workspace';
+};
 
-export default function Kanban({ view, onChanged, readOnly }: Props) {
+export default function Kanban({ view, onChanged, readOnly, heading, actions, status, appearance }: Props) {
   const { api, isTeacher } = useSb();
   const [optimistic, setOptimistic] = useState<{ base: CardView[]; cards: CardView[] } | null>(null);
   const cards = optimistic && optimistic.base === view.cards ? optimistic.cards : view.cards;
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  // 학생에게는 자기 멤버 섹션을 맨 앞에, 각 섹션 안에서는 자기 카드를 맨 앞에 보여 준다(교사는 저장된 순서 그대로).
+  const [composeId, setComposeId] = useState<string | null>(null);
+  const [showMyReview, setShowMyReview] = useState(false);
+  // 공지사항 섹션은 누구에게나 맨 앞. 학생에게는 그다음 자기 멤버 섹션을, 각 섹션 안에서는 자기 카드를 맨 앞에 보여 준다.
   // 자기 카드끼리·남의 카드끼리의 순서는 저장된 순서를 지킨다.
   const viewerId = view.board.viewer_id;
   const columns = useMemo(() => {
-    const sorted = [...view.columns].sort((a, b) => a.position - b.position);
+    const sorted = orderColumns(view.columns);
     if (isTeacher) return sorted;
-    return [...sorted.filter((c) => c.member_id && c.member_id === viewerId), ...sorted.filter((c) => !(c.member_id && c.member_id === viewerId))];
+    const notice = sorted.filter((c) => isNoticeColumn(c.name));
+    const rest = sorted.filter((c) => !isNoticeColumn(c.name));
+    const mine = (c: ColumnView) => Boolean(c.member_id && c.member_id === viewerId);
+    return [...notice, ...rest.filter(mine), ...rest.filter((c) => !mine(c))];
   }, [view.columns, isTeacher, viewerId]);
   const byColumn = useMemo(() => {
     const m = new Map<string, CardView[]>();
@@ -114,6 +127,9 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
   const openCard = cards.find((c) => c.id === openId) ?? null;
   const canWrite = view.board.can_write && !readOnly;
   const template = view.board.card_fields ?? [];
+  const myColumn = !isTeacher && viewerId ? columns.find((col) => col.member_id === viewerId) : undefined;
+  const writeChoices = myColumn ? [myColumn] : columns;
+  const composeColumn = canWrite ? columns.find((col) => col.id === composeId) : undefined;
   const [review, setReview] = useState<{ mode: 'peer' | 'summary'; id: string; name: string } | null>(null);
   // 섹션 주인에 따라: 내 섹션 → 내 평가 보기, 친구 섹션 → 평가하기(동료평가가 켜져 있고 기준이 있을 때), 교사 → 그 학생 평가 보기
   const reviewAction = (col: ColumnView): 'summary' | 'peer' | null => {
@@ -125,6 +141,36 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
 
   return (
     <>
+      {heading && (
+        <header className="sb-board-head sb-space-header">
+          {heading}
+          <div className="sb-board-actions">
+            {actions}
+            {myColumn && <button type="button" className="sb-btn-dark" onClick={() => setShowMyReview(true)}>내 평가</button>}
+            {canWrite && writeChoices.length === 1 && (
+              <button type="button" className="sb-btn-gold" onClick={() => setComposeId(writeChoices[0].id)}>
+                ＋ {myColumn ? '내 카드 쓰기' : '카드 쓰기'}
+              </button>
+            )}
+            {canWrite && writeChoices.length > 1 && (
+              <details className="sb-write-menu">
+                <summary className="sb-btn-gold">＋ 카드 쓰기</summary>
+                <div>
+                  {writeChoices.map((col) => (
+                    <button key={col.id} type="button" className="sb-plain-btn" onClick={(e) => {
+                      e.currentTarget.closest('details')?.removeAttribute('open');
+                      setComposeId(col.id);
+                    }}>
+                      {col.name}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </header>
+      )}
+      {status}
       {error && (
         <p role="alert" className="notice error sb-kanban-error">
           {error}
@@ -140,13 +186,14 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
           </div>
         ))}
       <DndContext id={`kanban-${view.board.id}`} sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
-        <div className={isTeacher ? 'sb-kanban' : 'sb-kanban is-student'} data-testid="kanban">
+        <div className={`sb-kanban${isTeacher ? '' : ' is-student'}${appearance ? ' sb-kanban-workspace' : ''}`} data-testid="kanban">
           {columns.map((col) => (
             <Column
               key={col.id}
               col={col}
               cards={byColumn.get(col.id) ?? []}
-              canWrite={canWrite}
+              workspace={appearance === 'workspace'}
+              onWrite={canWrite ? () => setComposeId(col.id) : undefined}
               boardId={view.board.id}
               template={template}
               readOnly={!!readOnly}
@@ -155,7 +202,6 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
               onReview={(mode) => setReview({ mode, id: col.member_id!, name: memberName(col.name) })}
               evaluationBoardId={view.board.evaluation_board_id}
               onOpen={setOpenId}
-              onChanged={onChanged}
             />
           ))}
           {isTeacher && !readOnly && columns.length > 0 && (
@@ -163,6 +209,23 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
           )}
         </div>
       </DndContext>
+      {composeColumn && (
+        <AddCard
+          key={composeColumn.id}
+          boardId={view.board.id}
+          columnId={composeColumn.id}
+          columnName={composeColumn.name}
+          template={template}
+          lastPosition={(byColumn.get(composeColumn.id) ?? []).reduce((last, card) => Math.max(last, card.position), 0)}
+          onAdded={onChanged}
+          onClose={() => setComposeId(null)}
+        />
+      )}
+      {showMyReview && myColumn?.member_id && (
+        <ReviewModal label="내 평가" onClose={() => setShowMyReview(false)}>
+          <MyReviewInline boardId={view.board.evaluation_board_id} studentId={myColumn.member_id} />
+        </ReviewModal>
+      )}
       {review?.mode === 'peer' && (
         <PeerReviewModal boardId={view.board.evaluation_board_id} target={{ id: review.id, name: review.name }} criteria={view.criteria} onClose={() => setReview(null)} />
       )}
@@ -171,6 +234,7 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
       )}
       {openCard && (
         <CardModal
+          workspace={appearance === 'workspace'}
           card={readOnly ? { ...openCard, can_edit: false } : openCard}
           boardId={view.board.id}
           template={template}
@@ -186,7 +250,8 @@ export default function Kanban({ view, onChanged, readOnly }: Props) {
 type ColumnProps = {
   col: ColumnView;
   cards: CardView[];
-  canWrite: boolean;
+  workspace: boolean;
+  onWrite?: () => void;
   boardId: string;
   template: CardField[];
   readOnly: boolean;
@@ -196,26 +261,25 @@ type ColumnProps = {
   /** 평가가 걸린 작업장(개인 보드면 부모 작업장) — 학생 본인 섹션의 펼침 평가가 쓴다 */
   evaluationBoardId: string;
   onOpen: (id: string) => void;
-  onChanged: () => void;
 };
 
-function Column({ col, cards, canWrite, boardId, template, readOnly, reviewAction, isMine, onReview, evaluationBoardId, onOpen, onChanged }: ColumnProps) {
+function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, reviewAction, isMine, onReview, evaluationBoardId, onOpen }: ColumnProps) {
   const { isTeacher } = useSb();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` });
-  const [adding, setAdding] = useState(false);
   // 학생 본인 섹션의 📊는 창을 띄우지 않고 섹션 안에 평가 기준·내 평가를 펼친다.
   const inlineReview = !isTeacher && isMine && reviewAction === 'summary';
   const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <section
       ref={setNodeRef}
+      style={workspace ? ({ '--sb-column-color': columnTint(col.color) } as CSSProperties) : undefined}
       className={isOver ? 'sb-column is-over' : 'sb-column'}
       aria-label={`${col.name} 열`}
       data-testid="column"
       data-column-name={col.name}
       data-member-id={col.member_id ?? undefined}
     >
-      <header className="sb-column-head" style={{ background: columnTint(col.color) }}>
+      <header className="sb-column-head" style={workspace ? undefined : { background: columnTint(col.color) }}>
         <h3 title={col.name}>{col.name}</h3>
         {isMine && <span className="sb-me-badge">나</span>}
         <span className="sb-count-pill" data-testid="column-count">
@@ -234,14 +298,13 @@ function Column({ col, cards, canWrite, boardId, template, readOnly, reviewActio
             <span aria-hidden="true">{reviewAction === 'peer' ? '⭐' : '📊'}</span>
           </button>
         )}
-        {canWrite && (
+        {onWrite && (
           <button
             type="button"
-            className={adding ? 'sb-round-btn is-active' : 'sb-round-btn'}
-            onClick={() => setAdding((v) => !v)}
+            className="sb-round-btn"
+            onClick={onWrite}
             aria-label={`${col.name}에 글쓰기`}
-            title={adding ? '글쓰기 닫기' : '글쓰기'}
-            aria-pressed={adding}
+            title="글쓰기"
             data-testid="write-toggle"
           >
             <span aria-hidden="true">✏️</span>
@@ -251,20 +314,17 @@ function Column({ col, cards, canWrite, boardId, template, readOnly, reviewActio
       {isTeacher && col.effective_hide !== 'off' && <p className="sb-column-hide">가리기: {HIDE_MODE_LABEL[col.effective_hide]}</p>}
       <div className="sb-column-body">
         {inlineReview && reviewOpen && col.member_id && <MyReviewInline boardId={evaluationBoardId} studentId={col.member_id} />}
-        {canWrite && adding && (
-          <AddCard boardId={boardId} columnId={col.id} template={template} lastPosition={cards.at(-1)?.position ?? 0} onAdded={onChanged} />
-        )}
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           <ul className="sb-card-list">
-            {cards.length === 0 && col.hidden_count === 0 && !adding && (
-              <li className="sb-empty-row">{canWrite ? '✏️를 눌러 글을 써 보세요' : '아직 카드가 없어요'}</li>
+            {cards.length === 0 && col.hidden_count === 0 && (
+              <li className="sb-empty-row">{onWrite ? '✏️를 눌러 글을 써 보세요' : '아직 카드가 없어요'}</li>
             )}
             {cards.map((card) => (
               <CardItem key={card.id} card={card} template={template} boardId={boardId} readOnly={readOnly} onOpen={() => onOpen(card.id)} />
             ))}
             {col.hidden_count > 0 && (
               <li className="sb-hidden-count" data-testid="hidden-count">
-                다른 친구 카드 {col.hidden_count}개
+                {workspace ? `카드 ${col.hidden_count}개 · 내용 비공개` : `다른 친구 카드 ${col.hidden_count}개`}
               </li>
             )}
           </ul>
@@ -318,7 +378,15 @@ function CardItem({ card, template, boardId, readOnly, onOpen }: { card: CardVie
 /** 섹션 머리의 ✏️로 여닫는 글쓰기 칸: 제목 + 보드 카드 형식(기본: 내용) */
 type PendingFile = { id: string; file: File; kind: 'image' | 'pdf' | 'video'; url: string };
 
-function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { boardId: string; columnId: string; template: CardField[]; lastPosition: number; onAdded: () => void }) {
+function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdded, onClose }: {
+  boardId: string;
+  columnId: string;
+  columnName: string;
+  template: CardField[];
+  lastPosition: number;
+  onAdded: () => void;
+  onClose: () => void;
+}) {
   const { api } = useSb();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -331,6 +399,13 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
   const [link, setLink] = useState('');
   const [progress, setProgress] = useState('');
   // 쓰기 창을 닫을 때 남은 미리보기 주소를 풀어 준다(빼기·올리기에서는 그때그때 푼다).
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+
   const filesRef = useRef(files);
   filesRef.current = files;
   useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.url)), []);
@@ -355,153 +430,168 @@ function AddCard({ boardId, columnId, template, lastPosition, onAdded }: { board
   };
 
   return (
-    <form
-      className="sb-composer"
-      data-testid="card-composer"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setPending(true);
-        try {
-          const created = await api<{ id: string }>(
-            `/boards/${boardId}/cards`,
-            json('POST', {
-              columnId,
-              position: lastPosition + 1,
-              title,
-              body: template.length ? '' : body,
-              fields: template.length ? values : {},
-              labels: [],
-              due_date: null,
-              checklist: [],
-            }),
-          );
-          // 첨부는 카드가 생긴 뒤에 올린다. 하나가 실패해도 나머지는 계속 올리고, 실패한 것만 알려 준다.
-          const total = files.length + links.length;
-          const failed: string[] = [];
-          let done = 0;
-          for (const f of files) {
-            setProgress(`첨부 올리는 중 (${++done}/${total})`);
-            await uploadCardFile(api, created.id, f.file).catch((err: Error) => failed.push(`${f.file.name}: ${err.message}`));
-          }
-          for (const url of links) {
-            setProgress(`첨부 올리는 중 (${++done}/${total})`);
-            await addCardLink(api, created.id, url).catch((err: Error) => failed.push(`${url}: ${err.message}`));
-          }
-          setProgress('');
-          setTitle('');
-          setBody('');
-          setValues({});
-          files.forEach((f) => URL.revokeObjectURL(f.url));
-          setFiles([]);
-          setLinks([]);
-          setError(failed.length ? `카드는 올렸지만 첨부 ${failed.length}개를 올리지 못했어요. ${failed.join(' ')}` : '');
-          onAdded();
-        } catch (err) {
-          setError(err instanceof Error ? err.message : '올리지 못했어요.');
-        } finally {
-          setPending(false);
-          setProgress('');
-        }
-      }}
-      onKeyDown={(e) => {
-        // 한 줄 칸에서 Enter는 다음 칸으로, Ctrl/⌘+Enter는 올리기
-        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-        const t = e.target as HTMLElement;
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault();
-          e.currentTarget.requestSubmit();
-        } else if (t.tagName === 'INPUT') {
-          e.preventDefault();
-          const inputs = [...e.currentTarget.querySelectorAll<HTMLElement>('input, textarea')];
-          inputs[inputs.indexOf(t) + 1]?.focus();
-        }
-      }}
-    >
-      <div>
-        <label htmlFor={`new-${columnId}-title`}>제목</label>
-        <input id={`new-${columnId}-title`} autoFocus maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} data-testid="card-input-title" />
-      </div>
-      <CardContentInputs template={template} body={body} onBody={setBody} values={values} onValues={setValues} idPrefix={`new-${columnId}`} compact />
-      <div className="sb-composer-attach">
-        <label className="sb-file-label">
-          📎 사진·PDF·영상 넣기
-          <input
-            type="file"
-            className="sb-sr-only"
-            accept={ACCEPT_FILES}
-            multiple
-            disabled={pending}
-            data-testid="composer-file-input"
-            onChange={(e) => {
-              pick(e.target.files);
-              e.target.value = '';
-            }}
-          />
-        </label>
-        <div className="sb-inline-form">
-          <input
-            placeholder="링크 주소"
-            aria-label="넣을 링크 주소"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (link.trim()) addLink();
-              }
-            }}
-          />
-          <button type="button" className="sb-btn ghost is-small" disabled={pending || !link.trim()} onClick={addLink}>
-            링크 넣기
-          </button>
+    <dialog ref={dialogRef} className="sb-modal sb-compose-dialog" aria-label="카드 쓰기" onCancel={(e) => {
+      e.preventDefault();
+      if (!pending) onClose();
+    }}>
+      <header className="sb-modal-head">
+        <div className="sb-flex-1">
+          <h2 className="sb-modal-title">카드 쓰기</h2>
+          <p className="sb-meta">{columnName}</p>
         </div>
-        {(files.length > 0 || links.length > 0) && (
-          <ul className="sb-pending-list" aria-label="넣은 첨부 미리보기" data-testid="composer-previews">
-            {files.map((f) => (
-              <li key={f.id} className="sb-pending-item">
-                {f.kind === 'image' && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.url} alt={f.file.name} />
-                )}
-                {f.kind === 'video' && <video src={f.url} muted playsInline controls preload="metadata" aria-label={f.file.name} />}
-                {f.kind === 'pdf' && (
+        <button type="button" className="sb-icon-btn sb-close" aria-label="닫기" disabled={pending} onClick={onClose}>×</button>
+      </header>
+      <form
+        className="sb-composer"
+        data-testid="card-composer"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (pending || !title.trim()) return;
+          setPending(true);
+          try {
+            const created = await api<{ id: string }>(
+              `/boards/${boardId}/cards`,
+              json('POST', {
+                columnId,
+                position: lastPosition + 1,
+                title,
+                body: template.length ? '' : body,
+                fields: template.length ? values : {},
+                labels: [],
+                due_date: null,
+                checklist: [],
+              }),
+            );
+            // 첨부는 카드가 생긴 뒤에 올린다. 하나가 실패해도 나머지는 계속 올리고, 실패한 것만 알려 준다.
+            const total = files.length + links.length;
+            const failed: string[] = [];
+            let done = 0;
+            for (const f of files) {
+              setProgress(`첨부 올리는 중 (${++done}/${total})`);
+              await uploadCardFile(api, created.id, f.file).catch((err: Error) => failed.push(`${f.file.name}: ${err.message}`));
+            }
+            for (const url of links) {
+              setProgress(`첨부 올리는 중 (${++done}/${total})`);
+              await addCardLink(api, created.id, url).catch((err: Error) => failed.push(`${url}: ${err.message}`));
+            }
+            setProgress('');
+            setTitle('');
+            setBody('');
+            setValues({});
+            files.forEach((f) => URL.revokeObjectURL(f.url));
+            setFiles([]);
+            setLinks([]);
+            setError(failed.length ? `카드는 올렸지만 첨부 ${failed.length}개를 올리지 못했어요. ${failed.join(' ')}` : '');
+            onAdded();
+            if (!failed.length) onClose();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : '올리지 못했어요.');
+          } finally {
+            setPending(false);
+            setProgress('');
+          }
+        }}
+        onKeyDown={(e) => {
+          // 한 줄 칸에서 Enter는 다음 칸으로, Ctrl/⌘+Enter는 올리기
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          const t = e.target as HTMLElement;
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
+          } else if (t.tagName === 'INPUT') {
+            e.preventDefault();
+            const inputs = [...e.currentTarget.querySelectorAll<HTMLElement>('input, textarea')];
+            inputs[inputs.indexOf(t) + 1]?.focus();
+          }
+        }}
+      >
+        <div>
+          <label htmlFor={`new-${columnId}-title`}>제목</label>
+          <input id={`new-${columnId}-title`} autoFocus maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} data-testid="card-input-title" />
+        </div>
+        <CardContentInputs template={template} body={body} onBody={setBody} values={values} onValues={setValues} idPrefix={`new-${columnId}`} />
+        <div className="sb-composer-attach">
+          <label className="sb-file-label">
+            📎 사진·PDF·영상 넣기
+            <input
+              type="file"
+              className="sb-sr-only"
+              accept={ACCEPT_FILES}
+              multiple
+              disabled={pending}
+              data-testid="composer-file-input"
+              onChange={(e) => {
+                pick(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <div className="sb-inline-form">
+            <input
+              placeholder="링크 주소"
+              aria-label="넣을 링크 주소"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (link.trim()) addLink();
+                }
+              }}
+            />
+            <button type="button" className="sb-btn ghost is-small" disabled={pending || !link.trim()} onClick={addLink}>
+              링크 넣기
+            </button>
+          </div>
+          {(files.length > 0 || links.length > 0) && (
+            <ul className="sb-pending-list" aria-label="넣은 첨부 미리보기" data-testid="composer-previews">
+              {files.map((f) => (
+                <li key={f.id} className="sb-pending-item">
+                  {f.kind === 'image' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.url} alt={f.file.name} />
+                  )}
+                  {f.kind === 'video' && <video src={f.url} muted playsInline controls preload="metadata" aria-label={f.file.name} />}
+                  {f.kind === 'pdf' && (
+                    <span className="sb-file-chip">
+                      <span aria-hidden="true">📄</span> {f.file.name}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="sb-pending-remove"
+                    aria-label={`${f.file.name} 빼기`}
+                    disabled={pending}
+                    onClick={() => {
+                      URL.revokeObjectURL(f.url);
+                      setFiles((prev) => prev.filter((x) => x.id !== f.id));
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+              {links.map((url, i) => (
+                <li key={`${url}-${i}`} className="sb-pending-item is-link">
                   <span className="sb-file-chip">
-                    <span aria-hidden="true">📄</span> {f.file.name}
+                    <span aria-hidden="true">🔗</span> {url}
                   </span>
-                )}
-                <button
-                  type="button"
-                  className="sb-pending-remove"
-                  aria-label={`${f.file.name} 빼기`}
-                  disabled={pending}
-                  onClick={() => {
-                    URL.revokeObjectURL(f.url);
-                    setFiles((prev) => prev.filter((x) => x.id !== f.id));
-                  }}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-            {links.map((url, i) => (
-              <li key={`${url}-${i}`} className="sb-pending-item is-link">
-                <span className="sb-file-chip">
-                  <span aria-hidden="true">🔗</span> {url}
-                </span>
-                <button type="button" className="sb-pending-remove" aria-label={`${url} 빼기`} disabled={pending} onClick={() => setLinks((prev) => prev.filter((_, k) => k !== i))}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {error && <p className="sb-error">{error}</p>}
-      <button className="sb-btn" disabled={pending || !title.trim()}>
-        {pending ? progress || '올리는 중…' : '올리기'}
-      </button>
-    </form>
+                  <button type="button" className="sb-pending-remove" aria-label={`${url} 빼기`} disabled={pending} onClick={() => setLinks((prev) => prev.filter((_, k) => k !== i))}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {error && <p className="sb-error">{error}</p>}
+        <div className="sb-modal-actions">
+          <button type="button" className="sb-btn ghost" disabled={pending} onClick={onClose}>취소</button>
+          <button className="sb-btn" disabled={pending || !title.trim()}>{pending ? progress || '올리는 중…' : '카드 올리기'}</button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

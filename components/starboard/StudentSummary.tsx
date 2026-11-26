@@ -28,16 +28,29 @@ const STATUS: Record<Summary['students'][number]['evaluation_status'], string> =
 
 export default function StudentSummary({ projectId, boardId }: { projectId: string; boardId: string }) {
   const { api, go } = useSb();
+  const [filter, setFilter] = useState<'all' | 'pending' | 'published'>('all');
   const { data, error, reload } = useLoad(() => api<{ board: { id: string; title: string }; summary: Summary }>(`/boards/${boardId}/students`), [api, boardId]);
   if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
   const s = data.summary;
   const hasPersonal = s.students.some((x) => x.personal_board_id);
+  const published = s.students.filter((student) => student.evaluation_status === 'published').length;
+  const students = s.students.filter((student) => !s.has_criteria || filter === 'all' || (student.evaluation_status === 'published') === (filter === 'published'));
   return (
     <main className="sb-summary">
-      <button type="button" className="sb-link" onClick={() => go({ name: 'board', projectId, boardId })}>
-        ← {data.board.title}
-      </button>
-      <h2 className="sb-page-heading">학생별 보기 — {data.board.title}</h2>
+      <header className="sb-space-header sb-summary-head">
+        <div>
+          <h2 className="sb-page-heading">학생별 현황</h2>
+          <p>{data.board.title}</p>
+        </div>
+        <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'board', projectId, boardId })}>← 작업장</button>
+      </header>
+      {s.has_criteria && (
+        <div className="sb-row-wrap sb-summary-filters" role="group" aria-label="평가 상태">
+          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>전체 {s.students.length}명</button>
+          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'pending'} onClick={() => setFilter('pending')}>미공개 {s.students.length - published}명</button>
+          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'published'} onClick={() => setFilter('published')}>공개 {published}명</button>
+        </div>
+      )}
       {s.has_criteria && <PublishAll boardId={boardId} onDone={reload} />}
       <div className="card sb-table-scroll">
         <table className="table sb-summary-table" data-testid="summary-table">
@@ -55,7 +68,8 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
             </tr>
           </thead>
           <tbody>
-            {s.students.map((st) => (
+            {students.length === 0 && <tr><td colSpan={1 + s.columns.length + Number(hasPersonal) + Number(s.has_criteria)}>표시할 학생이 없어요.</td></tr>}
+            {students.map((st) => (
               <tr key={st.id} data-testid={`summary-${st.student_number}`}>
                 <td>
                   {st.name} <span className="sb-meta">{st.student_number}번</span>
@@ -81,8 +95,9 @@ export default function StudentSummary({ projectId, boardId }: { projectId: stri
                 )}
                 {s.has_criteria && (
                   <td>
-                    <button type="button" className="sb-link" data-testid="eval-status" onClick={() => go({ name: 'evaluate', projectId, boardId, studentId: st.id })}>
-                      {STATUS[st.evaluation_status]}
+                    <button type="button" className="sb-btn ghost is-small" data-testid="eval-status" onClick={() => go({ name: 'evaluate', projectId, boardId, studentId: st.id })}>
+                      <span className="sb-eval-status" data-state={st.evaluation_status}>{STATUS[st.evaluation_status]}</span>
+                      {st.evaluation_status === 'none' ? '평가하기' : '평가 열기'}
                     </button>
                   </td>
                 )}

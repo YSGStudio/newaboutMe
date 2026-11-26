@@ -38,17 +38,13 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
   if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
   return (
     <main className="sb-evaluate">
-      <div className="sb-row-wrap">
-        <button type="button" className="sb-link" onClick={() => go({ name: 'students', projectId, boardId })}>
-          ← 학생별 보기
-        </button>
-        <h2 className="sb-page-heading">
-          평가: {data.board.title} — <span data-testid="eval-student">{data.student.name}</span>
-        </h2>
-        <span className="sb-meta">
-          {data.index + 1} / {data.total}
-        </span>
-      </div>
+      <header className="sb-space-header sb-summary-head">
+        <div>
+          <h2 className="sb-page-heading">학생 평가 · <span data-testid="eval-student">{data.student.name}</span></h2>
+          <p>{data.board.title} · {data.index + 1} / {data.total}</p>
+        </div>
+        <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'students', projectId, boardId })}>← 학생별 현황</button>
+      </header>
       {data.linkedActivity && (
         <p className="notice info" data-testid="eval-linked">
           배움성찰 &lsquo;{data.linkedActivity.subject} · {[data.linkedActivity.unit, data.linkedActivity.title].filter(Boolean).join(' ')}&rsquo;과 연결된 작업장입니다. 여기서 매긴 등급과 피드백이 배움성찰 평가로 함께 저장됩니다.
@@ -56,13 +52,14 @@ export default function EvaluationScreen({ projectId, boardId, studentId }: { pr
       )}
       <div className="sb-evaluate-grid">
         <section aria-label="평가 대상(읽기 전용)" className="sb-evaluate-targets" data-testid="eval-target" data-mode={data.mode}>
+          <h3>평가할 결과물</h3>
           {data.targets.length === 0 && <p className="card sb-meta">이 학생의 개인 보드가 없습니다.</p>}
           {data.targets.map((t) => (
             <div key={t.view.board.id} className="card sb-evaluate-target">
               <h3>
                 {t.title} <span className="sb-meta">카드 {t.view.cards.length}개</span>
               </h3>
-              <Kanban view={{ ...t.view, board: { ...t.view.board, can_write: false } }} readOnly onChanged={() => {}} />
+              <Kanban view={{ ...t.view, board: { ...t.view.board, can_write: false } }} readOnly appearance="workspace" onChanged={() => {}} />
             </div>
           ))}
         </section>
@@ -151,26 +148,28 @@ function EvaluationForm({
 
   return (
     <aside className="card sb-evaluate-form" aria-label="평가 입력">
+      <h3>평가 기준</h3>
       {criteria.length === 0 && <p className="hint">이 보드에 붙은 평가 기준이 없습니다. 보드 설정에서 기준을 붙이세요.</p>}
       {criteria.map((c) => (
         <fieldset key={c.id} className="sb-fieldset">
           <legend>{c.name}</legend>
           {c.description && <p className="hint">{c.description}</p>}
-          <div className="sb-row-wrap">
+          <div className="sb-level-options">
             {c.levels.map((l, i) => (
               <label key={i} className={levels[c.id] === i ? 'sb-level-pick is-selected' : 'sb-level-pick'} title={l.description}>
-                <input type="radio" className="sb-sr-only" name={`level-${c.id}`} checked={levels[c.id] === i} onChange={() => change({ levels: { ...latest.current.levels, [c.id]: i } })} />
-                {l.name} ({l.score})
+                <input type="radio" name={`level-${c.id}`} checked={levels[c.id] === i} onChange={() => change({ levels: { ...latest.current.levels, [c.id]: i } })} />
+                <strong>{l.name} ({l.score})</strong>
+                {l.description && <span>{l.description}</span>}
               </label>
             ))}
           </div>
         </fieldset>
       ))}
       <div>
-        <label htmlFor="feedback">피드백</label>
+        <label htmlFor="feedback">학생에게 남길 피드백</label>
         <textarea id="feedback" className="sb-textarea-lg" maxLength={feedbackMax} value={feedback} onChange={(e) => change({ feedback: e.target.value })} onBlur={flush} />
         <p className="sb-between sb-meta">
-          <span data-testid="save-status">{status}</span>
+          <span role="status" data-testid="save-status">{status || '변경 내용은 자동으로 저장돼요.'}</span>
           <span>{feedback.length}/{feedbackMax}</span>
         </p>
       </div>

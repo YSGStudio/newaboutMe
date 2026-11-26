@@ -2,12 +2,9 @@
 
 /**
  * BoardScreen — 작업장 화면(원본 boards/[boardId]/page.tsx + BoardClient)
- * 칸반을 맨 위에 그려 왼쪽 작업장 사이드바와 시작선을 맞춥니다(경로·제목 줄은 그리지 않음 — 현재 작업장은 사이드바 트리가 보여 줌).
- * 교사 버튼(모두 공개/다시 가리기, 학생별 보기, 설정)과 가리기 상태는 사이드바 아래 자리에 포털로 그립니다.
- * 내 평가·평가 기준은 칸반 아래에 둡니다. 다른 사람이 바꾸면 ProjectRoom 신호로 다시 불러옵니다.
+ * 작업장 머리에 현재 위치와 운영 버튼을 모아 두고, 변경 신호를 받으면 보드를 다시 불러옵니다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import Notice from '@/components/ui/Notice';
 import { HIDE_MODE_LABEL } from '@/lib/starboard/hiding';
 import { pathTo } from '@/lib/starboard/tree';
@@ -24,15 +21,13 @@ type Props = {
   tree: TreeNode[];
   signals: RoomSignals;
   onTreeChanged: () => void;
-  /** 사이드바 아래 교사 버튼 자리(ProjectSidebar의 .sb-sidebar-board-actions) */
-  actionsSlot: HTMLDivElement | null;
 };
 
-export default function BoardScreen({ project, boardId, tree, signals, onTreeChanged, actionsSlot }: Props) {
+export default function BoardScreen({ project, boardId, tree, signals, onTreeChanged }: Props) {
   const { api, go, isTeacher } = useSb();
   const [view, setView] = useState<BoardView | null | undefined>(undefined);
   const [error, setError] = useState('');
-  const [settings, setSettings] = useState(false);
+  const [settings, setSettings] = useState<false | '일반' | '가리기'>(false);
   const [pending, setPending] = useState(false);
 
   const refetchView = useCallback(async () => {
@@ -52,8 +47,7 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
   }, [refetchView, signals.structure, mine]);
 
   const b = view?.board;
-  // 경로 줄을 없앴으므로 현재 작업장 이름은 화면 읽기 프로그램용 제목으로만 남긴다.
-  const title = useMemo(() => pathTo(tree, boardId).at(-1)?.title ?? '', [tree, boardId]);
+  const path = useMemo(() => pathTo(tree, boardId), [tree, boardId]);
 
   return (
     <div className="sb-board-screen">
@@ -66,15 +60,19 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
         </div>
       ) : (
         <>
-          <h1 className="sb-sr-only" data-testid="board-title">{b.title || title}</h1>
-          {isTeacher && actionsSlot && createPortal(
-              <div className="sb-board-actions">
-                {b.hide_mode !== 'off' && (
-                  <span className="badge sb-badge-hide">
-                    가리기 {HIDE_MODE_LABEL[b.hide_mode]}
-                    {b.revealed ? ' · 공개 중' : ''}
-                  </span>
-                )}
+          <Notice type="error" message={error} />
+          <Kanban
+            view={view}
+            onChanged={refetchView}
+            appearance="workspace"
+            heading={
+              <div className="sb-board-heading">
+                <p>{[project.title, ...path.slice(0, -1).map((node) => node.title)].join(' / ')}</p>
+                <h1 data-testid="board-title">{b.title || path.at(-1)?.title}</h1>
+              </div>
+            }
+            actions={isTeacher && (
+              <>
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (
                   <button
                     type="button"
@@ -97,17 +95,22 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
                 )}
                 {b.kind === 'shared' && (
                   <button type="button" className="sb-btn-dark" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
-                    학생별 보기
+                    학생별 현황
                   </button>
                 )}
-                <button type="button" className="sb-btn-dark" onClick={() => setSettings(true)}>
+                <button type="button" className="sb-btn-dark" onClick={() => setSettings('일반')}>
                   설정
                 </button>
-              </div>,
-            actionsSlot,
-          )}
-          <Notice type="error" message={error} />
-          <Kanban view={view} onChanged={refetchView} />
+              </>
+            )}
+            status={isTeacher && b.hide_mode !== 'off' && (
+              <p className="sb-visibility-note">
+                <strong>학생에게 보이는 범위</strong>
+                {b.revealed ? ' · 현재 모두 공개 중' : ` · ${HIDE_MODE_LABEL[b.hide_mode]}`}
+                <button type="button" className="sb-link" onClick={() => setSettings('가리기')}>공개 범위 확인</button>
+              </p>
+            )}
+          />
           {/* 학생은 자기 섹션의 📊에서 평가 기준·내 평가를 펼쳐 본다 — 자기 섹션이 없는 보드에서만 따로 보여 준다. */}
           {(isTeacher || !view.columns.some((c) => c.member_id && c.member_id === b.viewer_id)) && (
             <>
@@ -120,6 +123,7 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
       {settings && view && (
         <BoardSettingsDrawer
           view={view}
+          initialTab={settings}
           projectId={project.id}
           tree={tree}
           onChanged={() => {

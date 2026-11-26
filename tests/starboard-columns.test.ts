@@ -50,3 +50,25 @@ describe("열 머리 색", () => {
     expect(columnTint("#475569")).toContain("color-mix");
   });
 });
+
+import { isNoticeColumn, noticePosition, orderColumns } from "@/lib/starboard/columns";
+
+describe("공지사항 섹션은 맨 앞", () => {
+  it("이름에 '공지'가 들어가면 공지사항 섹션", () => {
+    expect(isNoticeColumn("공지사항")).toBe(true);
+    expect(isNoticeColumn("📢 공 지")).toBe(true);
+    expect(isNoticeColumn("1모둠")).toBe(false);
+  });
+  it("저장 순서와 상관없이 공지사항을 앞으로 모으고 나머지 순서는 지킨다", () => {
+    const cols = [
+      { name: "1모둠", position: 1 },
+      { name: "2모둠", position: 2 },
+      { name: "공지사항", position: 3 },
+    ];
+    expect(orderColumns(cols).map((c) => c.name)).toEqual(["공지사항", "1모둠", "2모둠"]);
+  });
+  it("새 공지사항 자리는 지금 맨 앞보다 앞", () => {
+    expect(noticePosition([1, 2, 3])).toBe(0);
+    expect(noticePosition([])).toBe(1);
+  });
+});
