@@ -6233,4 +6233,9 @@ html:has(.sb-settings) { scrollbar-gutter: stable; }
   align-items: center;
   gap: 8px 12px;
 }
-.sb-board-title-tools { display: flex; flex: 0 0 auto; gap: 6px; }
+/* 작업장 머리 — 왼쪽 아이콘 칸(교사, 30px 아이콘 2열 × 2줄) | 구분선 | 오른쪽 글자 칸(경로 · 작업장 이름) */
+.sb-board-heading.has-tools { display: flex; align-items: center; gap: 14px; }
+.sb-board-title-tools { display: grid; flex: 0 0 auto; grid-template-columns: repeat(2, 30px); gap: 4px; padding-right: 14px; border-right: 1px solid var(--border); }
+.sb-board-title-tools button.sb-round-btn { width: 30px; min-height: 30px; height: 30px; font-size: 14px; }
+.sb-board-heading-text { min-width: 0; }
+.sb-board-heading-text h1 { margin: 0; }

@@ -80,58 +80,57 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             onChanged={refetchView}
             appearance="workspace"
             heading={
-              <div className="sb-board-heading">
-                <p>{[project.title, ...path.slice(0, -1).map((node) => node.title)].join(' / ')}</p>
-                <div className="sb-board-title-row">
-                  {isTeacher && (
-                    <div className="sb-board-title-tools" role="group" aria-label="작업장 관리">
-                      {b.kind === 'shared' && (
-                        <button
-                          type="button"
-                          className={b.default_access === 'edit' ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
-                          aria-pressed={b.default_access === 'edit'}
-                          aria-label={b.default_access === 'edit' ? '학생 글쓰기 켜짐 — 눌러서 끄기' : '학생 글쓰기 꺼짐 — 눌러서 켜기'}
-                          title={b.default_access === 'none' ? '학생에게 숨긴 작업장이에요. 설정 › 권한에서 바꿔요.' : b.default_access === 'edit' ? '학생 글쓰기 켜짐' : '학생 글쓰기 꺼짐'}
-                          disabled={pending || b.default_access === 'none'}
-                          data-testid="toggle-writing"
-                          onClick={() => toggle({ default_access: b.default_access === 'edit' ? 'read' : 'edit' })}
-                        >
-                          <span aria-hidden="true">✏️</span>
-                        </button>
-                      )}
-                      <button type="button" className="sb-round-btn" aria-label="작업장 설정" title="작업장 설정" onClick={() => setSettings('일반')}>
-                        <span aria-hidden="true">⚙️</span>
+              <div className={isTeacher ? 'sb-board-heading has-tools' : 'sb-board-heading'}>
+                {/* 아이콘 칸(교사만) — 작게 2줄: ✏️ 글쓰기 · ⭐ 동료평가 / ⚙️ 설정 · 👥 학생별 현황. 서버도 담임 교사만 받는다. */}
+                {isTeacher && (
+                  <div className="sb-board-title-tools" role="group" aria-label="작업장 관리">
+                    {b.kind === 'shared' && (
+                      <button
+                        type="button"
+                        className={b.default_access === 'edit' ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                        aria-pressed={b.default_access === 'edit'}
+                        aria-label={b.default_access === 'edit' ? '학생 글쓰기 켜짐 — 눌러서 끄기' : '학생 글쓰기 꺼짐 — 눌러서 켜기'}
+                        title={b.default_access === 'none' ? '학생에게 숨긴 작업장이에요. 설정 › 권한에서 바꿔요.' : b.default_access === 'edit' ? '학생 글쓰기 켜짐' : '학생 글쓰기 꺼짐'}
+                        disabled={pending || b.default_access === 'none'}
+                        data-testid="toggle-writing"
+                        onClick={() => toggle({ default_access: b.default_access === 'edit' ? 'read' : 'edit' })}
+                      >
+                        <span aria-hidden="true">✏️</span>
                       </button>
-                      {b.kind === 'shared' && (
-                        <button type="button" className="sb-round-btn" aria-label="학생별 현황" title="학생별 현황" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
-                          <span aria-hidden="true">👥</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {b.kind === 'shared' && (
+                      <button
+                        type="button"
+                        className={b.peer_review ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                        aria-pressed={Boolean(b.peer_review)}
+                        aria-label={b.peer_review ? '학생끼리 평가 켜짐 — 눌러서 끄기' : '학생끼리 평가 꺼짐 — 눌러서 켜기'}
+                        title={b.peer_review ? '학생끼리 평가 켜짐' : '학생끼리 평가 꺼짐'}
+                        disabled={pending}
+                        data-testid="toggle-peer-review"
+                        onClick={() => toggle({ peer_review: !b.peer_review })}
+                      >
+                        <span aria-hidden="true">⭐</span>
+                      </button>
+                    )}
+                    <button type="button" className="sb-round-btn" aria-label="작업장 설정" title="작업장 설정" onClick={() => setSettings('일반')}>
+                      <span aria-hidden="true">⚙️</span>
+                    </button>
+                    {b.kind === 'shared' && (
+                      <button type="button" className="sb-round-btn" aria-label="학생별 현황" title="학생별 현황" onClick={() => go({ name: 'students', projectId: project.id, boardId: b.id })}>
+                        <span aria-hidden="true">👥</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                {/* 글자 칸 — 프로젝트 경로와 작업장 이름 */}
+                <div className="sb-board-heading-text">
+                  <p>{[project.title, ...path.slice(0, -1).map((node) => node.title)].join(' / ')}</p>
                   <h1 data-testid="board-title">{b.title || path.at(-1)?.title}</h1>
                 </div>
               </div>
             }
             actions={isTeacher && (
               <>
-                {b.kind === 'shared' && (
-                  <span className="sb-board-toggles" role="group" aria-label="학생 설정">
-                    {/* 학생끼리 평가하기(동료평가) */}
-                    <button
-                      type="button"
-                      className={b.peer_review ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
-                      aria-pressed={Boolean(b.peer_review)}
-                      aria-label={b.peer_review ? '학생끼리 평가 켜짐 — 눌러서 끄기' : '학생끼리 평가 꺼짐 — 눌러서 켜기'}
-                      title={b.peer_review ? '학생끼리 평가 켜짐' : '학생끼리 평가 꺼짐'}
-                      disabled={pending}
-                      data-testid="toggle-peer-review"
-                      onClick={() => toggle({ peer_review: !b.peer_review })}
-                    >
-                      <span aria-hidden="true">⭐</span>
-                    </button>
-                  </span>
-                )}
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (
                   <button
                     type="button"
