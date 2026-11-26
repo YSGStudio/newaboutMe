@@ -29,7 +29,7 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
   const [error, setError] = useState('');
   const [settings, setSettings] = useState<false | '가리기'>(false);
   const [pending, setPending] = useState(false);
-  /** 학생별 현황 전체 화면 창(교사, 공용 작업장) */
+  /** 학생별 활동 전체 화면 창(교사, 공용 작업장) */
   const [statusOpen, setStatusOpen] = useState(false);
 
   const refetchView = useCallback(async () => {
@@ -84,8 +84,7 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             appearance="workspace"
             heading={
               <div className={isTeacher && b.kind === 'shared' ? 'sb-board-heading has-tools' : 'sb-board-heading'}>
-                {/* 아이콘 칸(교사, 공용 작업장만) — ✏️ 학생 글쓰기 · ⭐ 동료평가 켜기/끄기. 서버도 담임 교사만 받는다.
-                    설정은 사이드바 "⚙ 작업장 설정"·"공개 범위 확인"으로 연다(2026-11-26 바로가기 아이콘 정리). */}
+                {/* 공용 작업장의 교사용 글쓰기·동료평가 제어 */}
                 {isTeacher && b.kind === 'shared' && (
                   <div className="sb-board-title-tools" role="group" aria-label="작업장 관리">
                     <button
@@ -123,9 +122,18 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             }
             actions={isTeacher && (
               <>
+                <button
+                  type="button"
+                  className="sb-btn-dark"
+                  aria-label="작업장 설정"
+                  title="작업장 설정"
+                  onClick={() => go({ name: 'settings', projectId: project.id, boardId: b.id })}
+                >
+                  <span aria-hidden="true">⚙</span>
+                </button>
                 {b.kind === 'shared' && (
                   <button type="button" className="sb-btn-dark" data-testid="open-student-status" onClick={() => setStatusOpen(true)}>
-                    <span aria-hidden="true">📊</span> 학생별 현황
+                    <span aria-hidden="true">📊</span> 학생별 활동
                   </button>
                 )}
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (

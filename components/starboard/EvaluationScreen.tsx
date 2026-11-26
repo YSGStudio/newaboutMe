@@ -52,7 +52,7 @@ export default function EvaluationScreen({ boardId, studentId, onBack, onStudent
           <h2 className="sb-page-heading">학생 평가 · <span data-testid="eval-student">{data.student.name}</span></h2>
           <p>{data.board.title} · {data.index + 1} / {data.total}</p>
         </div>
-        <button type="button" className="sb-btn-dark" onClick={onBack}>← 학생별 현황</button>
+        <button type="button" className="sb-btn-dark" onClick={onBack}>← 학생별 활동</button>
       </header>
       {data.linkedActivity && (
         <p className="notice info" data-testid="eval-linked">

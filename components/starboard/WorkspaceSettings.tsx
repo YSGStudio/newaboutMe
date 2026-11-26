@@ -164,6 +164,15 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
             <h3 id="ws-list-h">
               작업장 <span className="sb-count-pill">{sharedCount}</span>
             </h3>
+            {selectedNode && (
+              <button
+                type="button"
+                className="sb-btn ghost is-small"
+                onClick={() => go({ name: 'board', projectId: project.id, boardId: selectedNode.id })}
+              >
+                보드 열기
+              </button>
+            )}
             <AddWorkspace
               onAdd={(title) =>
                 run(
@@ -265,7 +274,7 @@ function AddWorkspace({ onAdd }: { onAdd: (title: string) => void }) {
   const [title, setTitle] = useState('');
   if (!open)
     return (
-      <button type="button" className="sb-btn is-small sb-push-right" onClick={() => setOpen(true)}>
+      <button type="button" className="sb-btn is-small" onClick={() => setOpen(true)}>
         ＋ 추가
       </button>
     );
@@ -456,7 +465,7 @@ function DetailPanel({
   onChanged: () => void;
   onDeleted: () => void;
 }) {
-  const { api, go } = useSb();
+  const { api } = useSb();
   const [view, setView] = useState<BoardView | null>(null);
   const parent = node.parent_id ? nodes.find((n) => n.id === node.parent_id) : null;
   const load = useCallback(async () => {
@@ -484,9 +493,6 @@ function DetailPanel({
             <span className="sb-tag">{node.kind === 'personal' ? '학생 개인 보드' : '작업장'}</span>
           </h3>
         </div>
-        <button type="button" className="sb-btn ghost is-small" onClick={() => go({ name: 'board', projectId: project.id, boardId: node.id })}>
-          보드 열기 <span aria-hidden="true">↗</span>
-        </button>
       </div>
       {view ? (
         <BoardSettingsPanel

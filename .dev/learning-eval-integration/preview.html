@@ -1,0 +1,692 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학생별 활동 현황</title>
+
+<style>
+:root {
+  --primary: #7c3aed;
+  --navy: #20164b;
+  --background: #f7f8fc;
+  --border: #e8e8f0;
+  --text: #1e293b;
+  --muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: Pretendard, -apple-system,
+    BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+}
+
+.container {
+  max-width: 1600px;
+  margin: auto;
+  padding: 32px;
+}
+
+.header {
+  background: var(--navy);
+  color: white;
+  padding: 28px 32px;
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header small {
+  color: #bdb2e5;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.header h1 {
+  margin: 8px 0;
+  font-size: 28px;
+}
+
+.header p {
+  margin: 0;
+  color: #d4ccec;
+  font-size: 14px;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.back-button {
+  color: white;
+  background: #ffffff15;
+  border: 1px solid #ffffff40;
+  border-radius: 10px;
+  padding: 12px 18px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin: 24px 0;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 750;
+  margin: 12px 0 6px;
+  letter-spacing: -1px;
+}
+
+.stat-unit {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.stat-description {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.panel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.panel h2 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.legend span {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0 18px;
+}
+
+.tabs {
+  display: flex;
+  background: #f1f2f6;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  padding: 10px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.tab.active {
+  background: white;
+  color: var(--primary);
+  font-weight: bold;
+  box-shadow: 0 1px 4px #00000010;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+input, select {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: white;
+  outline: none;
+  font-size: 13px;
+  color: #475569;
+}
+
+input:focus, select:focus {
+  border-color: var(--primary);
+}
+
+.table-wrapper {
+  overflow: auto;
+  max-height: 600px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 13px;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f9fc;
+  padding: 15px 8px;
+  min-width: 53px;
+  color: #64748b;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+th .number {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+
+td {
+  height: 45px;
+  padding: 3px;
+  border-bottom: 1px solid #f4f4f8;
+}
+
+.name-cell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 135px;
+  background: white;
+  text-align: left;
+  padding: 10px 14px;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+th.name-cell {
+  z-index: 5;
+  background: #f8f9fc;
+}
+
+.student-number {
+  background: #f1ebff;
+  color: #7854bc;
+  display: inline-block;
+  font-size: 11px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  margin-right: 8px;
+}
+
+.cell {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  cursor: default;
+  transition: 0.15s;
+}
+
+.cell:hover {
+  outline: 2px solid #7c3aed;
+  transform: scale(1.05);
+}
+
+.total-cell {
+  background: #faf8ff;
+  color: var(--primary);
+  font-weight: 750;
+  min-width: 65px;
+}
+
+tr:hover .name-cell {
+  background: #f7f4ff;
+}
+
+.chart {
+  padding: 10px 0;
+}
+
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 17px 0;
+}
+
+.chart-name {
+  min-width: 90px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bar-track {
+  background: #f3f0fa;
+  height: 25px;
+  border-radius: 6px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #a78bfa, #7c3aed);
+  transition: width .4s;
+}
+
+.chart-value {
+  width: 45px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.footer {
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: right;
+  margin-top: 16px;
+}
+
+.tooltip {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  background: #20164b;
+  color: white;
+  font-size: 12px;
+  padding: 12px 16px;
+  border-radius: 9px;
+  line-height: 1.8;
+  box-shadow: 0 6px 20px #0002;
+  z-index: 100;
+}
+
+@media (max-width: 750px) {
+  .container {
+    padding: 14px;
+  }
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .header {
+    padding: 22px;
+  }
+  .header h1 {
+    font-size: 21px;
+  }
+  .panel {
+    padding: 16px;
+  }
+  .stat-value {
+    font-size: 25px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <header class="header">
+    <div>
+      <small>CLASS ANALYTICS</small>
+      <h1>학생별 활동 현황</h1>
+      <p>3단원. 다양한 환경과 삶의 모습</p>
+    </div>
+    <button class="back-button" onclick="history.back()">
+      ← 작업장
+    </button>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>학생 간 상호작용</h2>
+        <div class="subtitle">
+          학생별 활동 및 상호작용 횟수를 확인하세요.
+        </div>
+      </div>
+
+      <div class="legend">
+        적음
+        <span style="background:#f4f4f7"></span>
+        <span style="background:#ede9fe"></span>
+        <span style="background:#c4b5fd"></span>
+        <span style="background:#a78bfa"></span>
+        <span style="background:#7c3aed"></span>
+        많음
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab active" data-mode="heatmap">
+          ▦ 히트맵
+        </button>
+        <button class="tab" data-mode="table">
+          ☷ 기본 표
+        </button>
+        <button class="tab" data-mode="chart">
+          ▥ 학생별 합계
+        </button>
+      </div>
+
+      <div class="filters">
+        <input id="search" placeholder="학생 이름 검색">
+        <select id="sort">
+          <option value="number">번호순</option>
+          <option value="desc">활동 많은 순</option>
+          <option value="asc">활동 적은 순</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="content"></div>
+
+    <div class="footer">
+      CLASS ANALYTICS · 예시 데이터
+    </div>
+  </section>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+
+// 학생 목록
+const students = Array.from({ length: 20 }, (_, i) => ({
+  id: i + 1,
+  name: `학생 ${String(i + 1).padStart(2, "0")}`
+}));
+
+// 화면 확인용 예시 데이터
+// 실제 서비스에서는 API 응답 데이터로 교체
+const matrix = students.map((student, i) =>
+  students.map((target, j) => {
+    if (i === j) return 0;
+    const n = (i * 13 + j * 17 + i * j * 3) % 19;
+    return n > 13 ? (n % 8) + 1 : 0;
+  })
+);
+
+const totals = matrix.map(row =>
+  row.reduce((sum, value) => sum + value, 0)
+);
+
+let mode = "heatmap";
+
+const colors = [
+  "#f4f4f7",
+  "#ede9fe",
+  "#ddd6fe",
+  "#c4b5fd",
+  "#a78bfa",
+  "#8b5cf6",
+  "#7c3aed"
+];
+
+const maximum = Math.max(1, ...matrix.flat());
+
+function getColor(value) {
+  if (value === 0) return colors[0];
+  const level = Math.ceil(value / maximum * 6);
+  return colors[level];
+}
+
+function renderStats() {
+  const total = totals.reduce((a, b) => a + b, 0);
+  const active = totals.filter(v => v > 0).length;
+
+  const stats = [
+    ["전체 학생", students.length, "명", "학급 전체 인원"],
+    ["참여 학생", active, "명",
+      `참여율 ${(active / students.length * 100).toFixed(0)}%`],
+    ["총 상호작용", total, "회", "누적 활동 횟수"],
+    ["평균 활동", (total / students.length).toFixed(1),
+      "회", "학생 1인당 평균"]
+  ];
+
+  document.getElementById("stats").innerHTML =
+    stats.map(([label, value, unit, description]) => `
+      <article class="stat-card">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value">
+          ${value} <span class="stat-unit">${unit}</span>
+        </div>
+        <div class="stat-description">${description}</div>
+      </article>
+    `).join("");
+}
+
+function getFilteredStudents() {
+  const keyword = document.getElementById("search").value;
+  const sort = document.getElementById("sort").value;
+
+  let list = students.map((s, i) => ({
+    ...s, index: i, total: totals[i]
+  }));
+
+  list = list.filter(s =>
+    s.name.includes(keyword) ||
+    String(s.id).includes(keyword)
+  );
+
+  if (sort === "desc") {
+    list.sort((a, b) => b.total - a.total);
+  }
+
+  if (sort === "asc") {
+    list.sort((a, b) => a.total - b.total);
+  }
+
+  return list;
+}
+
+function renderTable() {
+  const list = getFilteredStudents();
+
+  let html = `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="name-cell">학생</th>
+            ${students.map(s => `
+              <th>
+                <div class="number">${String(s.id).padStart(2,"0")}</div>
+                ${s.name}
+              </th>
+            `).join("")}
+            <th class="total-cell">합계</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  list.forEach(s => {
+    html += `
+      <tr>
+        <td class="name-cell">
+          <span class="student-number">${s.id}번</span>
+          ${s.name}
+        </td>
+    `;
+
+    students.forEach((target, j) => {
+      const value = matrix[s.index][j];
+      const self = s.index === j;
+
+      let background = mode === "heatmap"
+        ? getColor(value) : "#ffffff";
+
+      if (self) background = "#e5e7eb";
+
+      const label = self ? "—" :
+        mode === "heatmap" && value === 0 ? "" : value;
+
+      const color = mode === "heatmap" &&
+        value / maximum > 0.65 ? "#ffffff" : "#554080";
+
+      html += `
+        <td>
+          <div class="cell"
+            style="background:${background};color:${color}"
+            data-from="${s.name}"
+            data-to="${target.name}"
+            data-value="${value}">
+            ${label}
+          </div>
+        </td>
+      `;
+    });
+
+    html += `<td class="total-cell">${s.total}</td></tr>`;
+  });
+
+  html += "</tbody></table></div>";
+
+  document.getElementById("content").innerHTML = html;
+
+  bindTooltips();
+}
+
+function renderChart() {
+  const list = getFilteredStudents();
+  const max = Math.max(1, ...totals);
+
+  document.getElementById("content").innerHTML = `
+    <div class="chart">
+      ${list.map(s => `
+        <div class="chart-row">
+          <div class="chart-name">
+            ${s.id}. ${s.name}
+          </div>
+          <div class="bar-track">
+            <div class="bar"
+              style="width:${s.total / max * 100}%">
+            </div>
+          </div>
+          <div class="chart-value">${s.total}회</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function bindTooltips() {
+  const tooltip = document.getElementById("tooltip");
+
+  document.querySelectorAll(".cell").forEach(cell => {
+    cell.addEventListener("mouseenter", () => {
+      const { from, to, value } = cell.dataset;
+      tooltip.innerHTML = from === to
+        ? "본인"
+        : `${from} → ${to}<br>활동 횟수: <strong>${value}회</strong>`;
+      tooltip.style.display = "block";
+    });
+
+    cell.addEventListener("mousemove", e => {
+      tooltip.style.left = Math.min(
+        e.clientX + 15, window.innerWidth - 200
+      ) + "px";
+      tooltip.style.top = e.clientY + 15 + "px";
+    });
+
+    cell.addEventListener("mouseleave", () => {
+      tooltip.style.display = "none";
+    });
+  });
+}
+
+function render() {
+  document.getElementById("tooltip").style.display = "none";
+  mode === "chart" ? renderChart() : renderTable();
+}
+
+document.querySelectorAll(".tab").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b =>
+      b.classList.remove("active")
+    );
+    button.classList.add("active");
+    mode = button.dataset.mode;
+    render();
+  });
+});
+
+document.getElementById("search")
+  .addEventListener("input", render);
+
+document.getElementById("sort")
+  .addEventListener("change", render);
+
+renderStats();
+render();
+
+</script>
+</body>
+</html>

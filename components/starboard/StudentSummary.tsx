@@ -10,6 +10,7 @@ import Notice from '@/components/ui/Notice';
 import { useLoad } from '@/components/group-project/ui';
 import { json, useSb } from './context';
 import StudentIdentity from './StudentIdentity';
+import StudentActivity, { type PeerReviewPair } from './StudentActivity';
 
 type Summary = {
   columns: { id: string; name: string; color: string }[];
@@ -41,84 +42,79 @@ type Props = {
 export default function StudentSummary({ boardId, onClose, onEvaluate, onOpenBoard }: Props) {
   const { api } = useSb();
   const [filter, setFilter] = useState<'all' | 'pending' | 'published'>('all');
-  const { data, error, reload } = useLoad(() => api<{ board: { id: string; title: string }; summary: Summary }>(`/boards/${boardId}/students`), [api, boardId]);
+  const { data, error, reload } = useLoad(() => api<{ board: { id: string; title: string }; summary: Summary; reviews: PeerReviewPair[] }>(`/boards/${boardId}/students`), [api, boardId]);
   if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
   const s = data.summary;
   const hasPersonal = s.students.some((x) => x.personal_board_id);
   const published = s.students.filter((student) => student.evaluation_status === 'published').length;
   const students = s.students.filter((student) => !s.has_criteria || filter === 'all' || (student.evaluation_status === 'published') === (filter === 'published')).sort((a, b) => a.student_number - b.student_number || a.name.localeCompare(b.name, 'ko'));
   return (
-    <main className="sb-summary">
-      <header className="sb-space-header sb-summary-head">
-        <div>
-          <h2 className="sb-page-heading">학생별 현황</h2>
-          <p>{data.board.title}</p>
-        </div>
-        <button type="button" className="sb-btn-dark" onClick={onClose}>← 작업장</button>
-      </header>
-      {s.has_criteria && (
-        <div className="sb-row-wrap sb-summary-filters" role="group" aria-label="평가 상태">
-          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>전체 {s.students.length}명</button>
-          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'pending'} onClick={() => setFilter('pending')}>미공개 {s.students.length - published}명</button>
-          <button type="button" className="sb-filter-chip" aria-pressed={filter === 'published'} onClick={() => setFilter('published')}>공개 {published}명</button>
-        </div>
-      )}
-      {s.has_criteria && <PublishAll boardId={boardId} onDone={reload} />}
-      <div className="card sb-table-scroll">
-        <table className="table sb-summary-table" data-testid="summary-table">
-          <thead>
-            <tr>
-              <th>학생</th>
-              {s.columns.map((c) => (
-                <th key={c.id}>
-                  <span className="sb-color-dot" style={{ background: c.color }} aria-hidden="true" />
-                  {c.name}
-                </th>
-              ))}
-              {hasPersonal && <th>개인 보드 카드</th>}
-              {s.has_criteria && <th>평가</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {students.length === 0 && <tr><td colSpan={1 + s.columns.length + Number(hasPersonal) + Number(s.has_criteria)}>표시할 학생이 없어요.</td></tr>}
-            {students.map((st) => (
-              <tr key={st.id} data-testid={`summary-${st.student_number}`}>
-                <td>
-                  <StudentIdentity name={st.name} number={st.student_number} />
-                </td>
+    <StudentActivity title={data.board.title} students={s.students} reviews={data.reviews} onClose={onClose}>
+      <div className="sb-summary">
+        {s.has_criteria && (
+          <div className="sb-row-wrap sb-summary-filters" role="group" aria-label="평가 상태">
+            <button type="button" className="sb-filter-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>전체 {s.students.length}명</button>
+            <button type="button" className="sb-filter-chip" aria-pressed={filter === 'pending'} onClick={() => setFilter('pending')}>미공개 {s.students.length - published}명</button>
+            <button type="button" className="sb-filter-chip" aria-pressed={filter === 'published'} onClick={() => setFilter('published')}>공개 {published}명</button>
+          </div>
+        )}
+        {s.has_criteria && <PublishAll boardId={boardId} onDone={reload} />}
+        <div className="card sb-table-scroll">
+          <table className="table sb-summary-table" data-testid="summary-table">
+            <thead>
+              <tr>
+                <th>학생</th>
                 {s.columns.map((c) => (
-                  <td key={c.id} className="sb-num" data-testid="count-cell">
-                    {st.counts[c.id] ?? 0}
-                  </td>
+                  <th key={c.id}>
+                    <span className="sb-color-dot" style={{ background: c.color }} aria-hidden="true" />
+                    {c.name}
+                  </th>
                 ))}
-                {hasPersonal && (
-                  <td>
-                    {st.personal_board_id ? (
-                      <button type="button" className="sb-link" data-testid="personal-count" onClick={() => onOpenBoard(st.personal_board_id!)}>
-                        {st.personal_count}개
-                      </button>
-                    ) : (
-                      '—'
-                    )}
-                    {st.personal_counts && st.personal_counts.length > 0 && (
-                      <span className="sb-meta"> {st.personal_counts.map((p) => `${p.name} ${p.count}`).join(' · ')}</span>
-                    )}
-                  </td>
-                )}
-                {s.has_criteria && (
-                  <td>
-                    <button type="button" className="sb-btn ghost is-small" data-testid="eval-status" onClick={() => onEvaluate(st.id)}>
-                      <span className="sb-eval-status" data-state={st.evaluation_status}>{STATUS[st.evaluation_status]}</span>
-                      {st.evaluation_status === 'none' ? '평가하기' : '평가 열기'}
-                    </button>
-                  </td>
-                )}
+                {hasPersonal && <th>개인 보드 카드</th>}
+                {s.has_criteria && <th>평가</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {students.length === 0 && <tr><td colSpan={1 + s.columns.length + Number(hasPersonal) + Number(s.has_criteria)}>표시할 학생이 없어요.</td></tr>}
+              {students.map((st) => (
+                <tr key={st.id} data-testid={`summary-${st.student_number}`}>
+                  <td>
+                    <StudentIdentity name={st.name} number={st.student_number} />
+                  </td>
+                  {s.columns.map((c) => (
+                    <td key={c.id} className="sb-num" data-testid="count-cell">
+                      {st.counts[c.id] ?? 0}
+                    </td>
+                  ))}
+                  {hasPersonal && (
+                    <td>
+                      {st.personal_board_id ? (
+                        <button type="button" className="sb-link" data-testid="personal-count" onClick={() => onOpenBoard(st.personal_board_id!)}>
+                          {st.personal_count}개
+                        </button>
+                      ) : (
+                        '—'
+                      )}
+                      {st.personal_counts && st.personal_counts.length > 0 && (
+                        <span className="sb-meta"> {st.personal_counts.map((p) => `${p.name} ${p.count}`).join(' · ')}</span>
+                      )}
+                    </td>
+                  )}
+                  {s.has_criteria && (
+                    <td>
+                      <button type="button" className="sb-btn ghost is-small" data-testid="eval-status" onClick={() => onEvaluate(st.id)}>
+                        <span className="sb-eval-status" data-state={st.evaluation_status}>{STATUS[st.evaluation_status]}</span>
+                        {st.evaluation_status === 'none' ? '평가하기' : '평가 열기'}
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </main>
+    </StudentActivity>
   );
 }
 

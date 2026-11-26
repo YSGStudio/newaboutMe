@@ -35,8 +35,8 @@ export default function StudentStatusOverlay({ boardId, boardTitle, onClose, onO
   }, [onClose]);
 
   return (
-    <div className="sb-fullscreen" role="dialog" aria-modal="true" aria-label={`학생별 현황 · ${boardTitle}`}>
-      <button type="button" className="sb-icon-btn sb-fullscreen-close" onClick={onClose} aria-label="학생별 현황 닫기" title="닫기">
+    <div className="sb-fullscreen" role="dialog" aria-modal="true" aria-label={`학생별 활동 · ${boardTitle}`}>
+      <button type="button" className="sb-icon-btn sb-fullscreen-close" onClick={onClose} aria-label="학생별 활동 닫기" title="닫기">
         ×
       </button>
       <div className="sb-fullscreen-body">
