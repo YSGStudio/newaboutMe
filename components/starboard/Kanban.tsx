@@ -30,7 +30,8 @@ import type { CardField, CardFieldValues } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
 import { AttachmentThumbs } from './attachments/AttachmentList';
 import { addCardLink, uploadCardFile } from './attachments/upload-client';
-import { ACCEPT_FILES, checkFile, normalizeLink } from '@/lib/starboard/upload';
+import { ACCEPT_FILES, checkFile, parseLinks } from '@/lib/starboard/upload';
+import LinkDraftInput from './attachments/LinkDraftInput';
 import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 import CardModal from './CardModal';
 import { CardContentInputs, CardContentView } from './CardContent';
@@ -418,8 +419,8 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
   const [pending, setPending] = useState(false);
   // 올리기 전에 고른 첨부 — 카드를 만든 뒤 차례로 올린다. 미리보기는 브라우저 안 주소(objectURL)로 바로 그린다.
   const [files, setFiles] = useState<PendingFile[]>([]);
-  const [links, setLinks] = useState<string[]>([]);
-  const [link, setLink] = useState('');
+  // 링크 칸 — 넣기 버튼 없이, 카드를 올릴 때 칸에 붙여 넣은 주소를 모두 첨부한다.
+  const [linkText, setLinkText] = useState('');
   const [progress, setProgress] = useState('');
   // 쓰기 창을 닫을 때 남은 미리보기 주소를 풀어 준다(빼기·올리기에서는 그때그때 푼다).
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -443,13 +444,6 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
     }
     setFiles((prev) => [...prev, ...next]);
     setError(problems.join(' '));
-  };
-  const addLink = () => {
-    const url = normalizeLink(link);
-    if (!url) return setError('링크 주소가 올바르지 않아요.');
-    setLinks((prev) => [...prev, url]);
-    setLink('');
-    setError('');
   };
 
   return (
@@ -486,6 +480,7 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
               }),
             );
             // 첨부는 카드가 생긴 뒤에 올린다. 하나가 실패해도 나머지는 계속 올리고, 실패한 것만 알려 준다.
+            const links = parseLinks(linkText).urls;
             const total = files.length + links.length;
             const failed: string[] = [];
             let done = 0;
@@ -503,7 +498,7 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
             setValues({});
             files.forEach((f) => URL.revokeObjectURL(f.url));
             setFiles([]);
-            setLinks([]);
+            setLinkText('');
             setError(failed.length ? `카드는 올렸지만 첨부 ${failed.length}개를 올리지 못했어요. ${failed.join(' ')}` : '');
             onAdded();
             if (!failed.length) onClose();
@@ -549,25 +544,8 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
               }}
             />
           </label>
-          <div className="sb-inline-form">
-            <input
-              placeholder="링크 주소"
-              aria-label="넣을 링크 주소"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (link.trim()) addLink();
-                }
-              }}
-            />
-            <button type="button" className="sb-btn ghost is-small" disabled={pending || !link.trim()} onClick={addLink}>
-              링크 넣기
-            </button>
-          </div>
-          {(files.length > 0 || links.length > 0) && (
+          <LinkDraftInput id={`new-${columnId}-links`} value={linkText} onChange={setLinkText} disabled={pending} />
+          {files.length > 0 && (
             <ul className="sb-pending-list" aria-label="넣은 첨부 미리보기" data-testid="composer-previews">
               {files.map((f) => (
                 <li key={f.id} className="sb-pending-item">
@@ -591,16 +569,6 @@ function AddCard({ boardId, columnId, columnName, template, lastPosition, onAdde
                       setFiles((prev) => prev.filter((x) => x.id !== f.id));
                     }}
                   >
-                    ×
-                  </button>
-                </li>
-              ))}
-              {links.map((url, i) => (
-                <li key={`${url}-${i}`} className="sb-pending-item is-link">
-                  <span className="sb-file-chip">
-                    <span aria-hidden="true">🔗</span> {url}
-                  </span>
-                  <button type="button" className="sb-pending-remove" aria-label={`${url} 빼기`} disabled={pending} onClick={() => setLinks((prev) => prev.filter((_, k) => k !== i))}>
                     ×
                   </button>
                 </li>

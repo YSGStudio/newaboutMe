@@ -39,3 +39,22 @@ describe("링크 미리보기 주소 차단", () => {
     expect(parseMeta("<title>only</title>", "https://ex.com").title).toBe("only");
   });
 });
+
+import { parseLinks } from "@/lib/starboard/upload";
+
+describe("링크 칸 — 버튼 없이 저장할 때 붙일 링크", () => {
+  it("줄바꿈·띄어쓰기로 나누고 스킴이 없으면 https를 붙인다", () => {
+    expect(parseLinks("https://a.com/x\nyoutube.com/watch?v=1  https://a.com/x").urls).toEqual([
+      "https://a.com/x",
+      "https://youtube.com/watch?v=1",
+    ]);
+  });
+  it("주소가 아닌 말은 따로 알려 준다", () => {
+    const r = parseLinks("안녕 https://b.org");
+    expect(r.urls).toEqual(["https://b.org"]);
+    expect(r.invalid).toEqual(["안녕"]);
+  });
+  it("빈 칸이면 아무것도 붙이지 않는다", () => {
+    expect(parseLinks("   \n ")).toEqual({ urls: [], invalid: [] });
+  });
+});

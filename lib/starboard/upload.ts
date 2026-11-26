@@ -58,3 +58,23 @@ export function isCardFilePath(path: string, boardId: string, cardId: string): b
 export function thumbPathOf(path: string): string {
   return path.replace(/\.[a-z0-9]+$/, ".thumb.png");
 }
+
+/** 링크 칸에 붙여 넣을 수 있는 최대 개수 */
+export const MAX_DRAFT_LINKS = 5;
+
+/**
+ * 링크 칸 글자 → 붙일 링크 목록. 줄바꿈·띄어쓰기로 나누고, 주소처럼 생긴 것만(스킴이 있거나 점이 있는 것) 골라
+ * normalizeLink로 다듬는다. 같은 주소는 한 번만, 최대 MAX_DRAFT_LINKS개.
+ * 버튼 없이 저장할 때 이 결과를 그대로 첨부로 올린다.
+ */
+export function parseLinks(text: string): { urls: string[]; invalid: string[] } {
+  const urls: string[] = [];
+  const invalid: string[] = [];
+  for (const token of text.split(/\s+/).map((t) => t.trim()).filter(Boolean)) {
+    const looksLikeUrl = /^https?:\/\//i.test(token) || /^[^\s/]+\.[^\s]+/.test(token);
+    const url = looksLikeUrl ? normalizeLink(token) : null;
+    if (!url) invalid.push(token);
+    else if (!urls.includes(url) && urls.length < MAX_DRAFT_LINKS) urls.push(url);
+  }
+  return { urls, invalid };
+}

@@ -5746,6 +5746,11 @@ button.sb-card-open:hover:not(:disabled) { opacity: 1; transform: none; box-shad
 .sb-thumb-wrap { position: relative; display: inline-flex; }
 .sb-thumb-wrap.is-video::after { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: rgba(30, 27, 75, .72); color: #fff; font-size: 11px; content: '▶'; transform: translate(-50%, -50%); pointer-events: none; }
 .sb-attachment-video { display: block; width: 100%; max-height: 320px; border-radius: var(--radius-sm); background: #000; }
+/* 링크 칸(넣기 버튼 없음) — 붙여 넣은 주소마다 미리보기 카드를 바로 보여 주고, 올리기·저장할 때 함께 첨부한다 */
+.sb-link-draft { display: flex; flex-direction: column; gap: 6px; }
+.sb-link-draft textarea { min-height: 56px; resize: vertical; }
+.sb-link-draft-previews { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sb-link-draft-previews li { min-width: 0; }
 /* 새 카드 쓰기의 첨부 — 고른 파일·링크를 올리기 전에 미리 보여 준다 */
 .sb-composer-attach { display: flex; flex-direction: column; gap: 8px; }
 .sb-pending-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }

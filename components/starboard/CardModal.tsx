@@ -8,6 +8,7 @@
  * 교사는 그 작업장의 모든 카드(학생 카드 포함)를 지울 수 있어서, 읽기 화면 머리의 🗑로 바로 지웁니다(서버 sb_can_write_card가 담임 교사를 허용).
  * 라벨·마감일은 lib/features.ts STARBOARD_CARD_LABELS_DUE_ENABLED로 화면에서 내렸습니다(저장된 값은 그대로 다시 보냄).
  * 아래에 첨부(목록 — 읽기 화면에서는 첨부가 있을 때만), 활동 기록을 보여 줍니다.
+ * 수정 화면의 링크 칸은 넣기 버튼이 없습니다 — 주소를 붙여 넣고 저장하면 함께 첨부되고, 붙여 넣는 동안 미리보기가 보입니다.
  * 체크리스트는 lib/features.ts STARBOARD_CHECKLIST_ENABLED로 화면에서 내렸습니다(저장된 항목은 그대로 유지).
  */
 import { useEffect, useState } from 'react';
@@ -18,6 +19,9 @@ import type { CardField, CardFieldValues } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
 import { AttachmentDetail } from './attachments/AttachmentList';
 import AttachmentUploader from './attachments/AttachmentUploader';
+import LinkDraftInput from './attachments/LinkDraftInput';
+import { addCardLink } from './attachments/upload-client';
+import { parseLinks } from '@/lib/starboard/upload';
 import { CardContentInputs, CardContentView } from './CardContent';
 import { STARBOARD_CARD_LABELS_DUE_ENABLED, STARBOARD_CHECKLIST_ENABLED } from '@/lib/features';
 
@@ -38,6 +42,7 @@ export default function CardModal({ workspace, card, boardId, template, columns,
   const [newItem, setNewItem] = useState('');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linkText, setLinkText] = useState('');
   const editable = card.can_edit;
   const [editing, setEditing] = useState(false);
   const col = columns.find((c) => c.id === card.column_id);
@@ -77,12 +82,13 @@ export default function CardModal({ workspace, card, boardId, template, columns,
     setDue(card.due_date ?? '');
     setConfirmDelete(false);
     setError('');
+    setLinkText('');
     setEditing(false);
   };
 
   const save = (patch?: { checklist?: ChecklistItem[] }, after?: () => void) =>
-    run(() =>
-      api(
+    run(async () => {
+      await api(
         `/cards/${card.id}`,
         json('PATCH', {
           title,
@@ -93,9 +99,16 @@ export default function CardModal({ workspace, card, boardId, template, columns,
           due_date: STARBOARD_CARD_LABELS_DUE_ENABLED ? due || null : card.due_date,
           checklist: patch?.checklist ?? checklist,
         }),
-      ),
-      after,
-    );
+      );
+      // 저장 버튼으로 저장할 때 링크 칸에 붙여 넣은 주소도 함께 첨부한다(넣기 버튼 없음).
+      if (patch) return;
+      const failed: string[] = [];
+      for (const url of parseLinks(linkText).urls) {
+        await addCardLink(api, card.id, url).catch(() => failed.push(url));
+      }
+      setLinkText(failed.join('\n'));
+      if (failed.length) throw new Error(`카드는 저장했지만 링크 ${failed.length}개를 붙이지 못했어요. 주소를 확인하고 다시 저장해 주세요.`);
+    }, after);
 
   return (
     <div className="sb-overlay" onClick={onClose}>
@@ -261,7 +274,13 @@ export default function CardModal({ workspace, card, boardId, template, columns,
             canEdit={editable && editing}
             onDelete={(id) => run(() => api(`/attachments/${id}`, json('DELETE')))}
           />
-          {editable && editing && <AttachmentUploader cardId={card.id} onDone={onChanged} />}
+          {editable && editing && (
+            <>
+              <AttachmentUploader cardId={card.id} onDone={onChanged} />
+              <LinkDraftInput id={`card-${card.id}-links`} value={linkText} onChange={setLinkText} disabled={pending} />
+              {parseLinks(linkText).urls.length > 0 && <p className="sb-meta">링크는 위 저장을 누르면 함께 붙어요.</p>}
+            </>
+          )}
         </section>
         )}
 

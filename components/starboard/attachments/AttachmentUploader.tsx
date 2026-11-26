@@ -1,19 +1,19 @@
 'use client';
 
 /**
- * AttachmentUploader — 카드 상세의 파일(이미지·PDF·영상)·링크 첨부(원본 attachments/AttachmentUploader.tsx)
+ * AttachmentUploader — 카드 상세의 파일(이미지·PDF·영상) 첨부(원본 attachments/AttachmentUploader.tsx)
  * 올리는 방식은 upload-client.ts에 있습니다(새 카드 쓰기와 같은 길).
+ * 링크는 버튼 없이 저장할 때 붙도록 CardModal의 LinkDraftInput이 맡습니다.
  */
 import { useState } from 'react';
 import { ACCEPT_FILES } from '@/lib/starboard/upload';
 import { useSb } from '../context';
-import { addCardLink, uploadCardFile } from './upload-client';
+import { uploadCardFile } from './upload-client';
 
 export default function AttachmentUploader({ cardId, onDone }: { cardId: string; onDone: () => void }) {
   const { api } = useSb();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [link, setLink] = useState('');
 
   const run = async (work: () => Promise<void>, fail: string) => {
     setError('');
@@ -45,21 +45,6 @@ export default function AttachmentUploader({ cardId, onDone }: { cardId: string;
           }}
         />
       </label>
-      <form
-        className="sb-inline-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (link.trim()) run(async () => {
-            await addCardLink(api, cardId, link);
-            setLink('');
-          }, '링크를 추가하지 못했어요');
-        }}
-      >
-        <input placeholder="링크 주소" aria-label="링크 주소" value={link} onChange={(e) => setLink(e.target.value)} />
-        <button className="sb-btn ghost" disabled={busy || !link.trim()}>
-          링크 추가
-        </button>
-      </form>
       {error && <p className="sb-error">{error}</p>}
     </div>
   );
