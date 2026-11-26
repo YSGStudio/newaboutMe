@@ -412,6 +412,7 @@ hover 시 회전이 `0`으로 펴지며 떠오릅니다. 이 "종이" 언어는 
 - **배움성찰 활동 연결** — 작업장 설정 "평가 기준" 탭 맨 위. 연결 전에는 `<details className="sb-subpanel">` + `.sb-inline-form`, 연결 후에는 `.notice.info` 안내 + "연결 끊기"(`.sb-btn.ghost.is-small`)를 보여 주고 기준 붙이기·떼기·순서 조작은 숨긴다. 평가 화면에도 같은 `.notice.info`로 "배움성찰에 함께 저장" 안내
 - **사이드바 머리** — 프로젝트 이름(누르면 첫 작업장) 옆 🏠 `button.sb-sidebar-projects`(40px, 흰 반투명 테두리)로 프로젝트 목록에 돌아간다
 - **작업장 화면 시작선** — 경로·제목 줄을 그리지 않아 칸반이 왼쪽 사이드바와 같은 높이에서 시작한다(제목은 `.sb-sr-only`로만). 교사 버튼(모두 공개·학생별 보기·설정)과 가리기 상태는 사이드바 맨 아래 `.sb-sidebar-board-actions`(포털)에 `sb-btn-dark`/`sb-btn-gold`로. 내 평가·평가 기준 패널은 칸반 아래
+- **작업장 머리 교사 아이콘** — 교사에게만, 공용 작업장에서 `.sb-board-toggles` 안 `button.sb-round-btn` 두 개: ✏️ 학생 글쓰기(기본 권한 수정↔읽기, 숨긴 작업장은 막음) · ⭐ 학생끼리 평가(peer_review). 켜짐 `.is-on`(`--primary-soft` + `--primary` 링), 꺼짐 `.is-off`(흐리게 + `--danger` 빗금)
 - **공지사항 섹션** — 이름에 "공지"가 들어간 섹션은 교사·학생 모두 늘 맨 앞(`orderColumns`, lib/starboard/columns.ts). 만들거나 이름을 바꾸면 저장 순서도 맨 앞으로, ◀▶ 이동으로 다른 섹션과 자리를 넘지 않는다
 - **학생의 내 카드** — 학생 화면에서는 공지사항 다음으로 자기 멤버 섹션이 앞, 섹션 안에서도 자기 카드가 맨 앞. `.sb-kanban.is-student .sb-card.is-mine`은 금빛 맥동(`sb-mine-glow`, 3초, `#ffe47b` 링 + `rgba(251,191,36,.55)` 18px 번짐) — 2026-11-26 승인, `prefers-reduced-motion`에서 멈춤
 - **카드 첨부** — 이미지(10MB)·PDF(20MB)·영상(MP4·WebM·MOV 50MB)·링크. 새 카드 쓰기에서도 "📎 사진·PDF·영상 넣기"(`.sb-file-label`)와 링크 넣기로 고르면 `.sb-pending-list`에 96×72 미리보기(이미지·영상, PDF·링크는 `.sb-file-chip`)와 빼기 ×(`.sb-pending-remove`)가 보이고, 카드를 올린 뒤 차례로 올린다. 카드 위 영상 썸네일은 `.sb-thumb-wrap.is-video`(가운데 ▶), 카드 상세에서는 `video.sb-attachment-video`로 재생

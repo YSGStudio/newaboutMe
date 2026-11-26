@@ -48,6 +48,21 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
   const b = view?.board;
   const path = useMemo(() => pathTo(tree, boardId), [tree, boardId]);
 
+  /** 교사 아이콘 설정(글쓰기·평가) — 서버도 담임 교사만 받는다(requireBoardTeacher). */
+  const toggle = async (patch: Record<string, unknown>) => {
+    if (!b) return;
+    setPending(true);
+    try {
+      await api(`/boards/${b.id}`, json('PATCH', patch));
+      setError('');
+      await refetchView();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '바꾸지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
     <div className="sb-board-screen">
 
@@ -72,6 +87,36 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             }
             actions={isTeacher && (
               <>
+                {b.kind === 'shared' && (
+                  <span className="sb-board-toggles" role="group" aria-label="학생 설정">
+                    {/* 학생 글쓰기 — 작업장 기본 권한을 수정 ↔ 읽기로. 숨긴 작업장(none)은 여기서 바꾸지 않는다(설정 › 권한). */}
+                    <button
+                      type="button"
+                      className={b.default_access === 'edit' ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                      aria-pressed={b.default_access === 'edit'}
+                      aria-label={b.default_access === 'edit' ? '학생 글쓰기 켜짐 — 눌러서 끄기' : '학생 글쓰기 꺼짐 — 눌러서 켜기'}
+                      title={b.default_access === 'none' ? '학생에게 숨긴 작업장이에요. 설정 › 권한에서 바꿔요.' : b.default_access === 'edit' ? '학생 글쓰기 켜짐' : '학생 글쓰기 꺼짐'}
+                      disabled={pending || b.default_access === 'none'}
+                      data-testid="toggle-writing"
+                      onClick={() => toggle({ default_access: b.default_access === 'edit' ? 'read' : 'edit' })}
+                    >
+                      <span aria-hidden="true">✏️</span>
+                    </button>
+                    {/* 학생끼리 평가하기(동료평가) */}
+                    <button
+                      type="button"
+                      className={b.peer_review ? 'sb-round-btn is-on' : 'sb-round-btn is-off'}
+                      aria-pressed={Boolean(b.peer_review)}
+                      aria-label={b.peer_review ? '학생끼리 평가 켜짐 — 눌러서 끄기' : '학생끼리 평가 꺼짐 — 눌러서 켜기'}
+                      title={b.peer_review ? '학생끼리 평가 켜짐' : '학생끼리 평가 꺼짐'}
+                      disabled={pending}
+                      data-testid="toggle-peer-review"
+                      onClick={() => toggle({ peer_review: !b.peer_review })}
+                    >
+                      <span aria-hidden="true">⭐</span>
+                    </button>
+                  </span>
+                )}
                 {b.hide_mode !== 'off' && b.kind === 'shared' && (
                   <button
                     type="button"

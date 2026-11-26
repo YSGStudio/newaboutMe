@@ -5638,6 +5638,11 @@ button.sb-round-btn {
   font-size: 17px;
 }
 button.sb-round-btn.is-active { background: var(--text); color: #fff; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25); }
+/* 작업장 머리의 교사 설정 아이콘(✏️ 글쓰기 · ⭐ 평가) — 켜짐은 보라 링, 꺼짐은 흐리게 + 빗금 */
+.sb-board-toggles { display: inline-flex; align-items: center; gap: 6px; padding-right: 6px; border-right: 1px solid var(--border); }
+button.sb-round-btn.is-on { background: var(--primary-soft); box-shadow: 0 0 0 2px var(--primary); }
+button.sb-round-btn.is-off { position: relative; opacity: .55; }
+button.sb-round-btn.is-off::after { position: absolute; top: 50%; left: 18%; width: 64%; height: 2px; border-radius: 2px; background: var(--danger); content: ''; transform: rotate(-45deg); pointer-events: none; }
 .sb-column-hide { margin: 0; padding: 4px 12px; border-bottom: 1px solid #fde68a; background: #fef9c3; color: #a16207; font-size: 12px; font-weight: 700; text-align: center; }
 .sb-column-body { display: flex; flex-direction: column; gap: 10px; min-height: 200px; padding: 12px; background: var(--bg); }
 .sb-card-list { display: flex; flex-direction: column; gap: 10px; min-height: 48px; margin: 0; padding: 0; list-style: none; }
@@ -6152,7 +6157,16 @@ button.sb-round-btn.sb-review-glow:hover:not(:disabled) { background: #ffe47b; b
 
 /* 작업장 설정의 탭과 학생 명단 */
 html:has(.sb-settings) { scrollbar-gutter: stable; }
-.sb-panel .sb-workspace-drawer { flex: 0 0 auto; width: min(100%, 720px); max-width: none; scrollbar-gutter: stable; }
+.sb-panel:has(.sb-workspace-drawer) {
+  container-type: inline-size;
+  grid-template-columns: minmax(0, 1fr);
+}
+.sb-panel .sb-workspace-drawer {
+  flex: 0 0 auto;
+  width: 100cqw;
+  max-width: none;
+  scrollbar-gutter: stable;
+}
 .sb-settings, .sb-settings-body { width: 100%; min-width: 0; }
 .sb-settings-body > * { min-width: 0; }
 .sb-settings-tabs {
