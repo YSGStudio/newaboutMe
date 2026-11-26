@@ -176,10 +176,6 @@ export default function BoardScreen({ project, boardId, tree, signals, onTreeCha
             setStatusOpen(false);
             refetchView();
           }}
-          onOpenBoard={(id) => {
-            setStatusOpen(false);
-            go({ name: 'board', projectId: project.id, boardId: id });
-          }}
         />
       )}
       {settings && view && (

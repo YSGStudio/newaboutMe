@@ -1,28 +1,29 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
+import Notice from '@/components/ui/Notice';
+import { useLoad } from '@/components/group-project/ui';
+import { useSb } from './context';
 import StudentIdentity from './StudentIdentity';
 
 type Student = { id: string; name: string; student_number: number };
-export type PeerReviewPair = { reviewer_student_id: string; target_student_id: string };
+type PeerReviewPair = { reviewer_student_id: string; target_student_id: string };
+type ActivityData = { board: { title: string }; summary: { students: Student[] }; reviews: PeerReviewPair[] };
 
 const MODES = [
   ['heatmap', '히트맵'],
   ['table', '기본 표'],
   ['chart', '학생별 합계'],
-  ['cards', '카드·평가 관리'],
 ] as const;
 
-export default function StudentActivity({ title, students, reviews, onClose, children }: {
-  title: string;
-  students: Student[];
-  reviews: PeerReviewPair[];
-  onClose: () => void;
-  children: ReactNode;
-}) {
+export default function StudentActivity({ boardId, onClose }: { boardId: string; onClose: () => void }) {
+  const { api } = useSb();
   const [mode, setMode] = useState<(typeof MODES)[number][0]>('heatmap');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('number');
+  const { data, error } = useLoad(() => api<ActivityData>(`/boards/${boardId}/students`), [api, boardId]);
+  if (!data) return error ? <Notice type="error" message={error} /> : <p className="hint">불러오는 중...</p>;
+  const { board: { title }, summary: { students }, reviews } = data;
   const roster = [...students].sort((a, b) => a.student_number - b.student_number || a.name.localeCompare(b.name, 'ko'));
   const targetsByReviewer = new Map(roster.map((student) => [student.id, new Set<string>()]));
   for (const review of reviews) {
@@ -66,8 +67,8 @@ export default function StudentActivity({ title, students, reviews, onClose, chi
       <section className="sb-activity-panel" aria-labelledby="sb-activity-heading">
         <div className="sb-activity-toolbar">
           <div>
-            <h3 id="sb-activity-heading">{mode === 'cards' ? '카드·평가 관리' : '학생 간 상호작용'}</h3>
-            {mode !== 'cards' && <p>학생이 제출한 동료평가를 집계합니다. 표의 행은 평가한 학생, 열은 평가받은 학생입니다.</p>}
+            <h3 id="sb-activity-heading">학생 간 상호작용</h3>
+            <p>학생이 제출한 동료평가를 집계합니다. 표의 행은 평가한 학생, 열은 평가받은 학생입니다.</p>
           </div>
           {mode === 'heatmap' && (
             <div className="sb-activity-legend">
@@ -82,18 +83,16 @@ export default function StudentActivity({ title, students, reviews, onClose, chi
               <button key={key} type="button" aria-pressed={mode === key} onClick={() => setMode(key)}>{label}</button>
             ))}
           </div>
-          {mode !== 'cards' && (
-            <div className="sb-activity-filters">
-              <input type="search" aria-label="학생 이름 또는 번호 검색" placeholder="학생 이름 또는 번호 검색" value={search} onChange={(event) => setSearch(event.target.value)} />
-              <select aria-label="학생 정렬" value={sort} onChange={(event) => setSort(event.target.value)}>
-                <option value="number">번호순</option>
-                <option value="desc">활동 많은 순</option>
-                <option value="asc">활동 적은 순</option>
-              </select>
-            </div>
-          )}
+          <div className="sb-activity-filters">
+            <input type="search" aria-label="학생 이름 또는 번호 검색" placeholder="학생 이름 또는 번호 검색" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <select aria-label="학생 정렬" value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="number">번호순</option>
+              <option value="desc">활동 많은 순</option>
+              <option value="asc">활동 적은 순</option>
+            </select>
+          </div>
         </div>
-        {mode === 'cards' ? children : shown.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="hint" role="status">{roster.length ? '검색 결과가 없어요.' : '표시할 학생이 없어요.'}</p>
         ) : mode === 'chart' ? (
           <ul className="sb-activity-chart">
