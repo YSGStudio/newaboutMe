@@ -6157,13 +6157,15 @@ button.sb-round-btn.sb-review-glow:hover:not(:disabled) { background: #ffe47b; b
 
 /* 작업장 설정의 탭과 학생 명단 */
 html:has(.sb-settings) { scrollbar-gutter: stable; }
-.sb-panel:has(.sb-workspace-drawer) {
-  container-type: inline-size;
-  grid-template-columns: minmax(0, 1fr);
-}
+.sb-panel:has(> .sb-feature-bar) { grid-template-columns: minmax(0, 1fr); }
+.sb-panel .sb-room.is-wide,
+.sb-panel .sb-workspace,
+.sb-panel .sb-workspace-grid { width: 100%; min-width: 0; }
+.sb-overlay.is-drawer.sb-workspace-overlay { justify-content: flex-start; }
 .sb-panel .sb-workspace-drawer {
   flex: 0 0 auto;
-  width: 100cqw;
+  width: var(--sb-settings-width, 100%);
+  margin-left: var(--sb-settings-left, 0px);
   max-width: none;
   scrollbar-gutter: stable;
 }
@@ -6224,3 +6226,11 @@ html:has(.sb-settings) { scrollbar-gutter: stable; }
 .sb-summary-table tr > :first-child { position: sticky; left: 0; z-index: 1; min-width: 125px; background: #ede9fe; box-shadow: 1px 0 #d6cef0; text-align: left; }
 .sb-summary-table thead tr > :first-child { background: #ded5ff; }
 .sb-summary-table tbody tr:nth-child(even) > :first-child { background: #f5f3ff; }
+
+.sb-board-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.sb-board-title-tools { display: flex; flex: 0 0 auto; gap: 6px; }

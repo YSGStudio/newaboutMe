@@ -6,7 +6,7 @@
  * 작업장 화면의 오른쪽 서랍과 작업장 설정 화면이 같은 패널을 씁니다.
  * 학급 학생·학생별 권한·내 기준 목록은 패널이 직접 불러옵니다.
  */
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { Access, BoardView, PermissionRow, StudentLite, TreeNode } from '@/lib/starboard/types';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { HIDE_MODE_LABEL, type HideMode } from '@/lib/starboard/hiding';
@@ -133,13 +133,36 @@ export function BoardSettingsPanel({ view, projectId, tree, onChanged, onDeleted
 /** 작업장 화면의 설정 창(오른쪽 서랍) */
 export function BoardSettingsDrawer({ onClose, ...props }: PanelProps & { onClose: () => void }) {
   const { go } = useSb();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    const header = overlay?.closest('.sb-panel')?.querySelector('.sb-feature-bar');
+    if (!overlay || !header) return;
+
+    const alignWithHeader = () => {
+      const bounds = header.getBoundingClientRect();
+      overlay.style.setProperty('--sb-settings-left', `${bounds.left - overlay.getBoundingClientRect().left}px`);
+      overlay.style.setProperty('--sb-settings-width', `${bounds.width}px`);
+    };
+    alignWithHeader();
+    const observer = new ResizeObserver(alignWithHeader);
+    observer.observe(header);
+    window.addEventListener('resize', alignWithHeader);
+    window.addEventListener('scroll', alignWithHeader);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', alignWithHeader);
+      window.removeEventListener('scroll', alignWithHeader);
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="sb-overlay is-drawer" onClick={onClose}>
+    <div ref={overlayRef} className="sb-overlay is-drawer sb-workspace-overlay" onClick={onClose}>
       <aside className="sb-drawer sb-workspace-drawer" onClick={(e) => e.stopPropagation()} aria-label="보드 설정" role="dialog">
         <div className="sb-modal-head">
           <h2 className="sb-modal-title">작업장 설정</h2>
