@@ -16,13 +16,13 @@ import Notice from '@/components/ui/Notice';
 import usePoll from '@/lib/use-poll';
 import type { Project, TreeNode } from '@/lib/starboard/types';
 import { firstAccessible } from '@/lib/starboard/tree';
-import { useSb, type Screen } from './context';
+import { json, useSb, type Screen } from './context';
 import ProjectSidebar from './ProjectSidebar';
 import BoardScreen from './BoardScreen';
 import WorkspaceSettings from './WorkspaceSettings';
 
 type RoomScreen = Exclude<Screen, { name: 'projects' } | { name: 'criteria' }>;
-type Tree = { project: Project; isTeacher: boolean; nodes: TreeNode[]; counts: Record<string, number> };
+type Tree = { project: Project; isTeacher: boolean; nodes: TreeNode[] };
 type Ev = { board_id: string; content_at: string; structure_at: string };
 
 export type RoomSignals = {
@@ -36,12 +36,14 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
   const { api, go } = useSb();
   const projectId = screen.projectId;
   const [tree, setTree] = useState<Tree | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
   const [signals, setSignals] = useState<RoomSignals>({ structure: 0, content: {} });
+  const pendingCounts = useRef(new Set<string>());
   const last = useRef<Map<string, Ev> | null>(null);
 
   const loadTree = useCallback(async () => {
-    const t = await api<Tree>(`/projects/${projectId}/tree`);
+    const t = await api<Tree>(`/projects/${projectId}/tree?counts=skip`);
     setTree(t);
     setError('');
     return t;
@@ -55,29 +57,46 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
     const { events } = await api<{ events: Ev[] }>(`/projects/${projectId}/versions`);
     const next = new Map(events.map((e) => [e.board_id, e]));
     const prev = last.current;
-    last.current = next;
-    if (!prev) return;
-    let structure = prev.size !== next.size;
-    const changed: string[] = [];
-    for (const [id, e] of next) {
-      const p = prev.get(id);
-      if (!p) {
-        structure = true;
-        continue;
-      }
-      if (p.structure_at !== e.structure_at) structure = true;
-      if (p.content_at !== e.content_at) changed.push(id);
-    }
-    if (!structure && !changed.length) return;
-    setSignals((s) => {
-      const content = { ...s.content };
-      for (const id of changed) content[id] = (content[id] ?? 0) + 1;
-      return { structure: s.structure + (structure ? 1 : 0), content };
-    });
-    await loadTree();
-  }, [api, projectId, loadTree]);
 
-  usePoll(poll, { enabled: Boolean(tree), intervalMs: 3000 });
+    let structure = !!prev && prev.size !== next.size;
+    const changed: string[] = [];
+    if (prev) {
+      for (const [id, event] of next) {
+        const before = prev.get(id);
+        if (!before || before.structure_at !== event.structure_at) structure = true;
+        if (before && before.content_at !== event.content_at) changed.push(id);
+      }
+    }
+    if (!structure && prev && !changed.length && !pendingCounts.current.size) return;
+    const currentTree = structure ? await loadTree() : tree;
+    if (!currentTree) return;
+    last.current = next;
+    if (structure || changed.length) {
+      setSignals(s => {
+        const content = { ...s.content };
+        for (const id of changed) content[id] = (content[id] ?? 0) + 1;
+        return { structure: s.structure + Number(structure), content };
+      });
+    }
+
+    if (structure) {
+      pendingCounts.current.clear();
+      setCounts({});
+    }
+    const changedIds = new Set(changed);
+    for (const node of currentTree.nodes) {
+      if (node.accessible && (!prev || structure || changedIds.has(node.id))) pendingCounts.current.add(node.id);
+    }
+    const boardIds = Array.from(pendingCounts.current);
+    if (!boardIds.length) return;
+    const result = await api<{ counts: Record<string, number> }>(
+      `/projects/${projectId}/counts`, json('POST', { boardIds }),
+    );
+    setCounts(old => ({ ...old, ...result.counts }));
+    pendingCounts.current.clear();
+  }, [api, projectId, loadTree, tree]);
+
+  usePoll(poll, { enabled: Boolean(tree), intervalMs: 3000, immediate: true });
 
   // 프로젝트 첫 화면(home)은 첫 작업장의 카드 화면으로 바로 넘긴다. 볼 수 있는 작업장이 없을 때만 빈 안내를 그린다.
   const firstId = tree && screen.name === 'home' ? (firstAccessible(tree.nodes)?.id ?? null) : null;
@@ -110,7 +129,7 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
           projectId={projectId}
           title={tree.project.title}
           nodes={tree.nodes}
-          counts={tree.counts}
+          counts={counts}
           currentId={screen.name === 'board' ? screen.boardId : undefined}
           onHome={screen.name === 'home'}
           onChanged={refresh}
@@ -136,7 +155,7 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
           />
         )}
         {screen.name === 'settings' && (
-          <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={tree.counts} initialSelected={screen.boardId ?? null} initialTab={screen.tab} onTreeChanged={refresh} />
+          <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={counts} initialSelected={screen.boardId ?? null} initialTab={screen.tab} onTreeChanged={refresh} />
         )}
       </div>
     </div>

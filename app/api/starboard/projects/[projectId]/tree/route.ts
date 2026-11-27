@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: Params) {
   const args = { p_project: ctx.project.id, ...who(auth.actor) };
   const [tree, counts] = await Promise.all([
     supabaseAdmin.rpc('sb_get_board_tree', args),
-    supabaseAdmin.rpc('sb_visible_card_counts', args),
+    new URL(req.url).searchParams.get('counts') === 'skip' ? { data: [], error: null } : supabaseAdmin.rpc('sb_visible_card_counts', args),
   ]);
   if (tree.error || counts.error) return dbFail((tree.error ?? counts.error)!);
   const countMap: Record<string, number> = {};

@@ -75,7 +75,7 @@ export default function BoardTree({ projectId, nodes, currentId, counts = {}, on
           {isTeacher && <AddChild projectId={projectId} parentId={n.id} onAdded={() => { setOpen((s) => new Set(s).add(n.id)); onChanged(); }} />}
           {n.accessible && (
             <span className="sb-tree-count" data-testid="tree-count">
-              {counts[n.id] ?? 0}
+              {counts[n.id]}
             </span>
           )}
         </div>

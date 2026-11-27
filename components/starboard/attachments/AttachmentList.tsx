@@ -12,8 +12,7 @@ import PdfViewer from './PdfViewer';
 import { useSignedUrls } from './useSignedUrls';
 
 /** 카드 위 썸네일(작게) */
-export function AttachmentThumbs({ boardId, items }: { boardId: string; items: AttachmentView[] }) {
-  const urls = useSignedUrls(boardId, items.map((a) => a.thumb_path).filter(Boolean) as string[]);
+export function AttachmentThumbs({ thumbnailUrls: urls, items }: { thumbnailUrls: Record<string, string>; items: AttachmentView[] }) {
   if (!items.length) return null;
   return (
     <div className="sb-thumbs">

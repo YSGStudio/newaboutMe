@@ -4,7 +4,6 @@ import { requireActor } from '@/lib/group-project/actor';
 import { loadBoard, who } from '@/lib/starboard/access';
 import { signPaths } from '@/lib/starboard/storage';
 import { dbFail, readJson } from '@/lib/starboard/http';
-import type { BoardView } from '@/lib/starboard/types';
 
 type Params = { params: { boardId: string } };
 
@@ -17,13 +16,18 @@ export async function POST(req: Request, { params }: Params) {
   if ('error' in auth) return auth.error;
   const ctx = await loadBoard(auth.actor, params.boardId);
   if ('error' in ctx) return ctx.error;
-  const { data, error } = await supabaseAdmin.rpc('sb_get_board_view', { p_board: ctx.board.id, ...who(auth.actor) });
-  if (error) return dbFail(error);
-  const view = data as BoardView | null;
-  const allowed = new Set(
-    (view?.cards ?? []).flatMap((c) => c.attachments.flatMap((a) => [a.storage_path, a.thumb_path])).filter(Boolean) as string[],
-  );
   const body = await readJson(req);
-  const wanted = (Array.isArray(body.paths) ? body.paths : []).filter((p): p is string => typeof p === 'string' && allowed.has(p));
-  return NextResponse.json({ urls: await signPaths(wanted) });
+  const paths = Array.isArray(body.paths) ? [...new Set(body.paths.filter((p): p is string => typeof p === 'string'))] : [];
+  const urls: Record<string, string> = {};
+  // 한 번에 반환할 행 수가 PostgREST의 제한을 넘지 않게 한다.
+  const batchSize = 500;
+  for (let i = 0; i < paths.length; i += batchSize) {
+    const { data, error } = await supabaseAdmin.rpc('sb_readable_attachment_paths', {
+      p_board: ctx.board.id, ...who(auth.actor), p_paths: paths.slice(i, i + batchSize),
+    });
+    if (error) return dbFail(error);
+    const allowed = (data ?? []).map((row: { path: string }) => row.path);
+    Object.assign(urls, await signPaths(allowed));
+  }
+  return NextResponse.json({ urls });
 }

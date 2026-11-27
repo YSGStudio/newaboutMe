@@ -28,6 +28,7 @@ import { formatKST } from '@/lib/starboard/datetime';
 import { avatarPair, initials } from '@/lib/starboard/visual';
 import type { CardField, CardFieldValues } from '@/lib/starboard/card-fields';
 import { json, useSb } from './context';
+import { useSignedUrls } from './attachments/useSignedUrls';
 import { AttachmentThumbs } from './attachments/AttachmentList';
 import { addCardLink, uploadCardFile } from './attachments/upload-client';
 import { ACCEPT_FILES, checkFile, parseLinks } from '@/lib/starboard/upload';
@@ -61,6 +62,10 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
   const [showRubric, setShowRubric] = useState(false);
   // 공지사항 섹션은 누구에게나 맨 앞. 학생에게는 그다음 자기 멤버 섹션을, 각 섹션 안에서는 자기 카드를 맨 앞에 보여 준다.
   // 자기 카드끼리·남의 카드끼리의 순서는 저장된 순서를 지킨다.
+  const thumbnailPaths = useMemo(() => view.cards.flatMap(card =>
+    card.attachments.flatMap(attachment => attachment.thumb_path ? [attachment.thumb_path] : []),
+  ), [view.cards]);
+  const thumbnailUrls = useSignedUrls(view.board.id, thumbnailPaths);
   const viewerId = view.board.viewer_id;
   const columns = useMemo(() => {
     const sorted = orderColumns(view.columns);
@@ -189,7 +194,7 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
               cards={byColumn.get(col.id) ?? []}
               workspace={appearance === 'workspace'}
               onWrite={canWrite ? () => setComposeId(col.id) : undefined}
-              boardId={view.board.id}
+              thumbnailUrls={thumbnailUrls}
               template={template}
               readOnly={!!readOnly}
               reviewAction={reviewAction(col)}
@@ -244,7 +249,7 @@ type ColumnProps = {
   cards: CardView[];
   workspace: boolean;
   onWrite?: () => void;
-  boardId: string;
+  thumbnailUrls: Record<string, string>;
   template: CardField[];
   readOnly: boolean;
   reviewAction: 'summary' | 'peer' | null;
@@ -255,7 +260,7 @@ type ColumnProps = {
   onOpen: (id: string) => void;
 };
 
-function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, reviewAction, isMine, onReview, hasCriteria, onCardReview, onOpen }: ColumnProps) {
+function Column({ col, cards, workspace, onWrite, thumbnailUrls, template, readOnly, reviewAction, isMine, onReview, hasCriteria, onCardReview, onOpen }: ColumnProps) {
   const { isTeacher } = useSb();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` });
   return (
@@ -311,7 +316,7 @@ function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, r
                 key={card.id}
                 card={card}
                 template={template}
-                boardId={boardId}
+                thumbnailUrls={thumbnailUrls}
                 readOnly={readOnly}
                 onOpen={() => onOpen(card.id)}
                 onReview={hasCriteria && card.author_role !== 'teacher' ? () => onCardReview(card) : undefined}
@@ -329,7 +334,7 @@ function Column({ col, cards, workspace, onWrite, boardId, template, readOnly, r
   );
 }
 
-function CardItem({ card, template, boardId, readOnly, onOpen, onReview }: { card: CardView; template: CardField[]; boardId: string; readOnly: boolean; onOpen: () => void; onReview?: () => void }) {
+function CardItem({ card, template, thumbnailUrls, readOnly, onOpen, onReview }: { card: CardView; template: CardField[]; thumbnailUrls: Record<string, string>; readOnly: boolean; onOpen: () => void; onReview?: () => void }) {
   const movable = card.can_edit && !readOnly;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id, disabled: !movable });
   const done = card.checklist.filter((c) => c.done).length;
@@ -363,7 +368,7 @@ function CardItem({ card, template, boardId, readOnly, onOpen, onReview }: { car
             )}
           </span>
         </button>
-        <AttachmentThumbs boardId={boardId} items={card.attachments} />
+        <AttachmentThumbs thumbnailUrls={thumbnailUrls} items={card.attachments} />
         {!onReview && <AuthorLine card={card} />}
       </div>
       {onReview && (

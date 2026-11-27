@@ -209,7 +209,7 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
                     key={row.node.id}
                     node={row.node}
                     depth={row.depth}
-                    count={counts[row.node.id] ?? 0}
+                    count={counts[row.node.id]}
                     selected={row.node.id === selected}
                     drop={drop?.overId === row.node.id ? drop.where : null}
                     onSelect={() => select(row.node.id)}

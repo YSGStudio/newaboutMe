@@ -26,11 +26,12 @@ type Options = {
   busy?: boolean;
   /** 주기(ms). 기본 15초 — 교사 화면 폴링은 모두 이 간격으로 맞춘다. */
   intervalMs?: number;
+  immediate?: boolean;
 };
 
 export default function usePoll(
   refresh: () => Promise<unknown> | unknown,
-  { enabled, busy = false, intervalMs = DEFAULT_POLL_INTERVAL_MS }: Options,
+  { enabled, busy = false, intervalMs = DEFAULT_POLL_INTERVAL_MS, immediate = false }: Options,
 ) {
   // 인터벌 콜백은 만들어질 때의 값을 붙잡고 있으므로, 매 렌더의 최신 값을 ref로 건네준다.
   const refreshRef = useRef(refresh);
@@ -58,11 +59,12 @@ export default function usePoll(
 
     const onVisibilityChange = () => { if (!document.hidden) tick(); };
 
+    if (immediate) void tick();
     const timer = window.setInterval(tick, intervalMs);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, immediate]);
 }
