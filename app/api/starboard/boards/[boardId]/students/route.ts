@@ -14,11 +14,11 @@ export async function GET(req: Request, { params }: Params) {
   if ('error' in ctx) return ctx.error;
   const { data, error } = await supabaseAdmin.rpc('sb_get_board_student_summary', { p_board: ctx.board.id, p_teacher: auth.actor.id });
   if (error) return dbFail(error);
-  const reviews: { reviewer_student_id: string; target_student_id: string }[] = [];
+  const reviews: { reviewer_student_id: string; target_student_id: string; stars: Record<string, number> }[] = [];
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
     const page = await supabaseAdmin.from('sb_peer_reviews')
-      .select('reviewer_student_id, target_student_id')
+      .select('reviewer_student_id, target_student_id, stars')
       .eq('board_id', ctx.board.id)
       .order('id')
       .range(offset, offset + pageSize - 1);
