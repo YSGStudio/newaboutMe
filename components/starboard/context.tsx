@@ -7,6 +7,7 @@
  */
 import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react';
 import { useConfirm } from '@/components/ui/useConfirm';
+import type { Tab } from './BoardSettings';
 import { api as teacherApi, studentApi } from '@/lib/api-client';
 
 /** 원본 URL 경로에 대응하는 화면 */
@@ -15,7 +16,7 @@ export type Screen =
   | { name: 'criteria' }
   | { name: 'home'; projectId: string }
   | { name: 'board'; projectId: string; boardId: string }
-  | { name: 'settings'; projectId: string; boardId?: string | null };
+  | { name: 'settings'; projectId: string; boardId?: string | null; tab?: Tab };
 
 type Sb = {
   kind: 'teacher' | 'student';

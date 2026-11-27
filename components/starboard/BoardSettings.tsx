@@ -1,12 +1,11 @@
 'use client';
 
 /**
- * BoardSettingsPanel / BoardSettingsDrawer — 작업장 설정(원본 board/BoardSettings.tsx)
+ * BoardSettingsPanel — 작업장 설정(원본 board/BoardSettings.tsx)
  * 탭: 일반 · 열 · 카드 형식 · 가리기 · 권한 · 개인 보드 · 평가 기준 (학생 개인 보드는 일반 · 열 · 권한만).
- * 작업장 화면의 오른쪽 서랍과 작업장 설정 화면이 같은 패널을 씁니다.
  * 학급 학생·학생별 권한·내 기준 목록은 패널이 직접 불러옵니다.
  */
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import type { Access, BoardView, PermissionRow, StudentLite, TreeNode } from '@/lib/starboard/types';
 import type { Criterion } from '@/lib/starboard/criteria';
 import { HIDE_MODE_LABEL, type HideMode } from '@/lib/starboard/hiding';
@@ -126,55 +125,6 @@ export function BoardSettingsPanel({ view, projectId, tree, onChanged, onDeleted
         {current === '개인 보드' && <PersonalTab view={view} students={data.students} pending={pending} run={run} />}
         {current === '평가 기준' && <CriteriaTab view={view} myCriteria={data.myCriteria} pending={pending} run={run} onChanged={onChanged} />}
       </div>
-    </div>
-  );
-}
-
-/** 작업장 화면의 설정 창(오른쪽 서랍) */
-export function BoardSettingsDrawer({ onClose, ...props }: PanelProps & { onClose: () => void }) {
-  const { go } = useSb();
-  const overlayRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const overlay = overlayRef.current;
-    const header = overlay?.closest('.sb-panel')?.querySelector('.sb-feature-bar');
-    if (!overlay || !header) return;
-
-    const alignWithHeader = () => {
-      const bounds = header.getBoundingClientRect();
-      overlay.style.setProperty('--sb-settings-left', `${bounds.left - overlay.getBoundingClientRect().left}px`);
-      overlay.style.setProperty('--sb-settings-width', `${bounds.width}px`);
-    };
-    alignWithHeader();
-    const observer = new ResizeObserver(alignWithHeader);
-    observer.observe(header);
-    window.addEventListener('resize', alignWithHeader);
-    window.addEventListener('scroll', alignWithHeader);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', alignWithHeader);
-      window.removeEventListener('scroll', alignWithHeader);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div ref={overlayRef} className="sb-overlay is-drawer sb-workspace-overlay" onClick={onClose}>
-      <aside className="sb-drawer sb-workspace-drawer" onClick={(e) => e.stopPropagation()} aria-label="보드 설정" role="dialog">
-        <div className="sb-modal-head">
-          <h2 className="sb-modal-title">작업장 설정</h2>
-          <button type="button" className="sb-btn ghost is-small" onClick={() => go({ name: 'settings', projectId: props.projectId, boardId: props.view.board.id })}>
-            ⚙ 작업장 설정 페이지
-          </button>
-          <button type="button" className="sb-icon-btn sb-close" onClick={onClose} aria-label="설정 닫기" title="닫기">
-            ×
-          </button>
-        </div>
-        <BoardSettingsPanel {...props} />
-      </aside>
     </div>
   );
 }

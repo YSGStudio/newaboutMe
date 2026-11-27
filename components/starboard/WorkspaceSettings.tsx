@@ -32,9 +32,9 @@ const DROP_MSG: Record<string, string> = {
   personal: '학생 개인 보드는 다른 작업장으로 옮길 수 없어요. 순서만 바꿀 수 있어요.',
 };
 
-type Props = { project: Project; nodes: TreeNode[]; counts: Record<string, number>; initialSelected: string | null; onTreeChanged: () => void };
+type Props = { project: Project; nodes: TreeNode[]; counts: Record<string, number>; initialSelected: string | null; initialTab?: Tab; onTreeChanged: () => void };
 
-export default function WorkspaceSettings({ project, nodes: treeNodes, counts, initialSelected, onTreeChanged }: Props) {
+export default function WorkspaceSettings({ project, nodes: treeNodes, counts, initialSelected, initialTab = '일반', onTreeChanged }: Props) {
   const { api, go } = useSb();
   const [nodes, setNodes] = useState(treeNodes);
   const [seen, setSeen] = useState(treeNodes);
@@ -45,7 +45,7 @@ export default function WorkspaceSettings({ project, nodes: treeNodes, counts, i
   const [selected, setSelected] = useState<string | null>(
     initialSelected && treeNodes.some((n) => n.id === initialSelected) ? initialSelected : (roots(treeNodes)[0]?.id ?? null),
   );
-  const [panelTab, setPanelTab] = useState<{ tab: Tab; nonce: number }>({ tab: '일반', nonce: 0 });
+  const [panelTab, setPanelTab] = useState<{ tab: Tab; nonce: number }>({ tab: initialTab, nonce: 0 });
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
 

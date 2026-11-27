@@ -133,11 +133,10 @@ export default function ProjectRoom({ screen }: { screen: RoomScreen }) {
             boardId={screen.boardId}
             tree={tree.nodes}
             signals={signals}
-            onTreeChanged={refresh}
           />
         )}
         {screen.name === 'settings' && (
-          <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={tree.counts} initialSelected={screen.boardId ?? null} onTreeChanged={refresh} />
+          <WorkspaceSettings project={tree.project} nodes={tree.nodes} counts={tree.counts} initialSelected={screen.boardId ?? null} initialTab={screen.tab} onTreeChanged={refresh} />
         )}
       </div>
     </div>

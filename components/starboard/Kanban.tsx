@@ -129,7 +129,6 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
   const canWrite = view.board.can_write && !readOnly;
   const template = view.board.card_fields ?? [];
   const myColumn = !isTeacher && viewerId ? columns.find((col) => col.member_id === viewerId) : undefined;
-  const writeChoices = myColumn ? [myColumn] : columns;
   const composeColumn = canWrite ? columns.find((col) => col.id === composeId) : undefined;
   const [review, setReview] = useState<{ mode: 'peer' | 'summary'; id: string; name: string } | null>(null);
   const hasCriteria = appearance === 'workspace' && !readOnly && view.criteria.length > 0;
@@ -162,26 +161,6 @@ export default function Kanban({ view, onChanged, readOnly, heading, actions, st
             {actions}
             {myReviewId && (
               <button type="button" className="sb-btn-dark" onClick={() => setReview({ mode: 'summary', id: myReviewId, name: '나' })}>내 평가</button>
-            )}
-            {canWrite && writeChoices.length === 1 && (
-              <button type="button" className="sb-btn-gold" onClick={() => setComposeId(writeChoices[0].id)}>
-                ＋ {myColumn ? '내 카드 쓰기' : '카드 쓰기'}
-              </button>
-            )}
-            {canWrite && writeChoices.length > 1 && (
-              <details className="sb-write-menu">
-                <summary className="sb-btn-gold">＋ 카드 쓰기</summary>
-                <div>
-                  {writeChoices.map((col) => (
-                    <button key={col.id} type="button" className="sb-plain-btn" onClick={(e) => {
-                      e.currentTarget.closest('details')?.removeAttribute('open');
-                      setComposeId(col.id);
-                    }}>
-                      {col.name}
-                    </button>
-                  ))}
-                </div>
-              </details>
             )}
           </div>
         </header>

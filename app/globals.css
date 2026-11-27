@@ -6035,41 +6035,6 @@ button.sb-fullscreen-close { position: fixed; top: 16px; right: 16px; z-index: 1
   font-size: 13px;
 }
 .sb-visibility-note button.sb-link { color: inherit; text-decoration: underline; }
-.sb-write-menu { position: relative; }
-.sb-write-menu summary {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  background: #ffe47b;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  list-style: none;
-}
-.sb-write-menu summary::-webkit-details-marker { display: none; }
-.sb-write-menu > div {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 6px);
-  right: 0;
-  display: grid;
-  width: min(240px, 64vw);
-  max-height: 280px;
-  overflow-y: auto;
-  padding: 6px;
-  border: 1px solid var(--sb-sheet-border);
-  border-radius: var(--radius-sm);
-  background: var(--sb-sheet);
-  color: var(--text);
-  box-shadow: var(--shadow-lg);
-}
-.sb-write-menu button.sb-plain-btn { padding: 8px; text-align: left; overflow-wrap: anywhere; }
-.sb-write-menu button.sb-plain-btn:hover { background: #ded5ff; }
-.sb-write-menu :focus-visible { outline: 2px solid #966706; outline-offset: 2px; }
-
 .sb-kanban-workspace .sb-column {
   border-color: color-mix(in srgb, var(--sb-column-color) 72%, #65519d);
   background: color-mix(in srgb, var(--sb-column-color) 78%, #b9aadf);
@@ -6084,7 +6049,6 @@ button.sb-fullscreen-close { position: fixed; top: 16px; right: 16px; z-index: 1
 
 .sb-panel .sb-workspace-list,
 .sb-panel .sb-workspace-detail,
-.sb-panel .sb-workspace-drawer,
 .sb-panel .sb-summary .sb-table-scroll,
 .sb-panel .sb-evaluate-target,
 .sb-panel .sb-evaluate-form,
@@ -6094,9 +6058,7 @@ button.sb-fullscreen-close { position: fixed; top: 16px; right: 16px; z-index: 1
   background: var(--sb-sheet);
 }
 .sb-panel .sb-workspace-list-head,
-.sb-panel .sb-detail-head,
-.sb-panel .sb-workspace-drawer > .sb-modal-head { border-color: var(--sb-sheet-border); }
-.sb-panel .sb-workspace-drawer > .sb-modal-head { padding-bottom: 12px; border-bottom: 1px solid var(--sb-sheet-border); }
+.sb-panel .sb-detail-head { border-color: var(--sb-sheet-border); }
 .sb-panel .sb-workspace-list .sb-ws-row.is-selected { background: #ded5ff; }
 .sb-panel .sb-empty-project { padding: 30px 20px; }
 .sb-summary .sb-summary-filters button[aria-pressed="true"] { background: #25127e; color: white; }
@@ -6140,8 +6102,6 @@ button.sb-fullscreen-close { position: fixed; top: 16px; right: 16px; z-index: 1
   .sb-space-header { padding: 15px; }
   .sb-board-head .sb-board-actions { gap: 6px; }
   .sb-board-head .sb-board-actions button,
-  .sb-write-menu summary { padding-inline: 10px; }
-  .sb-write-menu > div { right: auto; left: 0; }
   .sb-compose-dialog[open] { max-width: 100%; max-height: 100dvh; }
 }
 
@@ -6178,22 +6138,12 @@ button.sb-round-btn.sb-review-glow:hover:not(:disabled) { background: #ffe47b; b
 /* 작업장 설정의 탭과 학생 명단 */
 html:has(.sb-settings) { scrollbar-gutter: stable; }
 /* 프로젝트 방(작업장 화면·작업장 설정)은 대시보드 최대 폭(1180px) 없이 화면 너비를 다 쓴다.
-   격자 칸은 화면 폭을 넘지 않게 묶어, 섹션이 많으면 페이지가 아니라 칸반(.sb-kanban) 안에서만 옆으로 넘긴다.
-   작업장 설정 서랍의 폭 고정(--sb-settings-width)은 아래 .sb-workspace-drawer 규칙이 따로 맡는다. */
+   섹션이 많으면 칸반(.sb-kanban) 안에서 옆으로 넘긴다. */
 .dashboard-layout > .sb-panel:has(.sb-room) { width: 100%; }
-.sb-panel:has(.sb-room),
-.sb-panel:has(.sb-workspace-drawer) { grid-template-columns: minmax(0, 1fr); }
+.sb-panel:has(.sb-room) { grid-template-columns: minmax(0, 1fr); }
 .sb-panel .sb-room.is-wide,
 .sb-panel .sb-workspace,
 .sb-panel .sb-workspace-grid { width: 100%; min-width: 0; }
-.sb-overlay.is-drawer.sb-workspace-overlay { justify-content: flex-start; }
-.sb-panel .sb-workspace-drawer {
-  flex: 0 0 auto;
-  width: var(--sb-settings-width, 100%);
-  margin-left: var(--sb-settings-left, 0px);
-  max-width: none;
-  scrollbar-gutter: stable;
-}
 .sb-settings, .sb-settings-body { width: 100%; min-width: 0; }
 .sb-settings-body > * { min-width: 0; }
 .sb-settings-tabs {
